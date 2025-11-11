@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ClientSelector from "../components/optimizer/ClientSelector";
 import RouteMap from "../components/optimizer/RouteMap";
 import OptimizedList from "../components/optimizer/OptimizedList";
+import NearbyClients from "../components/optimizer/NearbyClients";
 
 const PONTO_PARTIDA = {
   nome: "Matriz - Ponto de Partida",
@@ -20,6 +21,7 @@ export default function Optimizer() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimizedRoute, setOptimizedRoute] = useState(null);
   const [stats, setStats] = useState(null);
+  const [nearbyClients, setNearbyClients] = useState(null);
 
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes'],
@@ -32,11 +34,21 @@ export default function Optimizer() {
 
     setIsOptimizing(true);
     try {
-      const clientesData = selectedClients.map(id => {
+      const selectedClientesData = selectedClients.map(id => {
         const cliente = clientes.find(c => c.id === id);
-        return `${cliente.nome} - ${cliente.endereco}`;
-      }).join('\n');
+        return { nome: cliente.nome, endereco: cliente.endereco };
+      });
 
+      const allClientesData = clientes.map(c => ({
+        nome: c.nome,
+        endereco: c.endereco,
+        telefone: c.telefone,
+        observacoes: c.observacoes
+      }));
+
+      const clientesDataStr = selectedClientesData.map(c => `${c.nome} - ${c.endereco}`).join('\n');
+
+      // Optimize route
       const result = await base44.integrations.Core.InvokeLLM({
         prompt: `Você é um especialista em otimização de rotas de entrega no Rio de Janeiro. 
 
@@ -45,7 +57,7 @@ ${PONTO_PARTIDA.nome}
 ${PONTO_PARTIDA.endereco}
 
 CLIENTES PARA ENTREGAR:
-${clientesData}
+${clientesDataStr}
 
 Sua tarefa:
 1. A rota DEVE começar obrigatoriamente do ponto de partida (Matriz)
@@ -95,6 +107,50 @@ IMPORTANTE:
         time: result.total_time_minutes,
         notes: result.optimization_notes
       });
+
+      // Find nearby clients for promotions
+      const nearbyResult = await base44.integrations.Core.InvokeLLM({
+        prompt: `Você é um especialista em análise geográfica no Rio de Janeiro.
+
+CLIENTES QUE RECEBERÃO ENTREGAS HOJE:
+${JSON.stringify(selectedClientesData, null, 2)}
+
+TODOS OS CLIENTES DISPONÍVEIS (incluindo os selecionados):
+${JSON.stringify(allClientesData, null, 2)}
+
+Sua tarefa:
+1. Identifique clientes que NÃO estão na lista de entregas de hoje
+2. Mas que estão geograficamente próximos (no mesmo bairro ou região) dos clientes que receberão entregas
+3. Estes são clientes que podem ser visitados para oferecer promoções, já que o entregador estará na região
+4. Para cada cliente próximo identificado, explique por que vale a pena visitá-lo (proximidade, mesma rua, mesmo bairro, etc)
+5. Liste no máximo 6-8 clientes próximos mais estratégicos
+6. Priorize clientes que estão no caminho ou muito próximos
+
+IMPORTANTE:
+- NÃO inclua clientes que já estão na lista de entregas de hoje
+- Foque em clientes que representam oportunidades reais de negócio por estarem no caminho`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            nearby_clients: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  nome: { type: "string" },
+                  endereco: { type: "string" },
+                  telefone: { type: "string" },
+                  proximity_reason: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      setNearbyClients(nearbyResult.nearby_clients || []);
+
     } catch (error) {
       console.error("Erro ao otimizar rota:", error);
     }
@@ -105,6 +161,7 @@ IMPORTANTE:
     setSelectedClients([]);
     setOptimizedRoute(null);
     setStats(null);
+    setNearbyClients(null);
   };
 
   return (
@@ -282,6 +339,7 @@ IMPORTANTE:
                 <>
                   <RouteMap route={optimizedRoute} pontoPartida={PONTO_PARTIDA} />
                   <OptimizedList route={optimizedRoute} />
+                  <NearbyClients nearbyClients={nearbyClients} />
                 </>
               ) : (
                 <Card className="bg-white shadow-xl h-full min-h-[500px]">
