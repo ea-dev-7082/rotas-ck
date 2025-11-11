@@ -3,12 +3,17 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Route, MapPin, TrendingUp, Loader2, Users } from "lucide-react";
+import { Route, MapPin, TrendingUp, Loader2, Users, Home } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import ClientSelector from "../components/optimizer/ClientSelector";
 import RouteMap from "../components/optimizer/RouteMap";
 import OptimizedList from "../components/optimizer/OptimizedList";
+
+const PONTO_PARTIDA = {
+  nome: "Matriz - Ponto de Partida",
+  endereco: "R. Soares Meireles, 421 - Pilares, Rio de Janeiro - RJ, CEP: 20760-691"
+};
 
 export default function Optimizer() {
   const [selectedClients, setSelectedClients] = useState([]);
@@ -33,20 +38,32 @@ export default function Optimizer() {
       }).join('\n');
 
       const result = await base44.integrations.Core.InvokeLLM({
-        prompt: `Você é um especialista em otimização de rotas de entrega. Analise os seguintes clientes e seus endereços:
+        prompt: `Você é um especialista em otimização de rotas de entrega no Rio de Janeiro. 
 
+PONTO DE PARTIDA OBRIGATÓRIO:
+${PONTO_PARTIDA.nome}
+${PONTO_PARTIDA.endereco}
+
+CLIENTES PARA ENTREGAR:
 ${clientesData}
 
 Sua tarefa:
-1. Determine a ordem mais eficiente de visitação considerando:
+1. A rota DEVE começar obrigatoriamente do ponto de partida (Matriz)
+2. Determine a ordem mais eficiente de visitação dos clientes considerando:
    - Proximidade geográfica entre pontos
-   - Trânsito típico para o horário atual
+   - Trânsito típico do Rio de Janeiro para o horário atual
    - Minimização de voltas desnecessárias
-2. Estime coordenadas aproximadas (latitude, longitude) para cada endereço
-3. Calcule tempo total estimado e distância total
-4. Forneça horário estimado de chegada para cada parada
+   - Evitar congestionamentos conhecidos
+3. A rota DEVE retornar à matriz no final
+4. Estime coordenadas precisas (latitude, longitude) para cada endereço no Rio de Janeiro
+5. Calcule tempo total estimado e distância total realista
+6. Forneça horário estimado de chegada para cada parada
 
-IMPORTANTE: A otimização deve começar do primeiro ponto mais conveniente e criar o melhor fluxo.`,
+IMPORTANTE: 
+- O primeiro ponto da rota (order: 1) é sempre a Matriz
+- O último ponto da rota deve ser o retorno à Matriz
+- Considere o trânsito real do Rio de Janeiro
+- Use coordenadas precisas para melhor visualização no mapa`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
@@ -108,6 +125,15 @@ IMPORTANTE: A otimização deve começar do primeiro ponto mais conveniente e cr
           <p className="text-gray-600 text-lg">
             Selecione os clientes e planeje as entregas do dia
           </p>
+          
+          {/* Ponto de Partida Display */}
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-green-50 border-2 border-green-200 rounded-lg">
+            <Home className="w-5 h-5 text-green-600" />
+            <div className="text-left">
+              <p className="text-xs text-green-600 font-semibold">Ponto de Partida</p>
+              <p className="text-sm text-gray-700">{PONTO_PARTIDA.endereco}</p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Stats Cards */}
@@ -123,7 +149,7 @@ IMPORTANTE: A otimização deve começar do primeiro ponto mais conveniente e cr
                   <div>
                     <p className="text-sm text-gray-500 mb-1">Entregas Hoje</p>
                     <p className="text-3xl font-bold text-blue-600">
-                      {optimizedRoute?.length || 0}
+                      {selectedClients.length}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -254,7 +280,7 @@ IMPORTANTE: A otimização deve começar do primeiro ponto mais conveniente e cr
             <AnimatePresence mode="wait">
               {optimizedRoute ? (
                 <>
-                  <RouteMap route={optimizedRoute} />
+                  <RouteMap route={optimizedRoute} pontoPartida={PONTO_PARTIDA} />
                   <OptimizedList route={optimizedRoute} />
                 </>
               ) : (

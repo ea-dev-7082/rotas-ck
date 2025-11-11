@@ -1,11 +1,11 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
-import { Map, Navigation } from "lucide-react";
+import { Map, Navigation, Home } from "lucide-react";
 import { motion } from "framer-motion";
 import "leaflet/dist/leaflet.css";
 
-export default function RouteMap({ route }) {
+export default function RouteMap({ route, pontoPartida }) {
   if (!route || route.length === 0) return null;
 
   // Calculate center of map
@@ -21,9 +21,10 @@ export default function RouteMap({ route }) {
   ]);
 
   // Create custom marker colors based on order
-  const getMarkerColor = (order) => {
-    if (order === 1) return "#22c55e"; // green for start
-    if (order === route.length) return "#ef4444"; // red for end
+  const getMarkerColor = (order, isMatriz) => {
+    if (isMatriz) return "#10b981"; // green for matriz
+    if (order === 1) return "#10b981"; // green for start (also matriz)
+    if (order === route.length) return "#10b981"; // green for end (return to matriz)
     return "#3b82f6"; // blue for middle points
   };
 
@@ -63,30 +64,31 @@ export default function RouteMap({ route }) {
 
               {/* Markers */}
               {route.map((point, index) => {
+                const isMatriz = point.client_name?.includes("Matriz") || point.order === 1 || point.order === route.length;
                 const markerHtml = `
                   <div style="
-                    background-color: ${getMarkerColor(point.order)};
-                    width: 32px;
-                    height: 32px;
+                    background-color: ${getMarkerColor(point.order, isMatriz)};
+                    width: ${isMatriz ? '36px' : '32px'};
+                    height: ${isMatriz ? '36px' : '32px'};
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     color: white;
                     font-weight: bold;
-                    font-size: 14px;
+                    font-size: ${isMatriz ? '16px' : '14px'};
                     border: 3px solid white;
                     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
                   ">
-                    ${point.order}
+                    ${isMatriz ? '🏠' : point.order}
                   </div>
                 `;
 
                 const icon = L.divIcon({
                   html: markerHtml,
                   className: "custom-marker",
-                  iconSize: [32, 32],
-                  iconAnchor: [16, 16],
+                  iconSize: [isMatriz ? 36 : 32, isMatriz ? 36 : 32],
+                  iconAnchor: [isMatriz ? 18 : 16, isMatriz ? 18 : 16],
                 });
 
                 return (
@@ -98,23 +100,31 @@ export default function RouteMap({ route }) {
                     <Popup>
                       <div className="p-2">
                         <div className="flex items-center gap-2 mb-2">
-                          <div
-                            className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                            style={{
-                              backgroundColor: getMarkerColor(point.order),
-                            }}
-                          >
-                            {point.order}
-                          </div>
-                          <span className="font-semibold">
-                            {point.order === 1
-                              ? "Início"
-                              : point.order === route.length
-                              ? "Último"
-                              : `Parada ${point.order}`}
-                          </span>
+                          {isMatriz ? (
+                            <div className="flex items-center gap-1">
+                              <Home className="w-4 h-4 text-green-600" />
+                              <span className="font-semibold text-green-700">
+                                {point.order === 1 ? "Saída - Matriz" : "Retorno - Matriz"}
+                              </span>
+                            </div>
+                          ) : (
+                            <>
+                              <div
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                                style={{
+                                  backgroundColor: getMarkerColor(point.order, isMatriz),
+                                }}
+                              >
+                                {point.order}
+                              </div>
+                              <span className="font-semibold">Parada {point.order - 1}</span>
+                            </>
+                          )}
                         </div>
-                        <p className="text-sm text-gray-700 mb-1">
+                        <p className="text-sm font-medium text-gray-900 mb-1">
+                          {point.client_name}
+                        </p>
+                        <p className="text-xs text-gray-700 mb-1">
                           {point.address}
                         </p>
                         {point.estimated_arrival && (
@@ -135,15 +145,11 @@ export default function RouteMap({ route }) {
               <div className="space-y-2 text-xs">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span className="text-gray-700">Início</span>
+                  <span className="text-gray-700">Matriz (Início/Fim)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <span className="text-gray-700">Paradas</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <span className="text-gray-700">Último</span>
+                  <span className="text-gray-700">Entregas</span>
                 </div>
               </div>
             </div>

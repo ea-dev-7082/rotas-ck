@@ -1,7 +1,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { List, MapPin, Clock, Copy, CheckCircle2, User } from "lucide-react";
+import { List, MapPin, Clock, Copy, CheckCircle2, User, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 
@@ -55,6 +55,7 @@ export default function OptimizedList({ route }) {
         <CardContent className="p-6">
           <div className="space-y-3">
             {route.map((point, index) => {
+              const isMatriz = point.client_name?.includes("Matriz") || point.order === 1 || point.order === route.length;
               const isFirst = point.order === 1;
               const isLast = point.order === route.length;
 
@@ -65,41 +66,46 @@ export default function OptimizedList({ route }) {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 * index }}
                   className={`p-4 rounded-xl border-2 transition-all hover:shadow-md ${
-                    isFirst
+                    isMatriz
                       ? "bg-green-50 border-green-200"
-                      : isLast
-                      ? "bg-red-50 border-red-200"
                       : "bg-blue-50 border-blue-200"
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 shadow-md ${
-                        isFirst
+                        isMatriz
                           ? "bg-green-500"
-                          : isLast
-                          ? "bg-red-500"
                           : "bg-blue-500"
                       }`}
                     >
-                      {point.order}
+                      {isMatriz ? <Home className="w-5 h-5" /> : point.order}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         {isFirst && (
                           <Badge className="bg-green-500 text-white hover:bg-green-600">
-                            Início
+                            Saída - Matriz
                           </Badge>
                         )}
-                        {isLast && (
-                          <Badge className="bg-red-500 text-white hover:bg-red-600">
-                            Último
+                        {isLast && !isFirst && (
+                          <Badge className="bg-green-500 text-white hover:bg-green-600">
+                            Retorno - Matriz
+                          </Badge>
+                        )}
+                        {!isMatriz && (
+                          <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+                            Entrega {point.order - 1}
                           </Badge>
                         )}
                       </div>
                       <div className="flex items-start gap-2 mb-2">
-                        <User className="w-4 h-4 text-gray-500 mt-1 flex-shrink-0" />
-                        <p className="text-gray-900 font-bold leading-relaxed">
+                        {isMatriz ? (
+                          <Home className="w-4 h-4 text-green-600 mt-1 flex-shrink-0" />
+                        ) : (
+                          <User className="w-4 h-4 text-gray-500 mt-1 flex-shrink-0" />
+                        )}
+                        <p className={`font-bold leading-relaxed ${isMatriz ? 'text-green-700' : 'text-gray-900'}`}>
                           {point.client_name}
                         </p>
                       </div>
