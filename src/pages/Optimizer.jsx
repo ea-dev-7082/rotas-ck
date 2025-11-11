@@ -1,38 +1,52 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Route, MapPin, TrendingUp, Loader2 } from "lucide-react";
+import { Route, MapPin, TrendingUp, Loader2, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import AddressInput from "../components/optimizer/AddressInput";
+import ClientSelector from "../components/optimizer/ClientSelector";
 import RouteMap from "../components/optimizer/RouteMap";
 import OptimizedList from "../components/optimizer/OptimizedList";
 
 export default function Optimizer() {
-  const [addresses, setAddresses] = useState("");
+  const [selectedClients, setSelectedClients] = useState([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimizedRoute, setOptimizedRoute] = useState(null);
   const [stats, setStats] = useState(null);
 
+  const { data: clientes, isLoading } = useQuery({
+    queryKey: ['clientes'],
+    queryFn: () => base44.entities.Cliente.list('nome'),
+    initialData: [],
+  });
+
   const handleOptimize = async () => {
-    if (!addresses.trim()) return;
+    if (selectedClients.length === 0) return;
 
     setIsOptimizing(true);
     try {
+      const clientesData = selectedClients.map(id => {
+        const cliente = clientes.find(c => c.id === id);
+        return `${cliente.nome} - ${cliente.endereco}`;
+      }).join('\n');
+
       const result = await base44.integrations.Core.InvokeLLM({
-        prompt: `Você é um especialista em otimização de rotas de entrega. Analise os seguintes endereços e:
+        prompt: `Você é um especialista em otimização de rotas de entrega. Analise os seguintes clientes e seus endereços:
+
+${clientesData}
+
+Sua tarefa:
 1. Determine a ordem mais eficiente de visitação considerando:
    - Proximidade geográfica entre pontos
    - Trânsito típico para o horário atual
    - Minimização de voltas desnecessárias
 2. Estime coordenadas aproximadas (latitude, longitude) para cada endereço
 3. Calcule tempo total estimado e distância total
+4. Forneça horário estimado de chegada para cada parada
 
-Endereços para otimizar:
-${addresses}
-
-IMPORTANTE: Considere que a otimização deve começar do ponto de partida mais comum (centro da região) e retornar no final se necessário.`,
+IMPORTANTE: A otimização deve começar do primeiro ponto mais conveniente e criar o melhor fluxo.`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
@@ -43,6 +57,7 @@ IMPORTANTE: Considere que a otimização deve começar do ponto de partida mais 
                 type: "object",
                 properties: {
                   order: { type: "number" },
+                  client_name: { type: "string" },
                   address: { type: "string" },
                   latitude: { type: "number" },
                   longitude: { type: "number" },
@@ -70,7 +85,7 @@ IMPORTANTE: Considere que a otimização deve começar do ponto de partida mais 
   };
 
   const handleReset = () => {
-    setAddresses("");
+    setSelectedClients([]);
     setOptimizedRoute(null);
     setStats(null);
   };
@@ -91,7 +106,7 @@ IMPORTANTE: Considere que a otimização deve começar do ponto de partida mais 
             Otimizador de Rotas
           </h1>
           <p className="text-gray-600 text-lg">
-            Planeje entregas eficientes com análise de trânsito em tempo real
+            Selecione os clientes e planeje as entregas do dia
           </p>
         </motion.div>
 
@@ -106,7 +121,7 @@ IMPORTANTE: Considere que a otimização deve começar do ponto de partida mais 
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500 mb-1">Pontos de Entrega</p>
+                    <p className="text-sm text-gray-500 mb-1">Entregas Hoje</p>
                     <p className="text-3xl font-bold text-blue-600">
                       {optimizedRoute?.length || 0}
                     </p>
@@ -154,7 +169,7 @@ IMPORTANTE: Considere que a otimização deve começar do ponto de partida mais 
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Input */}
+          {/* Left Column - Client Selection */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -163,21 +178,22 @@ IMPORTANTE: Considere que a otimização deve começar do ponto de partida mais 
             <Card className="bg-white shadow-xl">
               <CardHeader className="border-b border-gray-100">
                 <CardTitle className="flex items-center gap-2 text-xl">
-                  <MapPin className="w-5 h-5 text-blue-600" />
-                  Endereços de Entrega
+                  <Users className="w-5 h-5 text-blue-600" />
+                  Selecione os Clientes
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                <AddressInput
-                  value={addresses}
-                  onChange={setAddresses}
-                  disabled={isOptimizing}
+                <ClientSelector
+                  clientes={clientes}
+                  selectedClients={selectedClients}
+                  onSelectionChange={setSelectedClients}
+                  isLoading={isLoading}
                 />
 
                 <div className="flex gap-3 mt-6">
                   <Button
                     onClick={handleOptimize}
-                    disabled={isOptimizing || !addresses.trim()}
+                    disabled={isOptimizing || selectedClients.length === 0}
                     className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all"
                   >
                     {isOptimizing ? (
@@ -188,7 +204,7 @@ IMPORTANTE: Considere que a otimização deve começar do ponto de partida mais 
                     ) : (
                       <>
                         <Route className="w-5 h-5 mr-2" />
-                        Otimizar Rota
+                        Otimizar Rota ({selectedClients.length})
                       </>
                     )}
                   </Button>
@@ -248,11 +264,11 @@ IMPORTANTE: Considere que a otimização deve começar do ponto de partida mais 
                       <Route className="w-12 h-12 text-gray-400" />
                     </div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      Aguardando Endereços
+                      Aguardando Seleção
                     </h3>
                     <p className="text-gray-500 max-w-sm">
-                      Insira os endereços de entrega ao lado e clique em
-                      "Otimizar Rota" para visualizar a melhor sequência
+                      Selecione os clientes que receberão entregas hoje e clique
+                      em "Otimizar Rota" para visualizar a melhor sequência
                     </p>
                   </CardContent>
                 </Card>
