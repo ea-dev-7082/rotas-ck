@@ -102,10 +102,18 @@ INSTRUÇÕES DETALHADAS:
    - Use formato HH:MM (ex: 09:30, 14:45)
    - Seja preciso e realista com base no tempo acumulado
 
+6. WAYPOINTS DAS RUAS:
+   - Para cada segmento entre pontos consecutivos, gere waypoints que seguem as RUAS REAIS
+   - Use seu conhecimento das vias do Rio de Janeiro
+   - Inclua 5-10 waypoints intermediários por segmento seguindo as principais avenidas/ruas
+   - Os waypoints devem formar um caminho realista pelas vias (não linha reta)
+   - Formato: from_order, to_order, e array de waypoints com coordenadas {lat, lng}
+
 IMPORTANTE: 
 - Numere os clientes em ordem de visitação (1=Matriz saída, 2-N=entregas, último=Matriz retorno)
 - Cada horário deve ser calculado somando tempo de deslocamento + tempo de entrega do ponto anterior
-- Inclua o endereço COMPLETO com número em cada parada`,
+- Inclua o endereço COMPLETO com número em cada parada
+- Gere waypoints realistas que seguem as vias do Rio de Janeiro (não linhas retas)`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
@@ -129,6 +137,27 @@ IMPORTANTE:
                 }
               }
             },
+            route_waypoints: {
+              type: "array",
+              description: "Waypoints que seguem as ruas entre cada par de pontos",
+              items: {
+                type: "object",
+                properties: {
+                  from_order: { type: "number" },
+                  to_order: { type: "number" },
+                  waypoints: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        lat: { type: "number" },
+                        lng: { type: "number" }
+                      }
+                    }
+                  }
+                }
+              }
+            },
             total_distance_km: { type: "number" },
             total_time_minutes: { type: "number" },
             optimization_notes: { type: "string" }
@@ -140,7 +169,8 @@ IMPORTANTE:
       setStats({
         distance: result.total_distance_km,
         time: result.total_time_minutes,
-        notes: result.optimization_notes
+        notes: result.optimization_notes,
+        waypoints: result.route_waypoints || []
       });
 
       // Find nearby clients for promotions
@@ -389,7 +419,7 @@ IMPORTANTE:
             <AnimatePresence mode="wait">
               {optimizedRoute ? (
                 <>
-                  <RouteMap route={optimizedRoute} pontoPartida={PONTO_PARTIDA} />
+                  <RouteMap route={optimizedRoute} pontoPartida={PONTO_PARTIDA} waypoints={stats?.waypoints} />
                   <OptimizedList route={optimizedRoute} />
                   <NearbyClients nearbyClients={nearbyClients} />
                 </>

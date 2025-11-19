@@ -5,7 +5,7 @@ import { Map, Navigation, Home } from "lucide-react";
 import { motion } from "framer-motion";
 import "leaflet/dist/leaflet.css";
 
-export default function RouteMap({ route, pontoPartida }) {
+export default function RouteMap({ route, pontoPartida, waypoints }) {
   if (!route || route.length === 0) return null;
 
   // Calculate center of map
@@ -14,11 +14,23 @@ export default function RouteMap({ route, pontoPartida }) {
     route.reduce((sum, point) => sum + point.longitude, 0) / route.length,
   ];
 
-  // Create polyline coordinates
-  const polylinePositions = route.map((point) => [
-    point.latitude,
-    point.longitude,
-  ]);
+  // Create polyline coordinates from waypoints or fallback to direct lines
+  const polylineSegments = [];
+  
+  if (waypoints && waypoints.length > 0) {
+    // Use waypoints for realistic street paths
+    waypoints.forEach(segment => {
+      const points = segment.waypoints.map(wp => [wp.lat, wp.lng]);
+      polylineSegments.push(points);
+    });
+  } else {
+    // Fallback to direct lines
+    const polylinePositions = route.map((point) => [
+      point.latitude,
+      point.longitude,
+    ]);
+    polylineSegments.push(polylinePositions);
+  }
 
   // Create custom marker colors based on order
   const getMarkerColor = (order, isMatriz) => {
@@ -55,12 +67,16 @@ export default function RouteMap({ route, pontoPartida }) {
               />
 
               {/* Route line */}
-              <Polyline
-                positions={polylinePositions}
-                color="#3b82f6"
-                weight={4}
-                opacity={0.7}
-              />
+              {/* Route lines */}
+              {polylineSegments.map((segment, idx) => (
+                <Polyline
+                  key={idx}
+                  positions={segment}
+                  color="#3b82f6"
+                  weight={4}
+                  opacity={0.7}
+                />
+              ))}
 
               {/* Markers */}
               {route.map((point, index) => {
