@@ -1,6 +1,6 @@
 import Optimizer from './pages/Optimizer';
 import Clientes from './pages/Clientes';
-import Layout from './Layout.jsx';
+import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
@@ -11,5 +11,5 @@ export const PAGES = {
 export const pagesConfig = {
     mainPage: "Optimizer",
     Pages: PAGES,
-    Layout: Layout,
+    Layout: __Layout,
 };

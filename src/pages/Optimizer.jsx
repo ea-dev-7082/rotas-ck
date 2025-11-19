@@ -36,46 +36,76 @@ export default function Optimizer() {
     try {
       const selectedClientesData = selectedClients.map(id => {
         const cliente = clientes.find(c => c.id === id);
-        return { nome: cliente.nome, endereco: cliente.endereco };
+        return { 
+          nome: cliente.nome, 
+          endereco: cliente.endereco,
+          endereco_num: cliente.endereco_num
+        };
       });
 
       const allClientesData = clientes.map(c => ({
         nome: c.nome,
         endereco: c.endereco,
+        endereco_num: c.endereco_num,
         telefone: c.telefone,
         observacoes: c.observacoes
       }));
 
-      const clientesDataStr = selectedClientesData.map(c => `${c.nome} - ${c.endereco}`).join('\n');
+      const clientesDataStr = selectedClientesData.map(c => 
+        `${c.nome} - ${c.endereco}${c.endereco_num ? `, Nº ${c.endereco_num}` : ''}`
+      ).join('\n');
 
+      // Get current time
+      const now = new Date();
+      const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      
       // Optimize route
       const result = await base44.integrations.Core.InvokeLLM({
         prompt: `Você é um especialista em otimização de rotas de entrega no Rio de Janeiro. 
+
+HORÁRIO DE SAÍDA: ${startTime}
 
 PONTO DE PARTIDA OBRIGATÓRIO:
 ${PONTO_PARTIDA.nome}
 ${PONTO_PARTIDA.endereco}
 
-CLIENTES PARA ENTREGAR:
+CLIENTES PARA ENTREGAR (com endereços completos incluindo número):
 ${clientesDataStr}
 
-Sua tarefa:
-1. A rota DEVE começar obrigatoriamente do ponto de partida (Matriz)
-2. Determine a ordem mais eficiente de visitação dos clientes considerando:
-   - Proximidade geográfica entre pontos
-   - Trânsito típico do Rio de Janeiro para o horário atual
-   - Minimização de voltas desnecessárias
-   - Evitar congestionamentos conhecidos
-3. A rota DEVE retornar à matriz no final
-4. Estime coordenadas precisas (latitude, longitude) para cada endereço no Rio de Janeiro
-5. Calcule tempo total estimado e distância total realista
-6. Forneça horário estimado de chegada para cada parada
+INSTRUÇÕES DETALHADAS:
+
+1. ESTRUTURA DA ROTA:
+   - O primeiro ponto (order: 1) é SEMPRE a Matriz (ponto de partida) com horário de saída ${startTime}
+   - Organize os clientes na ordem mais eficiente de visitação
+   - O último ponto é o RETORNO à Matriz
+
+2. OTIMIZAÇÃO GEOGRÁFICA:
+   - Agrupe entregas por REGIÃO/BAIRRO (ex: todos de Bangu juntos, depois Campo Grande, etc)
+   - Minimize deslocamentos entre bairros distantes
+   - Evite "voltas" - mantenha uma sequência lógica geográfica
+   - Considere o trânsito típico do Rio de Janeiro no horário atual
+
+3. CÁLCULO DE TEMPO (SEJA REALISTA):
+   - Considere 15-20 minutos por entrega (estacionar, localizar, entregar, recibo)
+   - Adicione tempo de deslocamento entre pontos baseado em:
+     * Distância real entre endereços
+     * Condições de trânsito do Rio de Janeiro
+     * Tipo de via (avenida principal = mais rápido, ruas locais = mais lento)
+   - Para cada ponto, calcule: horário_anterior + tempo_deslocamento + tempo_entrega
+
+4. ENDEREÇOS E COORDENADAS:
+   - Use o endereço COMPLETO com número para cada parada
+   - Pesquise as coordenadas GPS REAIS e PRECISAS de cada endereço
+   - Valide que as coordenadas estão no Rio de Janeiro
+
+5. FORMATO DE HORÁRIO:
+   - Use formato HH:MM (ex: 09:30, 14:45)
+   - Seja preciso e realista com base no tempo acumulado
 
 IMPORTANTE: 
-- O primeiro ponto da rota (order: 1) é sempre a Matriz
-- O último ponto da rota deve ser o retorno à Matriz
-- Considere o trânsito real do Rio de Janeiro
-- Use coordenadas precisas para melhor visualização no mapa`,
+- Numere os clientes em ordem de visitação (1=Matriz saída, 2-N=entregas, último=Matriz retorno)
+- Cada horário deve ser calculado somando tempo de deslocamento + tempo de entrega do ponto anterior
+- Inclua o endereço COMPLETO com número em cada parada`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
@@ -88,9 +118,14 @@ IMPORTANTE:
                   order: { type: "number" },
                   client_name: { type: "string" },
                   address: { type: "string" },
+                  street: { type: "string" },
+                  number: { type: "string" },
+                  neighborhood: { type: "string" },
                   latitude: { type: "number" },
                   longitude: { type: "number" },
-                  estimated_arrival: { type: "string" }
+                  estimated_arrival: { type: "string" },
+                  travel_time_from_previous: { type: "number" },
+                  delivery_time: { type: "number" }
                 }
               }
             },
