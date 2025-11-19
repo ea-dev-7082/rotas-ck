@@ -147,23 +147,40 @@ IMPORTANTE:
       const nearbyResult = await base44.integrations.Core.InvokeLLM({
         prompt: `Você é um especialista em análise geográfica no Rio de Janeiro.
 
+PONTO DE PARTIDA (MATRIZ):
+${PONTO_PARTIDA.endereco}
+
 CLIENTES QUE RECEBERÃO ENTREGAS HOJE:
 ${JSON.stringify(selectedClientesData, null, 2)}
 
 TODOS OS CLIENTES DISPONÍVEIS (incluindo os selecionados):
 ${JSON.stringify(allClientesData, null, 2)}
 
-Sua tarefa:
-1. Identifique clientes que NÃO estão na lista de entregas de hoje
-2. Mas que estão geograficamente próximos (no mesmo bairro ou região) dos clientes que receberão entregas
-3. Estes são clientes que podem ser visitados para oferecer promoções, já que o entregador estará na região
-4. Para cada cliente próximo identificado, explique por que vale a pena visitá-lo (proximidade, mesma rua, mesmo bairro, etc)
-5. Liste no máximo 6-8 clientes próximos mais estratégicos
-6. Priorize clientes que estão no caminho ou muito próximos
+CRITÉRIOS OBRIGATÓRIOS PARA CLIENTES PRÓXIMOS:
+
+1. DISTÂNCIA DA MATRIZ:
+   - Identifique qual cliente da lista de entregas está MAIS LONGE da matriz
+   - Clientes próximos devem estar em um raio de 5-7 km de distância deste cliente mais distante
+   - OU devem pertencer ao MESMO BAIRRO de algum cliente que receberá entrega
+
+2. ANÁLISE GEOGRÁFICA:
+   - Calcule distâncias reais usando as coordenadas geográficas
+   - Considere a geografia do Rio de Janeiro (não incluir clientes em direção totalmente oposta)
+   - Priorize clientes que estão realmente "no caminho" ou na mesma região
+
+3. SELEÇÃO:
+   - NÃO inclua clientes que já estão na lista de entregas de hoje
+   - Liste no máximo 6-8 clientes mais estratégicos
+   - Para cada um, calcule a distância aproximada do cliente de entrega mais próximo
+
+4. JUSTIFICATIVA:
+   - Explique claramente por que cada cliente próximo foi selecionado
+   - Mencione se está no mesmo bairro ou dentro do raio de 5-7km
+   - Informe qual cliente de entrega está mais próximo
 
 IMPORTANTE:
-- NÃO inclua clientes que já estão na lista de entregas de hoje
-- Foque em clientes que representam oportunidades reais de negócio por estarem no caminho`,
+- Seja rigoroso com os critérios de distância (5-7 km do mais longe OU mesmo bairro)
+- Só sugira clientes que realmente valem a visita pela proximidade`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
