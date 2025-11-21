@@ -8,10 +8,30 @@ import "leaflet/dist/leaflet.css";
 export default function RouteMap({ route, pontoPartida, waypoints }) {
   if (!route || route.length === 0) return null;
 
+  // Filter out invalid points
+  const validRoute = route.filter(point => 
+    point.latitude && 
+    point.longitude && 
+    !isNaN(point.latitude) && 
+    !isNaN(point.longitude) &&
+    Math.abs(point.latitude) <= 90 &&
+    Math.abs(point.longitude) <= 180
+  );
+
+  if (validRoute.length === 0) {
+    return (
+      <Card className="bg-white shadow-xl">
+        <CardContent className="p-6 text-center text-red-600">
+          Erro: Coordenadas inválidas na rota. Por favor, otimize novamente.
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Calculate center of map
   const center = [
-    route.reduce((sum, point) => sum + point.latitude, 0) / route.length,
-    route.reduce((sum, point) => sum + point.longitude, 0) / route.length,
+    validRoute.reduce((sum, point) => sum + point.latitude, 0) / validRoute.length,
+    validRoute.reduce((sum, point) => sum + point.longitude, 0) / validRoute.length,
   ];
 
   // Create polyline coordinates from waypoints or fallback to direct lines
@@ -20,12 +40,18 @@ export default function RouteMap({ route, pontoPartida, waypoints }) {
   if (waypoints && waypoints.length > 0) {
     // Use waypoints for realistic street paths
     waypoints.forEach(segment => {
-      const points = segment.waypoints.map(wp => [wp.lat, wp.lng]);
-      polylineSegments.push(points);
+      const points = segment.waypoints
+        .filter(wp => wp.lat && wp.lng && !isNaN(wp.lat) && !isNaN(wp.lng))
+        .map(wp => [wp.lat, wp.lng]);
+      if (points.length > 0) {
+        polylineSegments.push(points);
+      }
     });
-  } else {
-    // Fallback to direct lines
-    const polylinePositions = route.map((point) => [
+  }
+  
+  // Always add direct line as fallback
+  if (polylineSegments.length === 0) {
+    const polylinePositions = validRoute.map((point) => [
       point.latitude,
       point.longitude,
     ]);
@@ -36,7 +62,7 @@ export default function RouteMap({ route, pontoPartida, waypoints }) {
   const getMarkerColor = (order, isMatriz) => {
     if (isMatriz) return "#10b981"; // green for matriz
     if (order === 1) return "#10b981"; // green for start (also matriz)
-    if (order === route.length) return "#10b981"; // green for end (return to matriz)
+    if (order === validRoute.length) return "#10b981"; // green for end (return to matriz)
     return "#3b82f6"; // blue for middle points
   };
 
@@ -79,7 +105,7 @@ export default function RouteMap({ route, pontoPartida, waypoints }) {
               ))}
 
               {/* Markers */}
-              {route.map((point, index) => {
+              {validRoute.map((point, index) => {
                 const isMatriz = point.client_name?.includes("Matriz") || point.order === 1 || point.order === route.length;
                 const markerHtml = `
                   <div style="
