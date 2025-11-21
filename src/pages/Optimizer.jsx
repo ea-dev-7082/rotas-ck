@@ -51,6 +51,46 @@ export default function Optimizer() {
         observacoes: c.observacoes
       }));
 
+      // Step 1: Get exact GPS coordinates for all addresses
+      const addressesForGPS = [
+        { nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco },
+        ...selectedClientesData
+      ];
+
+      const gpsResult = await base44.integrations.Core.InvokeLLM({
+        prompt: `Você é um especialista em geolocalização no Rio de Janeiro.
+
+TAREFA: Forneça as coordenadas GPS EXATAS e REAIS dos seguintes endereços:
+
+${addressesForGPS.map((addr, idx) => `${idx + 1}. ${addr.nome}: ${addr.endereco}${addr.endereco_num ? `, Nº ${addr.endereco_num}` : ''}`).join('\n')}
+
+INSTRUÇÕES CRÍTICAS:
+- Use ferramentas de busca para encontrar as coordenadas GPS REAIS de cada endereço
+- Valide que as coordenadas estão no Rio de Janeiro (lat entre -23.1 e -22.7, lng entre -43.8 e -43.1)
+- Seja PRECISO - não invente coordenadas
+- Retorne as coordenadas no formato especificado
+
+Para cada endereço, retorne: nome, endereço completo, latitude e longitude REAIS.`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            addresses: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  address: { type: "string" },
+                  latitude: { type: "number" },
+                  longitude: { type: "number" }
+                }
+              }
+            }
+          }
+        }
+      });
+
       const clientesDataStr = selectedClientesData.map(c => 
         `${c.nome} - ${c.endereco}${c.endereco_num ? `, Nº ${c.endereco_num}` : ''}`
       ).join('\n');
@@ -59,17 +99,16 @@ export default function Optimizer() {
       const now = new Date();
       const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       
-      // Optimize route
+      // Step 2: Optimize route with real GPS coordinates
       const result = await base44.integrations.Core.InvokeLLM({
         prompt: `Você é um especialista em otimização de rotas de entrega no Rio de Janeiro. 
 
 HORÁRIO DE SAÍDA: ${startTime}
 
-PONTO DE PARTIDA OBRIGATÓRIO:
-${PONTO_PARTIDA.nome}
-${PONTO_PARTIDA.endereco}
+COORDENADAS GPS REAIS DOS ENDEREÇOS:
+${JSON.stringify(gpsResult.addresses, null, 2)}
 
-CLIENTES PARA ENTREGAR (com endereços completos incluindo número):
+CLIENTES PARA ENTREGAR:
 ${clientesDataStr}
 
 INSTRUÇÕES DETALHADAS:
@@ -94,11 +133,9 @@ INSTRUÇÕES DETALHADAS:
    - Para cada ponto, calcule: horário_anterior + tempo_deslocamento + tempo_entrega
 
 4. ENDEREÇOS E COORDENADAS:
+   - Use as coordenadas GPS fornecidas acima - elas são REAIS e PRECISAS
    - Use o endereço COMPLETO com número para cada parada
-   - CRÍTICO: Pesquise as coordenadas GPS REAIS e EXATAS de cada endereço específico
-   - Use ferramentas de busca para confirmar as coordenadas de cada endereço no Rio de Janeiro
-   - Valide que latitude está entre -23.1 e -22.7 e longitude entre -43.8 e -43.1 (Rio de Janeiro)
-   - NÃO invente coordenadas - busque as coordenadas reais do endereço completo
+   - IMPORTANTE: Use EXATAMENTE as coordenadas GPS fornecidas no JSON acima para cada local
 
 5. FORMATO DE HORÁRIO:
    - Use formato HH:MM (ex: 09:30, 14:45)
