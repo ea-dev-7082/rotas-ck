@@ -95,8 +95,10 @@ INSTRUÇÕES DETALHADAS:
 
 4. ENDEREÇOS E COORDENADAS:
    - Use o endereço COMPLETO com número para cada parada
-   - Pesquise as coordenadas GPS REAIS e PRECISAS de cada endereço
-   - Valide que as coordenadas estão no Rio de Janeiro
+   - CRÍTICO: Pesquise as coordenadas GPS REAIS e EXATAS de cada endereço específico
+   - Use ferramentas de busca para confirmar as coordenadas de cada endereço no Rio de Janeiro
+   - Valide que latitude está entre -23.1 e -22.7 e longitude entre -43.8 e -43.1 (Rio de Janeiro)
+   - NÃO invente coordenadas - busque as coordenadas reais do endereço completo
 
 5. FORMATO DE HORÁRIO:
    - Use formato HH:MM (ex: 09:30, 14:45)
