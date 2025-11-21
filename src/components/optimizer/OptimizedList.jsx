@@ -20,21 +20,16 @@ export default function OptimizedList({ route }) {
   };
 
   const handleOpenWaze = () => {
-    // Waze deep link - navigate through each stop
-    // Start with first delivery (skip matriz start)
+    // Get delivery stops (skip matriz start and return)
     const deliveryStops = route.filter((point, idx) => 
-      idx > 0 && idx < route.length - 1 // exclude first (matriz) and last (return to matriz)
+      idx > 0 && idx < route.length - 1
     );
     
     if (deliveryStops.length > 0) {
-      // Navigate to each stop in order
-      deliveryStops.forEach((point, index) => {
-        const wazeUrl = `https://waze.com/ul?ll=${point.latitude},${point.longitude}&navigate=yes&zoom=17`;
-        if (index === 0) {
-          // Open first one immediately
-          window.open(wazeUrl, '_blank');
-        }
-      });
+      // Use addresses directly - Waze will geocode them accurately
+      const firstStop = deliveryStops[0];
+      const wazeUrl = `https://waze.com/ul?q=${encodeURIComponent(firstStop.address)}&navigate=yes`;
+      window.open(wazeUrl, '_blank');
     }
   };
 
