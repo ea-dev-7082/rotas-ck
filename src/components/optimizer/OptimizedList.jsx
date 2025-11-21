@@ -1,7 +1,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { List, MapPin, Clock, Copy, CheckCircle2, User, Home } from "lucide-react";
+import { List, MapPin, Clock, Copy, CheckCircle2, User, Home, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 
@@ -17,6 +17,25 @@ export default function OptimizedList({ route }) {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleOpenWaze = () => {
+    // Waze deep link - navigate through each stop
+    // Start with first delivery (skip matriz start)
+    const deliveryStops = route.filter((point, idx) => 
+      idx > 0 && idx < route.length - 1 // exclude first (matriz) and last (return to matriz)
+    );
+    
+    if (deliveryStops.length > 0) {
+      // Navigate to each stop in order
+      deliveryStops.forEach((point, index) => {
+        const wazeUrl = `https://waze.com/ul?ll=${point.latitude},${point.longitude}&navigate=yes&zoom=17`;
+        if (index === 0) {
+          // Open first one immediately
+          window.open(wazeUrl, '_blank');
+        }
+      });
+    }
   };
 
   return (
@@ -124,11 +143,25 @@ export default function OptimizedList({ route }) {
                     </div>
                   </div>
                 </motion.div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
+                );
+                })}
+                </div>
+
+                {/* Waze Navigation Button */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                <Button
+                onClick={handleOpenWaze}
+                className="w-full h-14 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white text-lg font-semibold shadow-lg hover:shadow-xl transition-all"
+                >
+                <Navigation className="w-6 h-6 mr-3" />
+                Abrir Rota no Waze
+                </Button>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                Abrirá o Waze com a primeira entrega
+                </p>
+                </div>
+                </CardContent>
+                </Card>
+                </motion.div>
+                );
 }
