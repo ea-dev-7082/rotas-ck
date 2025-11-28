@@ -7,8 +7,12 @@ import { motion } from "framer-motion";
 export default function NearbyClients({ nearbyClients }) {
   if (!nearbyClients || nearbyClients.length === 0) return null;
 
+  // Criar uma key única baseada nos nomes dos clientes para forçar re-render
+  const listKey = nearbyClients.map(c => c.nome).join('-');
+
   return (
     <motion.div
+      key={listKey}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4 }}
