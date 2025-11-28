@@ -86,17 +86,25 @@ export default function RouteMap({ route, pontoPartida, waypoints }) {
                 url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
               />
 
-              {/* Route line */}
-              {/* Route lines */}
-              {polylineSegments.map((segment, idx) => (
-                <Polyline
-                  key={idx}
-                  positions={segment}
-                  color="#3b82f6"
-                  weight={4}
-                  opacity={0.7}
-                />
-              ))}
+              {/* Main route line connecting all points */}
+                  <Polyline
+                    positions={mainRoutePositions}
+                    color="#3b82f6"
+                    weight={5}
+                    opacity={0.8}
+                    dashArray="10, 10"
+                  />
+
+                  {/* Waypoint segments for detailed paths if available */}
+                  {waypointSegments.map((segment, idx) => (
+                    <Polyline
+                      key={idx}
+                      positions={segment}
+                      color="#6366f1"
+                      weight={4}
+                      opacity={0.6}
+                    />
+                  ))}
 
               {/* Markers */}
               {validRoute.map((point, index) => {
