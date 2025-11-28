@@ -1,4 +1,4 @@
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_API_KEY;
+const MAPBOX_TOKEN = "sk.eyJ1Ijoia2FmZnNwaWVsIiwiYSI6ImNtaWo1N3VuOTB6NTUza3EyajR5NDV1YnAifQ.6ExEy1_7txYOQSDuwbmxlg";
 
 // Geocodificar um endereço para obter coordenadas
 export async function geocodeAddress(address) {
