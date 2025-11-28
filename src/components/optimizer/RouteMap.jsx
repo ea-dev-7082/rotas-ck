@@ -34,28 +34,22 @@ export default function RouteMap({ route, pontoPartida, waypoints }) {
     validRoute.reduce((sum, point) => sum + point.longitude, 0) / validRoute.length,
   ];
 
-  // Create polyline coordinates from waypoints or fallback to direct lines
-  const polylineSegments = [];
-  
+  // Create polyline connecting all points in order
+  const mainRoutePositions = validRoute
+    .sort((a, b) => a.order - b.order)
+    .map((point) => [point.latitude, point.longitude]);
+
+  // Also check for waypoints for more detailed paths
+  const waypointSegments = [];
   if (waypoints && waypoints.length > 0) {
-    // Use waypoints for realistic street paths
     waypoints.forEach(segment => {
       const points = segment.waypoints
-        .filter(wp => wp.lat && wp.lng && !isNaN(wp.lat) && !isNaN(wp.lng))
+        ?.filter(wp => wp.lat && wp.lng && !isNaN(wp.lat) && !isNaN(wp.lng))
         .map(wp => [wp.lat, wp.lng]);
-      if (points.length > 0) {
-        polylineSegments.push(points);
+      if (points && points.length > 0) {
+        waypointSegments.push(points);
       }
     });
-  }
-  
-  // Always add direct line as fallback
-  if (polylineSegments.length === 0) {
-    const polylinePositions = validRoute.map((point) => [
-      point.latitude,
-      point.longitude,
-    ]);
-    polylineSegments.push(polylinePositions);
   }
 
   // Create custom marker colors based on order
