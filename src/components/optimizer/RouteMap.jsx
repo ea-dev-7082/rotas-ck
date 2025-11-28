@@ -109,6 +109,8 @@ export default function RouteMap({ route, pontoPartida, waypoints }) {
               {/* Markers */}
               {validRoute.map((point, index) => {
                 const isMatriz = point.client_name?.includes("Matriz") || point.order === 1 || point.order === route.length;
+                // Display number should be order - 1 for deliveries (since order 1 is Matriz)
+                const displayNumber = point.order - 1;
                 const markerHtml = `
                   <div style="
                     background-color: ${getMarkerColor(point.order, isMatriz)};
@@ -124,7 +126,7 @@ export default function RouteMap({ route, pontoPartida, waypoints }) {
                     border: 3px solid white;
                     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
                   ">
-                    ${isMatriz ? '🏠' : point.order}
+                    ${isMatriz ? '🏠' : displayNumber}
                   </div>
                 `;
 
