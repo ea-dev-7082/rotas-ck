@@ -61,60 +61,45 @@ export default function Optimizer() {
       
       // Optimize route
       const result = await base44.integrations.Core.InvokeLLM({
-        prompt: `Você é um especialista em otimização de rotas de entrega no Rio de Janeiro. 
+        prompt: `Você é um especialista em otimização de rotas de entrega no Rio de Janeiro.
 
-HORÁRIO DE SAÍDA: ${startTime}
+      TAREFA CRÍTICA: Buscar as COORDENADAS GPS EXATAS de cada endereço usando a internet.
 
-PONTO DE PARTIDA OBRIGATÓRIO:
-${PONTO_PARTIDA.nome}
-${PONTO_PARTIDA.endereco}
+      HORÁRIO DE SAÍDA: ${startTime}
 
-CLIENTES PARA ENTREGAR (com endereços completos incluindo número):
-${clientesDataStr}
+      PONTO DE PARTIDA OBRIGATÓRIO:
+      ${PONTO_PARTIDA.nome}
+      ${PONTO_PARTIDA.endereco}
 
-INSTRUÇÕES DETALHADAS:
+      CLIENTES PARA ENTREGAR:
+      ${clientesDataStr}
 
-1. ESTRUTURA DA ROTA:
-   - O primeiro ponto (order: 1) é SEMPRE a Matriz (ponto de partida) com horário de saída ${startTime}
-   - Organize os clientes na ordem mais eficiente de visitação
-   - O último ponto é o RETORNO à Matriz
+      INSTRUÇÕES:
 
-2. OTIMIZAÇÃO GEOGRÁFICA:
-   - Agrupe entregas por REGIÃO/BAIRRO (ex: todos de Bangu juntos, depois Campo Grande, etc)
-   - Minimize deslocamentos entre bairros distantes
-   - Evite "voltas" - mantenha uma sequência lógica geográfica
-   - Considere o trânsito típico do Rio de Janeiro no horário atual
+      1. COORDENADAS GPS - PRIORIDADE MÁXIMA:
+      - PESQUISE na internet as coordenadas EXATAS de cada endereço
+      - Use Google Maps, OpenStreetMap ou similar para obter latitude/longitude precisas
+      - Cada coordenada deve corresponder EXATAMENTE ao endereço da rua
+      - Exemplo de precisão esperada: "R. Soares Meireles, 421 - Pilares" = lat: -22.8756, lng: -43.3012
+      - NÃO use coordenadas aproximadas ou do centro do bairro
 
-3. CÁLCULO DE TEMPO (SEJA REALISTA):
-   - Considere 15-20 minutos por entrega (estacionar, localizar, entregar, recibo)
-   - Adicione tempo de deslocamento entre pontos baseado em:
-     * Distância real entre endereços
-     * Condições de trânsito do Rio de Janeiro
-     * Tipo de via (avenida principal = mais rápido, ruas locais = mais lento)
-   - Para cada ponto, calcule: horário_anterior + tempo_deslocamento + tempo_entrega
+      2. ESTRUTURA DA ROTA:
+      - order: 1 = Matriz (saída) com horário ${startTime}
+      - order: 2 até N = Entregas na ordem otimizada
+      - order: último = Retorno à Matriz
 
-4. ENDEREÇOS E COORDENADAS:
-   - Use o endereço COMPLETO com número para cada parada
-   - Use Google Maps API ou conhecimento de navegação para obter coordenadas GPS REAIS
-   - Pesquise cada endereço específico para garantir precisão máxima
-   - Valide que as coordenadas estão no Rio de Janeiro (lat: -23.1 a -22.7, lng: -43.8 a -43.1)
+      3. OTIMIZAÇÃO:
+      - Agrupe por proximidade geográfica/bairro
+      - Minimize distância total percorrida
 
-5. FORMATO DE HORÁRIO:
-   - Use formato HH:MM (ex: 09:30, 14:45)
-   - Seja preciso e realista com base no tempo acumulado
+      4. TEMPOS:
+      - 15 min por entrega + tempo de deslocamento realista
+      - Formato HH:MM
 
-6. WAYPOINTS DAS RUAS:
-   - Para cada segmento entre pontos consecutivos, gere waypoints que seguem as RUAS REAIS
-   - Use seu conhecimento das vias do Rio de Janeiro
-   - Inclua 5-10 waypoints intermediários por segmento seguindo as principais avenidas/ruas
-   - Os waypoints devem formar um caminho realista pelas vias (não linha reta)
-   - Formato: from_order, to_order, e array de waypoints com coordenadas {lat, lng}
-
-IMPORTANTE: 
-- Numere os clientes em ordem de visitação (1=Matriz saída, 2-N=entregas, último=Matriz retorno)
-- Cada horário deve ser calculado somando tempo de deslocamento + tempo de entrega do ponto anterior
-- Inclua o endereço COMPLETO com número em cada parada
-- Gere waypoints realistas que seguem as vias do Rio de Janeiro (não linhas retas)`,
+      VALIDAÇÃO OBRIGATÓRIA:
+      - Latitude deve estar entre -23.1 e -22.7
+      - Longitude deve estar entre -43.8 e -43.1
+      - Coordenadas devem ser ESPECÍFICAS do endereço, não genéricas`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
