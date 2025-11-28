@@ -161,9 +161,9 @@ export default function RouteMap({ route, pontoPartida, waypoints }) {
                                   backgroundColor: getMarkerColor(point.order, isMatriz),
                                 }}
                               >
-                                {point.order}
+                                {point.order - 1}
                               </div>
-                              <span className="font-semibold">Parada {point.order - 1}</span>
+                              <span className="font-semibold">Entrega {point.order - 1}</span>
                             </>
                           )}
                         </div>
