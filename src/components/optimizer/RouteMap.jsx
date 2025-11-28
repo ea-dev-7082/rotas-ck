@@ -5,7 +5,7 @@ import { Map, Navigation, Home } from "lucide-react";
 import { motion } from "framer-motion";
 import "leaflet/dist/leaflet.css";
 
-export default function RouteMap({ route, pontoPartida, waypoints }) {
+export default function RouteMap({ route, pontoPartida, routeGeometry }) {
   if (!route || route.length === 0) return null;
 
   // Filter out invalid points
@@ -34,23 +34,11 @@ export default function RouteMap({ route, pontoPartida, waypoints }) {
     validRoute.reduce((sum, point) => sum + point.longitude, 0) / validRoute.length,
   ];
 
-  // Create polyline connecting all points in order
-  const mainRoutePositions = validRoute
-    .sort((a, b) => a.order - b.order)
-    .map((point) => [point.latitude, point.longitude]);
-
-  // Also check for waypoints for more detailed paths
-  const waypointSegments = [];
-  if (waypoints && waypoints.length > 0) {
-    waypoints.forEach(segment => {
-      const points = segment.waypoints
-        ?.filter(wp => wp.lat && wp.lng && !isNaN(wp.lat) && !isNaN(wp.lng))
-        .map(wp => [wp.lat, wp.lng]);
-      if (points && points.length > 0) {
-        waypointSegments.push(points);
-      }
-    });
-  }
+  // Create polyline from Mapbox geometry (GeoJSON format: [lng, lat])
+  // Convert to Leaflet format: [lat, lng]
+  const routePositions = routeGeometry && routeGeometry.length > 0
+    ? routeGeometry.map(coord => [coord[1], coord[0]])
+    : validRoute.sort((a, b) => a.order - b.order).map(point => [point.latitude, point.longitude]);
 
   // Create custom marker colors based on order
   const getMarkerColor = (order, isMatriz) => {
@@ -86,25 +74,13 @@ export default function RouteMap({ route, pontoPartida, waypoints }) {
                 url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
               />
 
-              {/* Main route line connecting all points */}
-                  <Polyline
-                    positions={mainRoutePositions}
-                    color="#3b82f6"
-                    weight={5}
-                    opacity={0.8}
-                    dashArray="10, 10"
-                  />
-
-                  {/* Waypoint segments for detailed paths if available */}
-                  {waypointSegments.map((segment, idx) => (
-                    <Polyline
-                      key={idx}
-                      positions={segment}
-                      color="#6366f1"
-                      weight={4}
-                      opacity={0.6}
-                    />
-                  ))}
+              {/* Route line from Mapbox (follows real streets) */}
+              <Polyline
+                positions={routePositions}
+                color="#3b82f6"
+                weight={5}
+                opacity={0.8}
+              />
 
               {/* Markers */}
               {validRoute.map((point, index) => {

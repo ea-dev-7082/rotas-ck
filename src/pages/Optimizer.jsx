@@ -10,6 +10,7 @@ import ClientSelector from "../components/optimizer/ClientSelector";
 import RouteMap from "../components/optimizer/RouteMap";
 import OptimizedList from "../components/optimizer/OptimizedList";
 import NearbyClients from "../components/optimizer/NearbyClients";
+import { geocodeMultiple, optimizeRoute, processOptimizationResult } from "../components/optimizer/mapboxService";
 
 const PONTO_PARTIDA = {
   nome: "Matriz - Ponto de Partida",
@@ -36,10 +37,12 @@ export default function Optimizer() {
     try {
       const selectedClientesData = selectedClients.map(id => {
         const cliente = clientes.find(c => c.id === id);
+        const enderecoCompleto = cliente.endereco_num 
+          ? `${cliente.endereco}, ${cliente.endereco_num}`
+          : cliente.endereco;
         return { 
           nome: cliente.nome, 
-          endereco: cliente.endereco,
-          endereco_num: cliente.endereco_num
+          endereco: enderecoCompleto
         };
       });
 
@@ -51,115 +54,39 @@ export default function Optimizer() {
         observacoes: c.observacoes
       }));
 
-      const clientesDataStr = selectedClientesData.map(c => 
-        `${c.nome} - ${c.endereco}${c.endereco_num ? `, Nº ${c.endereco_num}` : ''}`
-      ).join('\n');
-
       // Get current time
       const now = new Date();
       const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       
-      // Optimize route
-      const result = await base44.integrations.Core.InvokeLLM({
-        prompt: `Você é um especialista em otimização de rotas de entrega no Rio de Janeiro.
-
-      TAREFA CRÍTICA: Buscar as COORDENADAS GPS EXATAS de cada endereço usando a internet.
-
-      HORÁRIO DE SAÍDA: ${startTime}
-
-      PONTO DE PARTIDA OBRIGATÓRIO:
-      ${PONTO_PARTIDA.nome}
-      ${PONTO_PARTIDA.endereco}
-
-      CLIENTES PARA ENTREGAR:
-      ${clientesDataStr}
-
-      INSTRUÇÕES:
-
-      1. COORDENADAS GPS - PRIORIDADE MÁXIMA:
-      - PESQUISE na internet as coordenadas EXATAS de cada endereço
-      - Use Google Maps, OpenStreetMap ou similar para obter latitude/longitude precisas
-      - Cada coordenada deve corresponder EXATAMENTE ao endereço da rua
-      - Exemplo de precisão esperada: "R. Soares Meireles, 421 - Pilares" = lat: -22.8756, lng: -43.3012
-      - NÃO use coordenadas aproximadas ou do centro do bairro
-
-      2. ESTRUTURA DA ROTA:
-      - order: 1 = Matriz (saída) com horário ${startTime}
-      - order: 2 até N = Entregas na ordem otimizada
-      - order: último = Retorno à Matriz
-
-      3. OTIMIZAÇÃO:
-      - Agrupe por proximidade geográfica/bairro
-      - Minimize distância total percorrida
-
-      4. TEMPOS:
-      - 15 min por entrega + tempo de deslocamento realista
-      - Formato HH:MM
-
-      VALIDAÇÃO OBRIGATÓRIA:
-      - Latitude deve estar entre -23.1 e -22.7
-      - Longitude deve estar entre -43.8 e -43.1
-      - Coordenadas devem ser ESPECÍFICAS do endereço, não genéricas`,
-        add_context_from_internet: true,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            optimized_route: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  order: { type: "number" },
-                  client_name: { type: "string" },
-                  address: { type: "string" },
-                  street: { type: "string" },
-                  number: { type: "string" },
-                  neighborhood: { type: "string" },
-                  latitude: { type: "number" },
-                  longitude: { type: "number" },
-                  estimated_arrival: { type: "string" },
-                  travel_time_from_previous: { type: "number" },
-                  delivery_time: { type: "number" }
-                }
-              }
-            },
-            route_waypoints: {
-              type: "array",
-              description: "Waypoints que seguem as ruas entre cada par de pontos",
-              items: {
-                type: "object",
-                properties: {
-                  from_order: { type: "number" },
-                  to_order: { type: "number" },
-                  waypoints: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        lat: { type: "number" },
-                        lng: { type: "number" }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            total_distance_km: { type: "number" },
-            total_time_minutes: { type: "number" },
-            optimization_notes: { type: "string" }
-          }
-        }
-      });
+      // 1. Geocodificar Matriz
+      const matrizData = [{ nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco }];
+      const [matrizGeocodificada] = await geocodeMultiple(matrizData);
+      
+      // 2. Geocodificar todos os clientes selecionados
+      const clientesGeocodificados = await geocodeMultiple(selectedClientesData);
+      
+      if (clientesGeocodificados.length === 0) {
+        throw new Error("Não foi possível geocodificar os endereços dos clientes");
+      }
+      
+      // 3. Montar array com matriz + clientes para otimização
+      const pontosParaOtimizar = [matrizGeocodificada, ...clientesGeocodificados];
+      
+      // 4. Chamar API de otimização do Mapbox
+      const optimizationData = await optimizeRoute(pontosParaOtimizar);
+      
+      // 5. Processar resultado
+      const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime);
 
       setOptimizedRoute(result.optimized_route);
       setStats({
         distance: result.total_distance_km,
         time: result.total_time_minutes,
         notes: result.optimization_notes,
-        waypoints: result.route_waypoints || []
+        routeGeometry: result.route_geometry
       });
 
-      // Find nearby clients for promotions
+      // Find nearby clients for promotions (mantém LLM para análise inteligente)
       const nearbyResult = await base44.integrations.Core.InvokeLLM({
         prompt: `Você é um especialista em análise geográfica no Rio de Janeiro.
 
@@ -405,7 +332,7 @@ IMPORTANTE:
             <AnimatePresence mode="wait">
               {optimizedRoute ? (
                 <>
-                  <RouteMap route={optimizedRoute} pontoPartida={PONTO_PARTIDA} waypoints={stats?.waypoints} />
+                  <RouteMap route={optimizedRoute} pontoPartida={PONTO_PARTIDA} routeGeometry={stats?.routeGeometry} />
                   <OptimizedList route={optimizedRoute} />
                   <NearbyClients nearbyClients={nearbyClients} />
                 </>
