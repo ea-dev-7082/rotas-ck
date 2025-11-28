@@ -1,4 +1,4 @@
-const MAPBOX_TOKEN = "sk.eyJ1Ijoia2FmZnNwaWVsIiwiYSI6ImNtaWo1N3VuOTB6NTUza3EyajR5NDV1YnAifQ.6ExEy1_7txYOQSDuwbmxlg";
+const MAPBOX_TOKEN = "pk.eyJ1Ijoia2FmZnNwaWVsIiwiYSI6ImNtaWo0d29kdTBwN3YzZG9jYjZ0bTViNDAifQ.3mWlq4U6wGn6ctgGcuOUog";
 
 // Geocodificar um endereço para obter coordenadas
 export async function geocodeAddress(address) {
