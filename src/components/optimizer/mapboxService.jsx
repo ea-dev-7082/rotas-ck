@@ -70,16 +70,21 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   const trip = optimizationData.trips[0];
   const waypoints = optimizationData.waypoints;
   
-  // Ordenar pontos pela ordem otimizada
-  const orderedPoints = waypoints
+  // Mapear waypoints otimizados para os pontos originais usando a posição no array
+  // O Mapbox retorna waypoints na mesma ordem que foram enviados, 
+  // mas cada um tem waypoint_index indicando a posição na rota otimizada
+  const waypointsWithOriginal = waypoints.map((wp, index) => ({
+    ...wp,
+    originalPoint: originalPoints[index] // índice no array = ordem original de envio
+  }));
+  
+  // Ordenar pela ordem otimizada (waypoint_index)
+  const orderedPoints = waypointsWithOriginal
     .sort((a, b) => a.waypoint_index - b.waypoint_index)
-    .map((wp, index) => {
-      const originalPoint = originalPoints[wp.original_index || index];
-      return {
-        ...originalPoint,
-        waypoint_index: wp.waypoint_index
-      };
-    });
+    .map(wp => ({
+      ...wp.originalPoint,
+      waypoint_index: wp.waypoint_index
+    }));
   
   // Calcular horários estimados
   let currentTime = parseTime(startTime);
