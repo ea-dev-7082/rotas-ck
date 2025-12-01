@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,8 +18,16 @@ export default function NotaFiscalDialog({
   notasFiscais,
   onSave,
 }) {
-  const [notas, setNotas] = useState(notasFiscais || []);
+  const [notas, setNotas] = useState([]);
   const [newNota, setNewNota] = useState({ numero: "", data: "", volume: "" });
+
+  // Atualizar notas quando o dialog abrir ou o cliente mudar
+  useEffect(() => {
+    if (open) {
+      setNotas(notasFiscais || []);
+      setNewNota({ numero: "", data: "", volume: "" });
+    }
+  }, [open, clientName, notasFiscais]);
 
   const handleAddNota = () => {
     if (newNota.numero) {
