@@ -11,6 +11,8 @@ import RouteMap from "../components/optimizer/RouteMap";
 import DraggableRouteList from "../components/optimizer/DraggableRouteList";
 import NearbyClients from "../components/optimizer/NearbyClients";
 import PrintModal from "../components/optimizer/PrintModal";
+import VehicleDriverSelector from "../components/optimizer/VehicleDriverSelector";
+import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
 import { geocodeMultiple, optimizeRoute, processOptimizationResult } from "../components/optimizer/mapboxService";
 
 const DEFAULT_MATRIZ = "Configure o endereço da matriz em Configurações";
@@ -24,6 +26,11 @@ export default function Optimizer() {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [geocodedClients, setGeocodedClients] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [selectedVeiculo, setSelectedVeiculo] = useState("");
+  const [selectedMotorista, setSelectedMotorista] = useState("");
+  const [notasFiscais, setNotasFiscais] = useState({});
+  const [showNotaFiscalDialog, setShowNotaFiscalDialog] = useState(false);
+  const [currentClientForNota, setCurrentClientForNota] = useState("");
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
@@ -39,6 +46,20 @@ export default function Optimizer() {
   const { data: configs } = useQuery({
     queryKey: ['configuracoes', currentUser?.email],
     queryFn: () => currentUser ? base44.entities.Configuracao.filter({ owner: currentUser.email }) : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
+
+  const { data: veiculos } = useQuery({
+    queryKey: ['veiculos', currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Veiculo.filter({ owner: currentUser.email, ativo: true }, 'descricao') : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
+
+  const { data: motoristas } = useQuery({
+    queryKey: ['motoristas', currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Motorista.filter({ owner: currentUser.email, ativo: true }, 'nome') : [],
     enabled: !!currentUser,
     initialData: [],
   });
@@ -177,7 +198,23 @@ IMPORTANTE:
     setStats(null);
     setNearbyClients(null);
     setGeocodedClients([]);
+    setNotasFiscais({});
   };
+
+  const handleOpenNotaFiscal = (clientName) => {
+    setCurrentClientForNota(clientName);
+    setShowNotaFiscalDialog(true);
+  };
+
+  const handleSaveNotaFiscal = (notas) => {
+    setNotasFiscais(prev => ({
+      ...prev,
+      [currentClientForNota]: notas
+    }));
+  };
+
+  const selectedVeiculoData = veiculos.find(v => v.id === selectedVeiculo);
+  const selectedMotoristaData = motoristas.find(m => m.id === selectedMotorista);
 
   const calcularDistancia = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
