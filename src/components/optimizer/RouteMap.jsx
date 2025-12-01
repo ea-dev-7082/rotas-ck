@@ -205,6 +205,14 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
                   <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                   <span className="text-gray-700">Entregas</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-0.5 bg-blue-500"></div>
+                  <span className="text-gray-700">Ida</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-0.5 bg-orange-500" style={{backgroundImage: 'repeating-linear-gradient(90deg, #f97316 0, #f97316 4px, transparent 4px, transparent 8px)'}}></div>
+                  <span className="text-gray-700">Volta</span>
+                </div>
               </div>
             </div>
           </div>
