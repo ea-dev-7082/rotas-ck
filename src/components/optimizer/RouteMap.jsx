@@ -40,6 +40,27 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
     ? routeGeometry.map(coord => [coord[1], coord[0]])
     : validRoute.sort((a, b) => a.order - b.order).map(point => [point.latitude, point.longitude]);
 
+  // Encontrar o ponto aproximado da última entrega para dividir ida/volta
+  const lastDeliveryPoint = validRoute.find(p => p.order === validRoute.length - 1);
+  let splitIndex = routePositions.length;
+  
+  if (lastDeliveryPoint && routeGeometry && routeGeometry.length > 0) {
+    // Encontrar o índice mais próximo da última entrega na geometria
+    let minDist = Infinity;
+    routePositions.forEach((pos, idx) => {
+      const dist = Math.pow(pos[0] - lastDeliveryPoint.latitude, 2) + 
+                   Math.pow(pos[1] - lastDeliveryPoint.longitude, 2);
+      if (dist < minDist) {
+        minDist = dist;
+        splitIndex = idx;
+      }
+    });
+  }
+  
+  // Dividir a rota em ida e volta
+  const routeIda = routePositions.slice(0, splitIndex + 1);
+  const routeVolta = routePositions.slice(splitIndex);
+
   // Create custom marker colors based on order
   const getMarkerColor = (order, isMatriz) => {
     if (isMatriz) return "#10b981"; // green for matriz
