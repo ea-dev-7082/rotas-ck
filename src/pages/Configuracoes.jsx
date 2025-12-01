@@ -27,6 +27,8 @@ import {
   Eye,
   EyeOff,
   Home,
+  Car,
+  Bike,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -42,8 +44,15 @@ export default function Configuracoes() {
     nome: "",
     telefone: "",
     cnh: "",
-    veiculo: "",
+    ativo: true,
+  });
+  const [showVeiculoDialog, setShowVeiculoDialog] = useState(false);
+  const [editingVeiculo, setEditingVeiculo] = useState(null);
+  const [veiculoForm, setVeiculoForm] = useState({
+    descricao: "",
+    tipo: "carro",
     placa: "",
+    capacidade: "",
     ativo: true,
   });
   const [currentUser, setCurrentUser] = useState(null);
@@ -66,6 +75,14 @@ export default function Configuracoes() {
   const { data: motoristas, isLoading: loadingMotoristas } = useQuery({
     queryKey: ["motoristas", currentUser?.email],
     queryFn: () => currentUser ? base44.entities.Motorista.filter({ owner: currentUser.email }, "nome") : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
+
+  // Buscar veículos
+  const { data: veiculos, isLoading: loadingVeiculos } = useQuery({
+    queryKey: ["veiculos", currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Veiculo.filter({ owner: currentUser.email }, "descricao") : [],
     enabled: !!currentUser,
     initialData: [],
   });
@@ -126,6 +143,29 @@ export default function Configuracoes() {
     },
   });
 
+  const createVeiculoMutation = useMutation({
+    mutationFn: (data) => base44.entities.Veiculo.create({ ...data, owner: currentUser?.email }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["veiculos"] });
+      handleCloseVeiculoDialog();
+    },
+  });
+
+  const updateVeiculoMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Veiculo.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["veiculos"] });
+      handleCloseVeiculoDialog();
+    },
+  });
+
+  const deleteVeiculoMutation = useMutation({
+    mutationFn: (id) => base44.entities.Veiculo.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["veiculos"] });
+    },
+  });
+
   const handleSaveToken = () => {
     saveConfigMutation.mutate({ chave: "mapbox_token", valor: mapboxToken });
   };
@@ -140,8 +180,6 @@ export default function Configuracoes() {
       nome: motorista.nome,
       telefone: motorista.telefone || "",
       cnh: motorista.cnh || "",
-      veiculo: motorista.veiculo || "",
-      placa: motorista.placa || "",
       ativo: motorista.ativo ?? true,
     });
     setShowMotoristaDialog(true);
@@ -154,10 +192,41 @@ export default function Configuracoes() {
       nome: "",
       telefone: "",
       cnh: "",
-      veiculo: "",
-      placa: "",
       ativo: true,
     });
+  };
+
+  const handleEditVeiculo = (veiculo) => {
+    setEditingVeiculo(veiculo);
+    setVeiculoForm({
+      descricao: veiculo.descricao,
+      tipo: veiculo.tipo || "carro",
+      placa: veiculo.placa || "",
+      capacidade: veiculo.capacidade || "",
+      ativo: veiculo.ativo ?? true,
+    });
+    setShowVeiculoDialog(true);
+  };
+
+  const handleCloseVeiculoDialog = () => {
+    setShowVeiculoDialog(false);
+    setEditingVeiculo(null);
+    setVeiculoForm({
+      descricao: "",
+      tipo: "carro",
+      placa: "",
+      capacidade: "",
+      ativo: true,
+    });
+  };
+
+  const handleSubmitVeiculo = (e) => {
+    e.preventDefault();
+    if (editingVeiculo) {
+      updateVeiculoMutation.mutate({ id: editingVeiculo.id, data: veiculoForm });
+    } else {
+      createVeiculoMutation.mutate(veiculoForm);
+    }
   };
 
   const handleSubmitMotorista = (e) => {
