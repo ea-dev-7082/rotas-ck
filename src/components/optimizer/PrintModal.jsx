@@ -146,18 +146,22 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
               </div>
             )}
 
+            {route?.[0]?.estimated_arrival && (
+              <div className="saida-section" style={{marginTop: '15px', padding: '10px', background: '#fff3cd', borderRadius: '5px'}}>
+                <div><strong>🚀 Hora de Saída:</strong> {route[0].estimated_arrival}</div>
+              </div>
+            )}
+
             <div className="route-list">
-              {route?.map((point, index) => {
-                const isMatriz = index === 0 || index === route.length - 1;
+              {route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
                 const clientNotas = notasFiscais?.[point.client_name] || [];
                 return (
                   <div key={index} className="route-item">
-                    <div className={`route-number ${isMatriz ? 'matriz' : ''}`}>
-                      {isMatriz ? '🏠' : index}
+                    <div className="route-number">
+                      {index + 1}
                     </div>
                     <div className="route-details">
                       <div className="route-name">
-                        {isMatriz ? (index === 0 ? 'SAÍDA - ' : 'RETORNO - ') : ''}
                         {point.client_name}
                       </div>
                       <div className="route-address">📍 {point.address}</div>
