@@ -398,7 +398,18 @@ IMPORTANTE:
   };
 
   const buildManualRoute = (matrizGeocodificada, entregas, startTime) => {
+    const parseTime = (timeStr) => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+    const formatTime = (totalMinutes) => {
+      const hours = Math.floor(totalMinutes / 60) % 24;
+      const minutes = Math.round(totalMinutes % 60);
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    };
+
     let currentOrder = 1;
+    let currentTime = parseTime(startTime);
     const route = [];
 
     route.push({
@@ -410,17 +421,28 @@ IMPORTANTE:
       estimated_arrival: startTime
     });
 
-    entregas.forEach((item) => {
+    entregas.forEach((item, idx) => {
       const geocoded = geocodedClients.find(g => g.nome === item.client_name) || item;
+      
+      // Estimar 10 min de deslocamento entre pontos + 15 min de descarga do anterior
+      if (idx > 0) {
+        currentTime += 10 + 15; // deslocamento + descarga
+      } else {
+        currentTime += 10; // apenas deslocamento da matriz
+      }
+
       route.push({
         order: currentOrder++,
         client_name: item.client_name,
         address: item.address,
         latitude: geocoded.latitude || item.latitude,
         longitude: geocoded.longitude || item.longitude,
-        estimated_arrival: "--:--"
+        estimated_arrival: formatTime(currentTime)
       });
     });
+
+    // Volta à matriz
+    currentTime += 15 + 10; // descarga última entrega + volta
 
     route.push({
       order: currentOrder,
@@ -428,7 +450,7 @@ IMPORTANTE:
       address: PONTO_PARTIDA.endereco,
       latitude: matrizGeocodificada.latitude,
       longitude: matrizGeocodificada.longitude,
-      estimated_arrival: "--:--"
+      estimated_arrival: formatTime(currentTime)
     });
 
     return route;
