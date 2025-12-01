@@ -18,7 +18,7 @@ import { Printer, Route, MapPin, Clock, User, Truck, Home } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 
-export default function PrintModal({ open, onClose, route, stats, pontoPartida }) {
+export default function PrintModal({ open, onClose, route, stats, pontoPartida, notasFiscais, responsavelExpedicao, veiculoData }) {
   const [selectedMotorista, setSelectedMotorista] = useState("");
   const printRef = useRef();
 
@@ -57,6 +57,11 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida }
             .route-name { font-weight: bold; font-size: 14px; }
             .route-address { color: #666; font-size: 12px; margin-top: 3px; }
             .route-time { color: #888; font-size: 11px; margin-top: 3px; }
+            .route-notas { margin-top: 5px; padding: 5px; background: #f9f9f9; border-radius: 3px; font-size: 11px; }
+            .route-notas-title { font-weight: bold; margin-bottom: 3px; }
+            .nota-item { display: flex; gap: 10px; margin-bottom: 2px; }
+            .expedidor-section { margin-top: 15px; padding: 10px; background: #e8f4fd; border-radius: 5px; }
+            .veiculo-section { margin-bottom: 15px; padding: 10px; background: #f0fdf4; border-radius: 5px; }
             .signature-section { margin-top: 40px; display: flex; justify-content: space-between; }
             .signature-box { width: 45%; text-align: center; }
             .signature-line { border-top: 1px solid #333; margin-top: 60px; padding-top: 5px; }
@@ -131,6 +136,17 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida }
               </div>
             </div>
 
+            {veiculoData && (
+              <div className="veiculo-section">
+                <div className="motorista-title">🚗 Veículo</div>
+                <div><strong>Descrição:</strong> {veiculoData.descricao}</div>
+                {veiculoData.placa && (
+                  <div><strong>Placa:</strong> {veiculoData.placa}</div>
+                )}
+                <div><strong>Tipo:</strong> {veiculoData.tipo === 'moto' ? 'Moto' : 'Carro'}</div>
+              </div>
+            )}
+
             {selectedMotoristaData && (
               <div className="motorista-section">
                 <div className="motorista-title">👤 Motorista</div>
@@ -138,18 +154,19 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida }
                 {selectedMotoristaData.telefone && (
                   <div><strong>Telefone:</strong> {selectedMotoristaData.telefone}</div>
                 )}
-                {selectedMotoristaData.veiculo && (
-                  <div><strong>Veículo:</strong> {selectedMotoristaData.veiculo}</div>
-                )}
-                {selectedMotoristaData.placa && (
-                  <div><strong>Placa:</strong> {selectedMotoristaData.placa}</div>
-                )}
+              </div>
+            )}
+
+            {responsavelExpedicao && (
+              <div className="expedidor-section">
+                <div><strong>📦 Responsável pela Expedição:</strong> {responsavelExpedicao}</div>
               </div>
             )}
 
             <div className="route-list">
               {route?.map((point, index) => {
                 const isMatriz = index === 0 || index === route.length - 1;
+                const clientNotas = notasFiscais?.[point.client_name] || [];
                 return (
                   <div key={index} className="route-item">
                     <div className={`route-number ${isMatriz ? 'matriz' : ''}`}>
@@ -163,6 +180,18 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida }
                       <div className="route-address">📍 {point.address}</div>
                       {point.estimated_arrival && (
                         <div className="route-time">⏰ Chegada: {point.estimated_arrival}</div>
+                      )}
+                      {clientNotas.length > 0 && (
+                        <div className="route-notas">
+                          <div className="route-notas-title">📄 Notas Fiscais:</div>
+                          {clientNotas.map((nota, nIdx) => (
+                            <div key={nIdx} className="nota-item">
+                              <span><strong>NF {nota.numero}</strong></span>
+                              {nota.data && <span>Data: {new Date(nota.data).toLocaleDateString('pt-BR')}</span>}
+                              {nota.volume && <span>Vol: {nota.volume}</span>}
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
