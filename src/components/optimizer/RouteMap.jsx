@@ -95,13 +95,24 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
                 url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
               />
 
-              {/* Route line from Mapbox (follows real streets) */}
+              {/* Route line - Ida (azul) */}
               <Polyline
-                positions={routePositions}
+                positions={routeIda}
                 color="#3b82f6"
                 weight={5}
                 opacity={0.8}
               />
+              
+              {/* Route line - Volta (laranja) */}
+              {routeVolta.length > 1 && (
+                <Polyline
+                  positions={routeVolta}
+                  color="#f97316"
+                  weight={5}
+                  opacity={0.8}
+                  dashArray="10, 10"
+                />
+              )}
 
               {/* Markers */}
               {validRoute.map((point, index) => {
