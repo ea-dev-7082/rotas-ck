@@ -16,10 +16,15 @@ export default function ClientSelector({
 }) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredClientes = clientes.filter((cliente) =>
-    cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.endereco.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredClientes = clientes.filter((cliente) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      cliente.nome.toLowerCase().includes(term) ||
+      cliente.endereco.toLowerCase().includes(term) ||
+      (cliente.bairro && cliente.bairro.toLowerCase().includes(term)) ||
+      (cliente.municipio && cliente.municipio.toLowerCase().includes(term))
+    );
+  });
 
   const handleToggle = (clienteId) => {
     if (selectedClients.includes(clienteId)) {
@@ -59,7 +64,7 @@ export default function ClientSelector({
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
         <Input
           type="text"
-          placeholder="Buscar cliente..."
+          placeholder="Buscar por nome, endereço, bairro ou município..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"

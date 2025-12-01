@@ -3,10 +3,10 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { List, MapPin, Clock, Copy, CheckCircle2, User, Home, Navigation, GripVertical, Printer } from "lucide-react";
+import { List, MapPin, Clock, Copy, CheckCircle2, User, Home, Navigation, GripVertical, Printer, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 
-export default function DraggableRouteList({ route, onReorder, onPrint }) {
+export default function DraggableRouteList({ route, onReorder, onPrint, notasFiscais, onOpenNotaFiscal }) {
   const [copied, setCopied] = React.useState(false);
 
   if (!route || route.length === 0) return null;
@@ -188,6 +188,26 @@ export default function DraggableRouteList({ route, onReorder, onPrint }) {
                                     <span>Chegada prevista: {point.estimated_arrival}</span>
                                   </div>
                                 )}
+                                {/* Notas Fiscais */}
+                                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onOpenNotaFiscal && onOpenNotaFiscal(point.client_name);
+                                    }}
+                                    className="gap-2"
+                                  >
+                                    <FileText className="w-4 h-4" />
+                                    Notas Fiscais
+                                    {notasFiscais?.[point.client_name]?.length > 0 && (
+                                      <Badge className="bg-blue-500 text-white ml-1">
+                                        {notasFiscais[point.client_name].length}
+                                      </Badge>
+                                    )}
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </div>
