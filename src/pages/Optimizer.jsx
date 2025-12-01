@@ -130,8 +130,8 @@ CRITÉRIOS OBRIGATÓRIOS PARA CLIENTES PRÓXIMOS:
 
 4. JUSTIFICATIVA:
    - Explique claramente por que cada cliente próximo foi selecionado
-   - Mencione se está no mesmo bairro ou dentro do raio de 5-7km
-   - Informe qual cliente de entrega está mais próximo
+   - Mencione se está no mesmo bairro ou dentro do raio de 5-7km 
+   - Informe qual cliente de entrega está mais próximo (Não inclua a MAtriz como entrega)
 
 IMPORTANTE:
 - Seja rigoroso com os critérios de distância (5-7 km do mais longe OU mesmo bairro)
