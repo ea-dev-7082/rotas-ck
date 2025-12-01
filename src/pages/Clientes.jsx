@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -31,10 +31,16 @@ export default function Clientes() {
   });
 
   const queryClient = useQueryClient();
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser);
+  }, []);
 
   const { data: clientes, isLoading } = useQuery({
-    queryKey: ["clientes"],
-    queryFn: () => base44.entities.Cliente.list("nome"),
+    queryKey: ["clientes", currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Cliente.filter({ owner: currentUser.email }, "nome") : [],
+    enabled: !!currentUser,
     initialData: [],
   });
 
@@ -66,7 +72,7 @@ export default function Clientes() {
     if (editingCliente) {
       updateMutation.mutate({ id: editingCliente.id, data: formData });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate({ ...formData, owner: currentUser?.email });
     }
   };
 

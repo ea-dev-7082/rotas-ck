@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Home,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -33,6 +34,8 @@ export default function Configuracoes() {
   const [mapboxToken, setMapboxToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [tokenSaved, setTokenSaved] = useState(false);
+  const [enderecoMatriz, setEnderecoMatriz] = useState("");
+  const [matrizSaved, setMatrizSaved] = useState(false);
   const [showMotoristaDialog, setShowMotoristaDialog] = useState(false);
   const [editingMotorista, setEditingMotorista] = useState(null);
   const [motoristaForm, setMotoristaForm] = useState({
@@ -43,49 +46,65 @@ export default function Configuracoes() {
     placa: "",
     ativo: true,
   });
+  const [currentUser, setCurrentUser] = useState(null);
 
   const queryClient = useQueryClient();
 
-  // Buscar token salvo
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser);
+  }, []);
+
+  // Buscar configurações salvas
   const { data: configs } = useQuery({
-    queryKey: ["configuracoes"],
-    queryFn: () => base44.entities.Configuracao.list(),
+    queryKey: ["configuracoes", currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Configuracao.filter({ owner: currentUser.email }) : [],
+    enabled: !!currentUser,
     initialData: [],
   });
 
   // Buscar motoristas
   const { data: motoristas, isLoading: loadingMotoristas } = useQuery({
-    queryKey: ["motoristas"],
-    queryFn: () => base44.entities.Motorista.list("nome"),
+    queryKey: ["motoristas", currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Motorista.filter({ owner: currentUser.email }, "nome") : [],
+    enabled: !!currentUser,
     initialData: [],
   });
 
-  // Carregar token salvo
+  // Carregar configurações salvas
   useEffect(() => {
     const tokenConfig = configs.find((c) => c.chave === "mapbox_token");
     if (tokenConfig) {
       setMapboxToken(tokenConfig.valor);
     }
+    const matrizConfig = configs.find((c) => c.chave === "endereco_matriz");
+    if (matrizConfig) {
+      setEnderecoMatriz(matrizConfig.valor);
+    }
   }, [configs]);
 
   // Mutations
   const saveConfigMutation = useMutation({
-    mutationFn: async ({ chave, valor }) => {
+    mutationFn: async ({ chave, valor, onSuccess }) => {
       const existing = configs.find((c) => c.chave === chave);
       if (existing) {
-        return base44.entities.Configuracao.update(existing.id, { chave, valor });
+        return base44.entities.Configuracao.update(existing.id, { chave, valor, owner: currentUser?.email });
       }
-      return base44.entities.Configuracao.create({ chave, valor });
+      return base44.entities.Configuracao.create({ chave, valor, owner: currentUser?.email });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["configuracoes"] });
-      setTokenSaved(true);
-      setTimeout(() => setTokenSaved(false), 3000);
+      if (variables.chave === "mapbox_token") {
+        setTokenSaved(true);
+        setTimeout(() => setTokenSaved(false), 3000);
+      } else if (variables.chave === "endereco_matriz") {
+        setMatrizSaved(true);
+        setTimeout(() => setMatrizSaved(false), 3000);
+      }
     },
   });
 
   const createMotoristaMutation = useMutation({
-    mutationFn: (data) => base44.entities.Motorista.create(data),
+    mutationFn: (data) => base44.entities.Motorista.create({ ...data, owner: currentUser?.email }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["motoristas"] });
       handleCloseMotoristaDialog();
@@ -109,6 +128,10 @@ export default function Configuracoes() {
 
   const handleSaveToken = () => {
     saveConfigMutation.mutate({ chave: "mapbox_token", valor: mapboxToken });
+  };
+
+  const handleSaveMatriz = () => {
+    saveConfigMutation.mutate({ chave: "endereco_matriz", valor: enderecoMatriz });
   };
 
   const handleEditMotorista = (motorista) => {
@@ -234,6 +257,61 @@ export default function Configuracoes() {
                       >
                         mapbox.com
                       </a>
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Endereço da Matriz */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <Card className="bg-white shadow-xl">
+              <CardHeader className="border-b border-gray-100">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Home className="w-5 h-5 text-green-600" />
+                  Endereço da Matriz (Ponto de Partida)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="endereco-matriz">Endereço Completo</Label>
+                    <div className="flex gap-2">
+                      <Textarea
+                        id="endereco-matriz"
+                        value={enderecoMatriz}
+                        onChange={(e) => setEnderecoMatriz(e.target.value)}
+                        placeholder="Ex: Rua Augusta, 1234 - Consolação, São Paulo - SP, CEP: 01305-100"
+                        className="flex-1 min-h-[80px]"
+                      />
+                      <Button
+                        onClick={handleSaveMatriz}
+                        disabled={saveConfigMutation.isPending}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {matrizSaved ? (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            Salvo!
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Salvar
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 p-3 bg-green-50 rounded-lg text-sm text-green-700">
+                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <p>
+                      Este é o endereço de onde as entregas partem e retornam. Informe o endereço completo com CEP para melhor precisão.
                     </p>
                   </div>
                 </div>
