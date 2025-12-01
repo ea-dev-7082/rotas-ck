@@ -29,34 +29,35 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
           <title>Rota de Entregas</title>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; }
-            .header h1 { font-size: 24px; margin-bottom: 5px; }
-            .header p { color: #666; font-size: 14px; }
-            .info-row { display: flex; justify-content: space-between; margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px; }
+            @page { size: A4; margin: 8mm; }
+            body { font-family: Arial, sans-serif; padding: 5px; font-size: 10px; }
+            .header { text-align: center; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 5px; }
+            .header h1 { font-size: 16px; margin-bottom: 2px; }
+            .header p { color: #666; font-size: 10px; }
+            .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; padding: 5px; background: #f5f5f5; border-radius: 3px; }
             .info-item { text-align: center; }
-            .info-label { font-size: 12px; color: #666; }
-            .info-value { font-size: 18px; font-weight: bold; }
-            .motorista-section { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-            .motorista-title { font-weight: bold; margin-bottom: 10px; }
-            .route-list { margin-top: 20px; }
-            .route-item { display: flex; padding: 12px; border-bottom: 1px solid #eee; }
+            .info-label { font-size: 8px; color: #666; }
+            .info-value { font-size: 12px; font-weight: bold; }
+            .motorista-section { margin-bottom: 8px; padding: 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 9px; }
+            .motorista-title { font-weight: bold; margin-bottom: 3px; font-size: 10px; }
+            .route-list { margin-top: 8px; }
+            .route-item { display: flex; padding: 4px 0; border-bottom: 1px solid #eee; align-items: flex-start; }
             .route-item:last-child { border-bottom: none; }
-            .route-number { width: 40px; height: 40px; background: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 15px; flex-shrink: 0; }
-            .route-number.matriz { background: #10b981; }
+            .route-number { width: 20px; height: 20px; background: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 8px; flex-shrink: 0; font-size: 9px; }
             .route-details { flex: 1; }
-            .route-name { font-weight: bold; font-size: 14px; }
-            .route-address { color: #666; font-size: 12px; margin-top: 3px; }
-            .route-time { color: #888; font-size: 11px; margin-top: 3px; }
-            .route-notas { margin-top: 5px; padding: 5px; background: #f9f9f9; border-radius: 3px; font-size: 11px; }
-            .route-notas-title { font-weight: bold; margin-bottom: 3px; }
-            .nota-item { display: flex; gap: 10px; margin-bottom: 2px; }
-            .expedidor-section { margin-top: 15px; padding: 10px; background: #e8f4fd; border-radius: 5px; }
-            .veiculo-section { margin-bottom: 15px; padding: 10px; background: #f0fdf4; border-radius: 5px; }
-            .signature-section { margin-top: 40px; display: flex; justify-content: space-between; }
-            .signature-box { width: 45%; text-align: center; }
-            .signature-line { border-top: 1px solid #333; margin-top: 60px; padding-top: 5px; }
-            @media print { body { padding: 10px; } }
+            .route-name { font-weight: bold; font-size: 10px; }
+            .route-address { color: #666; font-size: 9px; }
+            .route-time { color: #888; font-size: 8px; }
+            .route-notas { margin-top: 2px; padding: 3px; background: #f9f9f9; border-radius: 2px; font-size: 8px; }
+            .route-notas-title { font-weight: bold; margin-bottom: 1px; }
+            .nota-item { display: flex; gap: 6px; }
+            .expedidor-section { margin-top: 8px; padding: 5px; background: #e8f4fd; border-radius: 3px; font-size: 9px; }
+            .veiculo-section { margin-bottom: 8px; padding: 5px; background: #f0fdf4; border-radius: 3px; font-size: 9px; }
+            .saida-section { margin-top: 8px; padding: 5px; background: #fff3cd; border-radius: 3px; font-size: 9px; }
+            .signature-section { margin-top: 15px; display: flex; justify-content: space-between; }
+            .signature-box { width: 45%; text-align: center; font-size: 9px; }
+            .signature-line { border-top: 1px solid #333; margin-top: 30px; padding-top: 3px; }
+            @media print { body { padding: 0; } }
           </style>
         </head>
         <body>
