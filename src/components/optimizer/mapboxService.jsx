@@ -69,6 +69,7 @@ export async function getDirections(coordinates, mapboxToken) {
 export function processOptimizationResult(optimizationData, originalPoints, startTime) {
   const trip = optimizationData.trips[0];
   const waypoints = optimizationData.waypoints;
+  const legs = trip.legs || [];
   
   // Mapear waypoints otimizados para os pontos originais usando a posição no array
   // O Mapbox retorna waypoints na mesma ordem que foram enviados, 
@@ -86,23 +87,39 @@ export function processOptimizationResult(optimizationData, originalPoints, star
       waypoint_index: wp.waypoint_index
     }));
   
-  // Calcular horários estimados
+  // Calcular horários estimados usando os tempos reais do Mapbox
+  // Os legs estão na ordem correta da rota otimizada
   let currentTime = parseTime(startTime);
-  const legs = trip.legs || [];
   
   const optimizedRoute = orderedPoints.map((point, index) => {
     const isFirst = index === 0;
     const isLast = index === orderedPoints.length - 1;
     
-    // Adicionar tempo de viagem do trecho anterior
-    if (index > 0 && legs[index - 1]) {
-      currentTime += legs[index - 1].duration / 60; // converter segundos para minutos
+    // Para o primeiro ponto (matriz), o horário é o de saída
+    if (isFirst) {
+      return {
+        order: index + 1,
+        client_name: point.nome,
+        address: point.endereco,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        estimated_arrival: formatTime(currentTime),
+        travel_time_from_previous: 0,
+        delivery_time: 0
+      };
     }
+    
+    // Pegar o tempo de viagem do leg anterior (legs[0] = matriz -> primeiro destino)
+    const legIndex = index - 1;
+    const travelTimeMinutes = legs[legIndex] ? Math.round(legs[legIndex].duration / 60) : 0;
+    
+    // Adicionar tempo de viagem
+    currentTime += travelTimeMinutes;
     
     const arrivalTime = formatTime(currentTime);
     
-    // Adicionar tempo de entrega (15 min) exceto para matriz
-    if (!isFirst && !isLast) {
+    // Adicionar tempo de entrega (15 min) exceto para matriz e último ponto
+    if (!isLast) {
       currentTime += 15;
     }
     
@@ -113,20 +130,24 @@ export function processOptimizationResult(optimizationData, originalPoints, star
       latitude: point.latitude,
       longitude: point.longitude,
       estimated_arrival: arrivalTime,
-      travel_time_from_previous: index > 0 && legs[index - 1] ? Math.round(legs[index - 1].duration / 60) : 0,
-      delivery_time: (!isFirst && !isLast) ? 15 : 0
+      travel_time_from_previous: travelTimeMinutes,
+      delivery_time: (!isLast) ? 15 : 0
     };
   });
   
-  // Adicionar retorno à matriz
+  // Adicionar retorno à matriz (último leg)
+  const lastLegIndex = legs.length - 1;
+  const returnTravelTime = legs[lastLegIndex] ? Math.round(legs[lastLegIndex].duration / 60) : 0;
+  currentTime += returnTravelTime;
+  
   const matrizRetorno = {
     order: optimizedRoute.length + 1,
     client_name: originalPoints[0].nome,
     address: originalPoints[0].endereco,
     latitude: originalPoints[0].latitude,
     longitude: originalPoints[0].longitude,
-    estimated_arrival: formatTime(currentTime + (legs[legs.length - 1]?.duration / 60 || 0)),
-    travel_time_from_previous: legs[legs.length - 1] ? Math.round(legs[legs.length - 1].duration / 60) : 0,
+    estimated_arrival: formatTime(currentTime),
+    travel_time_from_previous: returnTravelTime,
     delivery_time: 0
   };
   
