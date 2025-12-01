@@ -313,7 +313,22 @@ IMPORTANTE:
         ];
 
         const optimizationData = await optimizeRoute(todosOsPontos, mapboxToken);
+        const trip = optimizationData.trips?.[0];
+        const legs = trip?.legs || [];
 
+        // Calcular horários estimados com base nos tempos reais + 15min de descarga
+        const parseTime = (timeStr) => {
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          return hours * 60 + minutes;
+        };
+        const formatTime = (totalMinutes) => {
+          const hours = Math.floor(totalMinutes / 60) % 24;
+          const minutes = Math.round(totalMinutes % 60);
+          return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        };
+
+        let currentTime = parseTime(startTime);
+        
         const matrizInicio = {
           order: 1,
           client_name: PONTO_PARTIDA.nome,
@@ -324,15 +339,32 @@ IMPORTANTE:
         };
 
         let currentOrder = 2;
-        const beforeItems = beforePriority.map((item) => ({
-          ...item,
-          order: currentOrder++
-        }));
+        const allDeliveries = [...beforePriority, ...ordenadosPorProximidade];
+        
+        const deliveryItems = allDeliveries.map((item, idx) => {
+          // Adicionar tempo de viagem do trecho anterior
+          if (legs[idx]) {
+            currentTime += legs[idx].duration / 60; // segundos para minutos
+          }
+          const arrivalTime = formatTime(currentTime);
+          
+          // Adicionar 15 min de tempo de descarga
+          currentTime += 15;
 
-        const afterItems = ordenadosPorProximidade.map((item) => ({
-          ...item,
-          order: currentOrder++
-        }));
+          const geocoded = geocodedClients.find(g => g.nome === item.client_name);
+          return {
+            ...item,
+            order: currentOrder++,
+            latitude: geocoded?.latitude || item.latitude,
+            longitude: geocoded?.longitude || item.longitude,
+            estimated_arrival: arrivalTime
+          };
+        });
+
+        // Tempo de volta à matriz
+        if (legs[legs.length - 1]) {
+          currentTime += legs[legs.length - 1].duration / 60;
+        }
 
         const matrizFim = {
           order: currentOrder,
@@ -340,12 +372,11 @@ IMPORTANTE:
           address: PONTO_PARTIDA.endereco,
           latitude: matrizGeocodificada.latitude,
           longitude: matrizGeocodificada.longitude,
-          estimated_arrival: "--:--"
+          estimated_arrival: formatTime(currentTime)
         };
 
-        finalRoute = [matrizInicio, ...beforeItems, ...afterItems, matrizFim];
+        finalRoute = [matrizInicio, ...deliveryItems, matrizFim];
 
-        const trip = optimizationData.trips?.[0];
         if (trip) {
           setStats(prev => ({
             ...prev,
