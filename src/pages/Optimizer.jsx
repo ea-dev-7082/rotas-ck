@@ -507,8 +507,18 @@ IMPORTANTE:
                   <Users className="w-5 h-5 text-blue-600" />
                   Selecione os Clientes
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                </CardHeader>
+                <CardContent className="p-6">
+                {/* Seletor de Veículo e Motorista */}
+                <VehicleDriverSelector
+                  veiculos={veiculos}
+                  motoristas={motoristas}
+                  selectedVeiculo={selectedVeiculo}
+                  selectedMotorista={selectedMotorista}
+                  onVeiculoChange={setSelectedVeiculo}
+                  onMotoristaChange={setSelectedMotorista}
+                />
+
                 <ClientSelector
                   clientes={clientes}
                   selectedClients={selectedClients}
@@ -585,6 +595,8 @@ IMPORTANTE:
                     route={optimizedRoute} 
                     onReorder={handleReorderRoute}
                     onPrint={() => setShowPrintModal(true)}
+                    notasFiscais={notasFiscais}
+                    onOpenNotaFiscal={handleOpenNotaFiscal}
                   />
                   <NearbyClients nearbyClients={nearbyClients} />
                 </>
@@ -616,6 +628,18 @@ IMPORTANTE:
         route={optimizedRoute}
         stats={stats}
         pontoPartida={PONTO_PARTIDA}
+        notasFiscais={notasFiscais}
+        responsavelExpedicao={currentUser?.full_name}
+        veiculoData={selectedVeiculoData}
+      />
+
+      {/* Nota Fiscal Dialog */}
+      <NotaFiscalDialog
+        open={showNotaFiscalDialog}
+        onClose={() => setShowNotaFiscalDialog(false)}
+        clientName={currentClientForNota}
+        notasFiscais={notasFiscais[currentClientForNota] || []}
+        onSave={handleSaveNotaFiscal}
       />
     </div>
   );
