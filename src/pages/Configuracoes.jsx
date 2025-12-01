@@ -388,11 +388,109 @@ export default function Configuracoes() {
             </Card>
           </motion.div>
 
-          {/* Motoristas */}
+          {/* Veículos */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
+          >
+            <Card className="bg-white shadow-xl">
+              <CardHeader className="border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Car className="w-5 h-5 text-blue-600" />
+                    Cadastro de Veículos
+                  </CardTitle>
+                  <Button
+                    onClick={() => setShowVeiculoDialog(true)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Novo Veículo
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <ScrollArea className="max-h-[300px]">
+                  <div className="space-y-3">
+                    <AnimatePresence>
+                      {veiculos.map((veiculo) => (
+                        <motion.div
+                          key={veiculo.id}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="p-4 border-2 rounded-xl hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                {veiculo.tipo === "moto" ? (
+                                  <Bike className="w-5 h-5 text-blue-600" />
+                                ) : (
+                                  <Car className="w-5 h-5 text-blue-600" />
+                                )}
+                                <h3 className="font-bold text-lg">{veiculo.descricao}</h3>
+                                <Badge
+                                  className={
+                                    veiculo.ativo
+                                      ? "bg-green-100 text-green-700"
+                                      : "bg-gray-100 text-gray-600"
+                                  }
+                                >
+                                  {veiculo.ativo ? "Ativo" : "Inativo"}
+                                </Badge>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                                {veiculo.placa && (
+                                  <div>🔢 Placa: {veiculo.placa}</div>
+                                )}
+                                {veiculo.capacidade && (
+                                  <div>📦 Capacidade: {veiculo.capacidade}</div>
+                                )}
+                                <div>🚗 Tipo: {veiculo.tipo === "moto" ? "Moto" : "Carro"}</div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditVeiculo(veiculo)}
+                                className="hover:bg-blue-50 hover:text-blue-600"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => deleteVeiculoMutation.mutate(veiculo.id)}
+                                className="hover:bg-red-50 hover:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+
+                    {veiculos.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <Car className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p>Nenhum veículo cadastrado</p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Motoristas */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
           >
             <Card className="bg-white shadow-xl">
               <CardHeader className="border-b border-gray-100">
@@ -411,7 +509,7 @@ export default function Configuracoes() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <ScrollArea className="max-h-[400px]">
+                <ScrollArea className="max-h-[300px]">
                   <div className="space-y-3">
                     <AnimatePresence>
                       {motoristas.map((motorista) => (
@@ -442,12 +540,6 @@ export default function Configuracoes() {
                                 )}
                                 {motorista.cnh && (
                                   <div>🪪 CNH: {motorista.cnh}</div>
-                                )}
-                                {motorista.veiculo && (
-                                  <div>🚗 {motorista.veiculo}</div>
-                                )}
-                                {motorista.placa && (
-                                  <div>🔢 Placa: {motorista.placa}</div>
                                 )}
                               </div>
                             </div>
@@ -486,6 +578,80 @@ export default function Configuracoes() {
             </Card>
           </motion.div>
         </div>
+
+        {/* Dialog Veículo */}
+        <Dialog open={showVeiculoDialog} onOpenChange={setShowVeiculoDialog}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>
+                {editingVeiculo ? "Editar Veículo" : "Novo Veículo"}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmitVeiculo} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="descricao">Descrição *</Label>
+                <Input
+                  id="descricao"
+                  value={veiculoForm.descricao}
+                  onChange={(e) =>
+                    setVeiculoForm({ ...veiculoForm, descricao: e.target.value })
+                  }
+                  placeholder="Ex: Fiorino Branca 2020"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tipo">Tipo</Label>
+                  <select
+                    id="tipo"
+                    value={veiculoForm.tipo}
+                    onChange={(e) =>
+                      setVeiculoForm({ ...veiculoForm, tipo: e.target.value })
+                    }
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                  >
+                    <option value="carro">Carro</option>
+                    <option value="moto">Moto</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="placa-veiculo">Placa</Label>
+                  <Input
+                    id="placa-veiculo"
+                    value={veiculoForm.placa}
+                    onChange={(e) =>
+                      setVeiculoForm({ ...veiculoForm, placa: e.target.value })
+                    }
+                    placeholder="ABC-1234"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="capacidade">Capacidade</Label>
+                <Input
+                  id="capacidade"
+                  value={veiculoForm.capacidade}
+                  onChange={(e) =>
+                    setVeiculoForm({ ...veiculoForm, capacidade: e.target.value })
+                  }
+                  placeholder="Ex: 500kg ou 20 caixas"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={handleCloseVeiculoDialog}>
+                  Cancelar
+                </Button>
+                <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                  {editingVeiculo ? "Salvar" : "Cadastrar"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Dialog Motorista */}
         <Dialog open={showMotoristaDialog} onOpenChange={setShowMotoristaDialog}>
@@ -530,31 +696,6 @@ export default function Configuracoes() {
                       setMotoristaForm({ ...motoristaForm, cnh: e.target.value })
                     }
                     placeholder="00000000000"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="veiculo">Veículo</Label>
-                  <Input
-                    id="veiculo"
-                    value={motoristaForm.veiculo}
-                    onChange={(e) =>
-                      setMotoristaForm({ ...motoristaForm, veiculo: e.target.value })
-                    }
-                    placeholder="Ex: Fiorino 2020"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="placa">Placa</Label>
-                  <Input
-                    id="placa"
-                    value={motoristaForm.placa}
-                    onChange={(e) =>
-                      setMotoristaForm({ ...motoristaForm, placa: e.target.value })
-                    }
-                    placeholder="ABC-1234"
                   />
                 </div>
               </div>
