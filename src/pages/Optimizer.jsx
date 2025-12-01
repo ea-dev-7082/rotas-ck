@@ -44,6 +44,7 @@ export default function Optimizer() {
   });
 
   const enderecoMatriz = configs.find(c => c.chave === "endereco_matriz")?.valor || "";
+  const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || "";
 
   const PONTO_PARTIDA = {
     nome: "Matriz - Ponto de Partida",
@@ -51,7 +52,7 @@ export default function Optimizer() {
   };
 
   const handleOptimize = async () => {
-    if (selectedClients.length === 0 || !enderecoMatriz) return;
+    if (selectedClients.length === 0 || !enderecoMatriz || !mapboxToken) return;
 
     setIsOptimizing(true);
     try {
@@ -83,9 +84,9 @@ export default function Optimizer() {
       const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       
       const matrizData = [{ nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco }];
-      const [matrizGeocodificada] = await geocodeMultiple(matrizData);
+      const [matrizGeocodificada] = await geocodeMultiple(matrizData, mapboxToken);
       
-      const clientesGeocodificados = await geocodeMultiple(selectedClientesData);
+      const clientesGeocodificados = await geocodeMultiple(selectedClientesData, mapboxToken);
 
       if (clientesGeocodificados.length === 0) {
         throw new Error("Não foi possível geocodificar os endereços dos clientes");
@@ -94,7 +95,7 @@ export default function Optimizer() {
       setGeocodedClients(clientesGeocodificados);
       
       const pontosParaOtimizar = [matrizGeocodificada, ...clientesGeocodificados];
-      const optimizationData = await optimizeRoute(pontosParaOtimizar);
+      const optimizationData = await optimizeRoute(pontosParaOtimizar, mapboxToken);
       const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime);
 
       setOptimizedRoute(result.optimized_route);
@@ -229,7 +230,7 @@ IMPORTANTE:
       const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
       const matrizData = [{ nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco }];
-      const [matrizGeocodificada] = await geocodeMultiple(matrizData);
+      const [matrizGeocodificada] = await geocodeMultiple(matrizData, mapboxToken);
 
       const beforePriority = newEntregas.slice(0, priorityIndex + 1);
       const afterPriority = newEntregas.slice(priorityIndex + 1);
@@ -274,7 +275,7 @@ IMPORTANTE:
           }))
         ];
 
-        const optimizationData = await optimizeRoute(todosOsPontos);
+        const optimizationData = await optimizeRoute(todosOsPontos, mapboxToken);
 
         const matrizInicio = {
           order: 1,
@@ -481,7 +482,7 @@ IMPORTANTE:
                 <div className="flex gap-3 mt-6">
                   <Button
                     onClick={handleOptimize}
-                    disabled={isOptimizing || selectedClients.length === 0 || !enderecoMatriz}
+                    disabled={isOptimizing || selectedClients.length === 0 || !enderecoMatriz || !mapboxToken}
                     className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all"
                   >
                     {isOptimizing ? (
