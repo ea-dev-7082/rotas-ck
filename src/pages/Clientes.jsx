@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, MapPin, Phone, Edit, Trash2, Users } from "lucide-react";
+import { Plus, MapPin, Phone, Edit, Trash2, Users, Warehouse } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
@@ -23,6 +24,8 @@ export default function Clientes() {
   const [formData, setFormData] = useState({
     nome: "",
     endereco: "",
+    endereco_entrega: "",
+    usar_endereco_entrega: false,
     telefone: "",
     observacoes: "",
   });
@@ -72,6 +75,8 @@ export default function Clientes() {
     setFormData({
       nome: cliente.nome,
       endereco: cliente.endereco,
+      endereco_entrega: cliente.endereco_entrega || "",
+      usar_endereco_entrega: cliente.usar_endereco_entrega || false,
       telefone: cliente.telefone || "",
       observacoes: cliente.observacoes || "",
     });
@@ -84,6 +89,8 @@ export default function Clientes() {
     setFormData({
       nome: "",
       endereco: "",
+      endereco_entrega: "",
+      usar_endereco_entrega: false,
       telefone: "",
       observacoes: "",
     });
@@ -192,6 +199,19 @@ export default function Clientes() {
                               <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-purple-500" />
                               <p className="leading-relaxed">{cliente.endereco}</p>
                             </div>
+                            {cliente.endereco_entrega && (
+                              <div className="flex items-start gap-2 text-sm text-gray-600">
+                                <Warehouse className="w-4 h-4 mt-0.5 flex-shrink-0 text-orange-500" />
+                                <div>
+                                  <p className="leading-relaxed">{cliente.endereco_entrega}</p>
+                                  {cliente.usar_endereco_entrega && (
+                                    <Badge className="mt-1 bg-orange-100 text-orange-700 text-xs">
+                                      Usar para entregas
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                             {cliente.telefone && (
                               <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <Phone className="w-4 h-4 text-purple-500" />
@@ -242,7 +262,7 @@ export default function Clientes() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="endereco">Endereço Completo *</Label>
+                <Label htmlFor="endereco">Endereço da Loja *</Label>
                 <Textarea
                   id="endereco"
                   value={formData.endereco}
@@ -253,6 +273,36 @@ export default function Clientes() {
                   className="min-h-[80px]"
                   required
                 />
+              </div>
+
+              <div className="space-y-2 p-4 border-2 border-dashed border-orange-200 rounded-lg bg-orange-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Warehouse className="w-4 h-4 text-orange-600" />
+                  <Label htmlFor="endereco_entrega" className="text-orange-800">Endereço de Entrega Alternativo (Galpão/Depósito)</Label>
+                </div>
+                <Textarea
+                  id="endereco_entrega"
+                  value={formData.endereco_entrega}
+                  onChange={(e) =>
+                    setFormData({ ...formData, endereco_entrega: e.target.value })
+                  }
+                  placeholder="Ex: Av. Industrial, 500 - Galpão 3, Zona Industrial"
+                  className="min-h-[60px]"
+                />
+                {formData.endereco_entrega && (
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-orange-200">
+                    <Label htmlFor="usar_endereco_entrega" className="text-sm text-orange-700">
+                      Usar este endereço para entregas
+                    </Label>
+                    <Switch
+                      id="usar_endereco_entrega"
+                      checked={formData.usar_endereco_entrega}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, usar_endereco_entrega: checked })
+                      }
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

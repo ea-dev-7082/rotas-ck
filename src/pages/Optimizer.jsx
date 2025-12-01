@@ -8,8 +8,9 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import ClientSelector from "../components/optimizer/ClientSelector";
 import RouteMap from "../components/optimizer/RouteMap";
-import OptimizedList from "../components/optimizer/OptimizedList";
+import DraggableRouteList from "../components/optimizer/DraggableRouteList";
 import NearbyClients from "../components/optimizer/NearbyClients";
+import PrintModal from "../components/optimizer/PrintModal";
 import { geocodeMultiple, optimizeRoute, processOptimizationResult } from "../components/optimizer/mapboxService";
 
 const PONTO_PARTIDA = {
@@ -23,6 +24,8 @@ export default function Optimizer() {
   const [optimizedRoute, setOptimizedRoute] = useState(null);
   const [stats, setStats] = useState(null);
   const [nearbyClients, setNearbyClients] = useState(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [geocodedClients, setGeocodedClients] = useState([]);
 
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes'],
@@ -36,15 +39,21 @@ export default function Optimizer() {
     setIsOptimizing(true);
     try {
       const selectedClientesData = selectedClients.map(id => {
-        const cliente = clientes.find(c => c.id === id);
-        const enderecoCompleto = cliente.endereco_num 
-          ? `${cliente.endereco}, ${cliente.endereco_num}`
-          : cliente.endereco;
-        return { 
-          nome: cliente.nome, 
-          endereco: enderecoCompleto
-        };
-      });
+                const cliente = clientes.find(c => c.id === id);
+                // Usar endereço de entrega alternativo se configurado
+                let enderecoFinal;
+                if (cliente.usar_endereco_entrega && cliente.endereco_entrega) {
+                  enderecoFinal = cliente.endereco_entrega;
+                } else {
+                  enderecoFinal = cliente.endereco_num 
+                    ? `${cliente.endereco}, ${cliente.endereco_num}`
+                    : cliente.endereco;
+                }
+                return { 
+                  nome: cliente.nome, 
+                  endereco: enderecoFinal
+                };
+              });
 
       const allClientesData = clientes.map(c => ({
         nome: c.nome,
@@ -63,11 +72,14 @@ export default function Optimizer() {
       const [matrizGeocodificada] = await geocodeMultiple(matrizData);
       
       // 2. Geocodificar todos os clientes selecionados
-      const clientesGeocodificados = await geocodeMultiple(selectedClientesData);
-      
-      if (clientesGeocodificados.length === 0) {
-        throw new Error("Não foi possível geocodificar os endereços dos clientes");
-      }
+                  const clientesGeocodificados = await geocodeMultiple(selectedClientesData);
+
+                  if (clientesGeocodificados.length === 0) {
+                    throw new Error("Não foi possível geocodificar os endereços dos clientes");
+                  }
+
+                  // Salvar clientes geocodificados para reordenação
+                  setGeocodedClients(clientesGeocodificados);
       
       // 3. Montar array com matriz + clientes para otimização
       const pontosParaOtimizar = [matrizGeocodificada, ...clientesGeocodificados];
@@ -153,11 +165,143 @@ IMPORTANTE:
   };
 
   const handleReset = () => {
-    setSelectedClients([]);
-    setOptimizedRoute(null);
-    setStats(null);
-    setNearbyClients(null);
-  };
+        setSelectedClients([]);
+        setOptimizedRoute(null);
+        setStats(null);
+        setNearbyClients(null);
+        setGeocodedClients([]);
+      };
+
+      // Função para reordenar rota quando usuário arrasta um cartão
+      const handleReorderRoute = async (newEntregas, priorityIndex) => {
+        if (newEntregas.length === 0) return;
+
+        setIsOptimizing(true);
+        try {
+          const now = new Date();
+          const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+          // Geocodificar Matriz
+          const matrizData = [{ nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco }];
+          const [matrizGeocodificada] = await geocodeMultiple(matrizData);
+
+          // Pegar o item que foi priorizado
+          const prioritizedItem = newEntregas[priorityIndex];
+
+          // Itens antes do priorizado (manter ordem manual)
+          const beforePriority = newEntregas.slice(0, priorityIndex + 1);
+
+          // Itens depois do priorizado (reotimizar)
+          const afterPriority = newEntregas.slice(priorityIndex + 1);
+
+          let finalRoute;
+
+          if (afterPriority.length > 0) {
+            // Encontrar coordenadas dos itens
+            const afterPriorityWithCoords = afterPriority.map(item => {
+              const geocoded = geocodedClients.find(g => g.nome === item.client_name);
+              return geocoded || { ...item, latitude: item.latitude, longitude: item.longitude };
+            });
+
+            // Otimizar apenas os itens após a prioridade, partindo do último item priorizado
+            const lastPriorityItem = beforePriority[beforePriority.length - 1];
+            const lastPriorityCoords = geocodedClients.find(g => g.nome === lastPriorityItem.client_name) || lastPriorityItem;
+
+            const pontosParaOtimizar = [lastPriorityCoords, ...afterPriorityWithCoords];
+
+            if (pontosParaOtimizar.length > 1) {
+              const optimizationData = await optimizeRoute(pontosParaOtimizar);
+              const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime);
+
+              // Combinar rotas: matriz + antes da prioridade + otimizados + matriz
+              const matrizInicio = {
+                order: 1,
+                client_name: PONTO_PARTIDA.nome,
+                address: PONTO_PARTIDA.endereco,
+                latitude: matrizGeocodificada.latitude,
+                longitude: matrizGeocodificada.longitude,
+                estimated_arrival: startTime
+              };
+
+              let currentOrder = 2;
+              const beforeItems = beforePriority.map((item, idx) => ({
+                ...item,
+                order: currentOrder++
+              }));
+
+              // Pular o primeiro item do resultado otimizado (é o ponto de partida da sub-rota)
+              const optimizedItems = result.optimized_route.slice(1, -1).map((item) => ({
+                ...item,
+                order: currentOrder++
+              }));
+
+              const matrizFim = {
+                order: currentOrder,
+                client_name: PONTO_PARTIDA.nome,
+                address: PONTO_PARTIDA.endereco,
+                latitude: matrizGeocodificada.latitude,
+                longitude: matrizGeocodificada.longitude,
+                estimated_arrival: result.optimized_route[result.optimized_route.length - 1]?.estimated_arrival
+              };
+
+              finalRoute = [matrizInicio, ...beforeItems, ...optimizedItems, matrizFim];
+            } else {
+              // Só tem um item após a prioridade, não precisa otimizar
+              finalRoute = buildManualRoute(matrizGeocodificada, newEntregas, startTime);
+            }
+          } else {
+            // Não tem itens após a prioridade, usar ordem manual
+            finalRoute = buildManualRoute(matrizGeocodificada, newEntregas, startTime);
+          }
+
+          setOptimizedRoute(finalRoute);
+
+        } catch (error) {
+          console.error("Erro ao reordenar rota:", error);
+        }
+        setIsOptimizing(false);
+      };
+
+      // Função auxiliar para construir rota manual
+      const buildManualRoute = (matrizGeocodificada, entregas, startTime) => {
+        let currentOrder = 1;
+        const route = [];
+
+        // Matriz início
+        route.push({
+          order: currentOrder++,
+          client_name: PONTO_PARTIDA.nome,
+          address: PONTO_PARTIDA.endereco,
+          latitude: matrizGeocodificada.latitude,
+          longitude: matrizGeocodificada.longitude,
+          estimated_arrival: startTime
+        });
+
+        // Entregas
+        entregas.forEach((item) => {
+          const geocoded = geocodedClients.find(g => g.nome === item.client_name) || item;
+          route.push({
+            order: currentOrder++,
+            client_name: item.client_name,
+            address: item.address,
+            latitude: geocoded.latitude || item.latitude,
+            longitude: geocoded.longitude || item.longitude,
+            estimated_arrival: "--:--"
+          });
+        });
+
+        // Matriz fim
+        route.push({
+          order: currentOrder,
+          client_name: PONTO_PARTIDA.nome,
+          address: PONTO_PARTIDA.endereco,
+          latitude: matrizGeocodificada.latitude,
+          longitude: matrizGeocodificada.longitude,
+          estimated_arrival: "--:--"
+        });
+
+        return route;
+      };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -330,13 +474,17 @@ IMPORTANTE:
             className="space-y-6"
           >
             <AnimatePresence mode="wait">
-              {optimizedRoute ? (
-                <>
-                  <RouteMap route={optimizedRoute} pontoPartida={PONTO_PARTIDA} routeGeometry={stats?.routeGeometry} />
-                  <OptimizedList route={optimizedRoute} />
-                  <NearbyClients nearbyClients={nearbyClients} />
-                </>
-              ) : (
+                                {optimizedRoute ? (
+                                  <>
+                                    <RouteMap route={optimizedRoute} pontoPartida={PONTO_PARTIDA} routeGeometry={stats?.routeGeometry} />
+                                    <DraggableRouteList 
+                                      route={optimizedRoute} 
+                                      onReorder={handleReorderRoute}
+                                      onPrint={() => setShowPrintModal(true)}
+                                    />
+                                    <NearbyClients nearbyClients={nearbyClients} />
+                                  </>
+                                ) : (
                 <Card className="bg-white shadow-xl h-full min-h-[500px]">
                   <CardContent className="p-12 flex flex-col items-center justify-center h-full text-center">
                     <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-6">
@@ -353,9 +501,18 @@ IMPORTANTE:
                 </Card>
               )}
             </AnimatePresence>
-          </motion.div>
-        </div>
-      </div>
-    </div>
-  );
-}
+                            </motion.div>
+                          </div>
+                        </div>
+
+                        {/* Print Modal */}
+                        <PrintModal
+                          open={showPrintModal}
+                          onClose={() => setShowPrintModal(false)}
+                          route={optimizedRoute}
+                          stats={stats}
+                          pontoPartida={PONTO_PARTIDA}
+                        />
+                      </div>
+                    );
+                  }

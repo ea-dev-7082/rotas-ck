@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Route, Users } from "lucide-react";
+import { Route, Users, Settings } from "lucide-react";
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
@@ -16,6 +16,11 @@ export default function Layout({ children, currentPageName }) {
       title: "Clientes",
       url: createPageUrl("Clientes"),
       icon: Users,
+    },
+    {
+      title: "Configurações",
+      url: createPageUrl("Configuracoes"),
+      icon: Settings,
     },
   ];
 
