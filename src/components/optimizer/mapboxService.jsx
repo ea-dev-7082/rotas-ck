@@ -1,9 +1,7 @@
-const MAPBOX_TOKEN = "pk.eyJ1Ijoia2FmZnNwaWVsIiwiYSI6ImNtaWo0d29kdTBwN3YzZG9jYjZ0bTViNDAifQ.3mWlq4U6wGn6ctgGcuOUog";
-
 // Geocodificar um endereço para obter coordenadas
-export async function geocodeAddress(address) {
+export async function geocodeAddress(address, mapboxToken) {
   const query = encodeURIComponent(address + ", Rio de Janeiro, Brazil");
-  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${MAPBOX_TOKEN}&country=BR&limit=1`;
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${mapboxToken}&country=BR&limit=1`;
   
   const response = await fetch(url);
   const data = await response.json();
@@ -16,11 +14,11 @@ export async function geocodeAddress(address) {
 }
 
 // Geocodificar múltiplos endereços
-export async function geocodeMultiple(addresses) {
+export async function geocodeMultiple(addresses, mapboxToken) {
   const results = await Promise.all(
     addresses.map(async (item) => {
       try {
-        const coords = await geocodeAddress(item.endereco);
+        const coords = await geocodeAddress(item.endereco, mapboxToken);
         return { ...item, ...coords };
       } catch (error) {
         console.error(`Erro ao geocodificar ${item.nome}:`, error);
@@ -32,14 +30,14 @@ export async function geocodeMultiple(addresses) {
 }
 
 // Otimizar rota usando Mapbox Optimization API
-export async function optimizeRoute(coordinates) {
+export async function optimizeRoute(coordinates, mapboxToken) {
   // coordinates: array de {longitude, latitude, nome, endereco}
   // O primeiro ponto é a origem (Matriz) e deve retornar a ela
   
   const coords = coordinates.map(c => `${c.longitude},${c.latitude}`).join(';');
   
   // source=first, destination=last, roundtrip=true para voltar à matriz
-  const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${coords}?access_token=${MAPBOX_TOKEN}&roundtrip=true&source=first&destination=last&geometries=geojson&overview=full&steps=true`;
+  const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${coords}?access_token=${mapboxToken}&roundtrip=true&source=first&destination=last&geometries=geojson&overview=full&steps=true`;
   
   const response = await fetch(url);
   const data = await response.json();
@@ -52,10 +50,10 @@ export async function optimizeRoute(coordinates) {
 }
 
 // Obter direções entre pontos para desenhar a rota
-export async function getDirections(coordinates) {
+export async function getDirections(coordinates, mapboxToken) {
   const coords = coordinates.map(c => `${c.longitude},${c.latitude}`).join(';');
   
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full`;
+  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?access_token=${mapboxToken}&geometries=geojson&overview=full`;
   
   const response = await fetch(url);
   const data = await response.json();
