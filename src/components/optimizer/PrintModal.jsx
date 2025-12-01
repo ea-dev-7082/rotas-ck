@@ -7,26 +7,17 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Printer, Route, MapPin, Clock, User, Truck, Home } from "lucide-react";
-import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { Printer } from "lucide-react";
 
-export default function PrintModal({ open, onClose, route, stats, pontoPartida, notasFiscais, responsavelExpedicao, veiculoData }) {
-  const [selectedMotorista, setSelectedMotorista] = useState("");
+export default function PrintModal({ open, onClose, route, stats, pontoPartida, notasFiscais, responsavelExpedicao, veiculoData, motoristaData }) {
+  const [expedidor, setExpedidor] = useState(responsavelExpedicao || "");
   const printRef = useRef();
 
-  const { data: motoristas } = useQuery({
-    queryKey: ["motoristas"],
-    queryFn: () => base44.entities.Motorista.filter({ ativo: true }, "nome"),
-    initialData: [],
-  });
+  // Atualizar expedidor quando prop mudar
+  React.useEffect(() => {
+    setExpedidor(responsavelExpedicao || "");
+  }, [responsavelExpedicao]);
 
   const handlePrint = () => {
     const printContent = printRef.current;
@@ -82,7 +73,6 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
     }, 250);
   };
 
-  const selectedMotoristaData = motoristas.find(m => m.id === selectedMotorista);
   const today = new Date().toLocaleDateString('pt-BR');
 
   return (
@@ -97,19 +87,12 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Selecionar Motorista</Label>
-            <Select value={selectedMotorista} onValueChange={setSelectedMotorista}>
-              <SelectTrigger>
-                <SelectValue placeholder="Escolha o motorista..." />
-              </SelectTrigger>
-              <SelectContent>
-                {motoristas.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.nome} {m.placa && `- ${m.placa}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Responsável pela Expedição</Label>
+            <Input
+              value={expedidor}
+              onChange={(e) => setExpedidor(e.target.value)}
+              placeholder="Nome do responsável..."
+            />
           </div>
 
           {/* Preview */}
@@ -147,19 +130,19 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
               </div>
             )}
 
-            {selectedMotoristaData && (
+            {motoristaData && (
               <div className="motorista-section">
                 <div className="motorista-title">👤 Motorista</div>
-                <div><strong>Nome:</strong> {selectedMotoristaData.nome}</div>
-                {selectedMotoristaData.telefone && (
-                  <div><strong>Telefone:</strong> {selectedMotoristaData.telefone}</div>
+                <div><strong>Nome:</strong> {motoristaData.nome}</div>
+                {motoristaData.telefone && (
+                  <div><strong>Telefone:</strong> {motoristaData.telefone}</div>
                 )}
               </div>
             )}
 
-            {responsavelExpedicao && (
+            {expedidor && (
               <div className="expedidor-section">
-                <div><strong>📦 Responsável pela Expedição:</strong> {responsavelExpedicao}</div>
+                <div><strong>📦 Responsável pela Expedição:</strong> {expedidor}</div>
               </div>
             )}
 

@@ -684,6 +684,7 @@ IMPORTANTE:
         notasFiscais={notasFiscais}
         responsavelExpedicao={currentUser?.full_name}
         veiculoData={selectedVeiculoData}
+        motoristaData={selectedMotoristaData}
       />
 
       {/* Nota Fiscal Dialog */}
