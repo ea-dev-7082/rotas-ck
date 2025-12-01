@@ -172,103 +172,175 @@ IMPORTANTE:
         setGeocodedClients([]);
       };
 
-      // Função para reordenar rota quando usuário arrasta um cartão
-      const handleReorderRoute = async (newEntregas, priorityIndex) => {
-        if (newEntregas.length === 0) return;
+      // Função para calcular distância entre dois pontos (Haversine)
+          const calcularDistancia = (lat1, lon1, lat2, lon2) => {
+            const R = 6371; // Raio da Terra em km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+          };
 
-        setIsOptimizing(true);
-        try {
-          const now = new Date();
-          const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+          // Ordenar pontos pela proximidade (algoritmo do vizinho mais próximo)
+          const ordenarPorProximidade = (pontos, pontoInicial, matrizCoords) => {
+            if (pontos.length === 0) return [];
 
-          // Geocodificar Matriz
-          const matrizData = [{ nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco }];
-          const [matrizGeocodificada] = await geocodeMultiple(matrizData);
+            const ordenados = [];
+            let restantes = [...pontos];
+            let atual = pontoInicial;
 
-          // Pegar o item que foi priorizado
-          const prioritizedItem = newEntregas[priorityIndex];
+            while (restantes.length > 0) {
+              // Encontrar o ponto mais próximo do atual
+              let maisProximoIdx = 0;
+              let menorDistancia = Infinity;
 
-          // Itens antes do priorizado (manter ordem manual)
-          const beforePriority = newEntregas.slice(0, priorityIndex + 1);
+              restantes.forEach((ponto, idx) => {
+                const dist = calcularDistancia(
+                  atual.latitude, atual.longitude,
+                  ponto.latitude, ponto.longitude
+                );
+                if (dist < menorDistancia) {
+                  menorDistancia = dist;
+                  maisProximoIdx = idx;
+                }
+              });
 
-          // Itens depois do priorizado (reotimizar)
-          const afterPriority = newEntregas.slice(priorityIndex + 1);
+              const maisProximo = restantes[maisProximoIdx];
+              ordenados.push(maisProximo);
+              restantes.splice(maisProximoIdx, 1);
+              atual = maisProximo;
+            }
 
-          let finalRoute;
+            return ordenados;
+          };
 
-          if (afterPriority.length > 0) {
-                    // Encontrar coordenadas dos itens
-                    const afterPriorityWithCoords = afterPriority.map(item => {
-                      const geocoded = geocodedClients.find(g => g.nome === item.client_name);
-                      return geocoded || { ...item, latitude: item.latitude, longitude: item.longitude };
-                    });
+          // Função para reordenar rota quando usuário arrasta um cartão
+          const handleReorderRoute = async (newEntregas, priorityIndex) => {
+            if (newEntregas.length === 0) return;
 
-                    // Otimizar apenas os itens após a prioridade, partindo do último item priorizado
-                    const lastPriorityItem = beforePriority[beforePriority.length - 1];
-                    const lastPriorityCoords = geocodedClients.find(g => g.nome === lastPriorityItem.client_name) || lastPriorityItem;
+            setIsOptimizing(true);
+            try {
+              const now = new Date();
+              const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-                    const pontosParaOtimizar = [lastPriorityCoords, ...afterPriorityWithCoords];
+              // Geocodificar Matriz
+              const matrizData = [{ nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco }];
+              const [matrizGeocodificada] = await geocodeMultiple(matrizData);
 
-                    if (pontosParaOtimizar.length > 1) {
-                      const optimizationData = await optimizeRoute(pontosParaOtimizar);
-                      const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime);
+              // Itens antes do priorizado (manter ordem manual)
+              const beforePriority = newEntregas.slice(0, priorityIndex + 1);
 
-                      // Combinar rotas: matriz + antes da prioridade + otimizados + matriz
-                      const matrizInicio = {
-                        order: 1,
-                        client_name: PONTO_PARTIDA.nome,
-                        address: PONTO_PARTIDA.endereco,
-                        latitude: matrizGeocodificada.latitude,
-                        longitude: matrizGeocodificada.longitude,
-                        estimated_arrival: startTime
-                      };
+              // Itens depois do priorizado (reordenar por proximidade)
+              const afterPriority = newEntregas.slice(priorityIndex + 1);
 
-                      let currentOrder = 2;
-                      const beforeItems = beforePriority.map((item, idx) => ({
-                        ...item,
-                        order: currentOrder++
-                      }));
+              let finalRoute;
 
-                      // Pular o primeiro item do resultado otimizado (é o ponto de partida da sub-rota)
-                      const optimizedItems = result.optimized_route.slice(1, -1).map((item) => ({
-                        ...item,
-                        order: currentOrder++
-                      }));
+              if (afterPriority.length > 0) {
+                // Encontrar coordenadas de todos os itens
+                const afterPriorityWithCoords = afterPriority.map(item => {
+                  const geocoded = geocodedClients.find(g => g.nome === item.client_name);
+                  return {
+                    ...item,
+                    latitude: geocoded?.latitude || item.latitude,
+                    longitude: geocoded?.longitude || item.longitude,
+                    nome: item.client_name
+                  };
+                });
 
-                      const matrizFim = {
-                        order: currentOrder,
-                        client_name: PONTO_PARTIDA.nome,
-                        address: PONTO_PARTIDA.endereco,
-                        latitude: matrizGeocodificada.latitude,
-                        longitude: matrizGeocodificada.longitude,
-                        estimated_arrival: result.optimized_route[result.optimized_route.length - 1]?.estimated_arrival
-                      };
+                // Pegar coordenadas do último item priorizado
+                const lastPriorityItem = beforePriority[beforePriority.length - 1];
+                const lastPriorityCoords = geocodedClients.find(g => g.nome === lastPriorityItem.client_name) || {
+                  latitude: lastPriorityItem.latitude,
+                  longitude: lastPriorityItem.longitude
+                };
 
-                      finalRoute = [matrizInicio, ...beforeItems, ...optimizedItems, matrizFim];
+                // Ordenar os itens restantes por proximidade do último priorizado
+                const ordenadosPorProximidade = ordenarPorProximidade(
+                  afterPriorityWithCoords, 
+                  lastPriorityCoords,
+                  matrizGeocodificada
+                );
 
-                      // Atualizar estatísticas
-                      setStats(prev => ({
-                        ...prev,
-                        distance: result.total_distance_km,
-                        time: result.total_time_minutes,
-                        routeGeometry: result.route_geometry
-                      }));
-                    } else {
-                      // Só tem um item após a prioridade, não precisa otimizar
-                      finalRoute = buildManualRoute(matrizGeocodificada, newEntregas, startTime);
-                    }
-                  } else {
-                    // Não tem itens após a prioridade, usar ordem manual
-                    finalRoute = buildManualRoute(matrizGeocodificada, newEntregas, startTime);
-                  }
+                // Montar rota completa para obter estatísticas do Mapbox
+                const todosOsPontos = [
+                  matrizGeocodificada,
+                  ...beforePriority.map(item => {
+                    const geocoded = geocodedClients.find(g => g.nome === item.client_name);
+                    return {
+                      nome: item.client_name,
+                      endereco: item.address,
+                      latitude: geocoded?.latitude || item.latitude,
+                      longitude: geocoded?.longitude || item.longitude
+                    };
+                  }),
+                  ...ordenadosPorProximidade.map(item => ({
+                    nome: item.client_name,
+                    endereco: item.address,
+                    latitude: item.latitude,
+                    longitude: item.longitude
+                  }))
+                ];
 
-                  setOptimizedRoute(finalRoute);
+                // Chamar Mapbox para obter distância e tempo reais
+                const optimizationData = await optimizeRoute(todosOsPontos);
 
-        } catch (error) {
-          console.error("Erro ao reordenar rota:", error);
-        }
-        setIsOptimizing(false);
-      };
+                // Construir rota final mantendo a ordem definida
+                const matrizInicio = {
+                  order: 1,
+                  client_name: PONTO_PARTIDA.nome,
+                  address: PONTO_PARTIDA.endereco,
+                  latitude: matrizGeocodificada.latitude,
+                  longitude: matrizGeocodificada.longitude,
+                  estimated_arrival: startTime
+                };
+
+                let currentOrder = 2;
+                const beforeItems = beforePriority.map((item) => ({
+                  ...item,
+                  order: currentOrder++
+                }));
+
+                const afterItems = ordenadosPorProximidade.map((item) => ({
+                  ...item,
+                  order: currentOrder++
+                }));
+
+                const matrizFim = {
+                  order: currentOrder,
+                  client_name: PONTO_PARTIDA.nome,
+                  address: PONTO_PARTIDA.endereco,
+                  latitude: matrizGeocodificada.latitude,
+                  longitude: matrizGeocodificada.longitude,
+                  estimated_arrival: "--:--"
+                };
+
+                finalRoute = [matrizInicio, ...beforeItems, ...afterItems, matrizFim];
+
+                // Atualizar estatísticas com dados do Mapbox
+                const trip = optimizationData.trips?.[0];
+                if (trip) {
+                  setStats(prev => ({
+                    ...prev,
+                    distance: (trip.distance || 0) / 1000,
+                    time: Math.round((trip.duration || 0) / 60),
+                    routeGeometry: trip.geometry?.coordinates || []
+                  }));
+                }
+              } else {
+                // Não tem itens após a prioridade, usar ordem manual
+                finalRoute = buildManualRoute(matrizGeocodificada, newEntregas, startTime);
+              }
+
+              setOptimizedRoute(finalRoute);
+
+            } catch (error) {
+              console.error("Erro ao reordenar rota:", error);
+            }
+            setIsOptimizing(false);
+          };
 
       // Função auxiliar para construir rota manual
       const buildManualRoute = (matrizGeocodificada, entregas, startTime) => {
