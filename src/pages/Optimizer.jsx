@@ -197,64 +197,72 @@ IMPORTANTE:
           let finalRoute;
 
           if (afterPriority.length > 0) {
-            // Encontrar coordenadas dos itens
-            const afterPriorityWithCoords = afterPriority.map(item => {
-              const geocoded = geocodedClients.find(g => g.nome === item.client_name);
-              return geocoded || { ...item, latitude: item.latitude, longitude: item.longitude };
-            });
+                    // Encontrar coordenadas dos itens
+                    const afterPriorityWithCoords = afterPriority.map(item => {
+                      const geocoded = geocodedClients.find(g => g.nome === item.client_name);
+                      return geocoded || { ...item, latitude: item.latitude, longitude: item.longitude };
+                    });
 
-            // Otimizar apenas os itens após a prioridade, partindo do último item priorizado
-            const lastPriorityItem = beforePriority[beforePriority.length - 1];
-            const lastPriorityCoords = geocodedClients.find(g => g.nome === lastPriorityItem.client_name) || lastPriorityItem;
+                    // Otimizar apenas os itens após a prioridade, partindo do último item priorizado
+                    const lastPriorityItem = beforePriority[beforePriority.length - 1];
+                    const lastPriorityCoords = geocodedClients.find(g => g.nome === lastPriorityItem.client_name) || lastPriorityItem;
 
-            const pontosParaOtimizar = [lastPriorityCoords, ...afterPriorityWithCoords];
+                    const pontosParaOtimizar = [lastPriorityCoords, ...afterPriorityWithCoords];
 
-            if (pontosParaOtimizar.length > 1) {
-              const optimizationData = await optimizeRoute(pontosParaOtimizar);
-              const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime);
+                    if (pontosParaOtimizar.length > 1) {
+                      const optimizationData = await optimizeRoute(pontosParaOtimizar);
+                      const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime);
 
-              // Combinar rotas: matriz + antes da prioridade + otimizados + matriz
-              const matrizInicio = {
-                order: 1,
-                client_name: PONTO_PARTIDA.nome,
-                address: PONTO_PARTIDA.endereco,
-                latitude: matrizGeocodificada.latitude,
-                longitude: matrizGeocodificada.longitude,
-                estimated_arrival: startTime
-              };
+                      // Combinar rotas: matriz + antes da prioridade + otimizados + matriz
+                      const matrizInicio = {
+                        order: 1,
+                        client_name: PONTO_PARTIDA.nome,
+                        address: PONTO_PARTIDA.endereco,
+                        latitude: matrizGeocodificada.latitude,
+                        longitude: matrizGeocodificada.longitude,
+                        estimated_arrival: startTime
+                      };
 
-              let currentOrder = 2;
-              const beforeItems = beforePriority.map((item, idx) => ({
-                ...item,
-                order: currentOrder++
-              }));
+                      let currentOrder = 2;
+                      const beforeItems = beforePriority.map((item, idx) => ({
+                        ...item,
+                        order: currentOrder++
+                      }));
 
-              // Pular o primeiro item do resultado otimizado (é o ponto de partida da sub-rota)
-              const optimizedItems = result.optimized_route.slice(1, -1).map((item) => ({
-                ...item,
-                order: currentOrder++
-              }));
+                      // Pular o primeiro item do resultado otimizado (é o ponto de partida da sub-rota)
+                      const optimizedItems = result.optimized_route.slice(1, -1).map((item) => ({
+                        ...item,
+                        order: currentOrder++
+                      }));
 
-              const matrizFim = {
-                order: currentOrder,
-                client_name: PONTO_PARTIDA.nome,
-                address: PONTO_PARTIDA.endereco,
-                latitude: matrizGeocodificada.latitude,
-                longitude: matrizGeocodificada.longitude,
-                estimated_arrival: result.optimized_route[result.optimized_route.length - 1]?.estimated_arrival
-              };
+                      const matrizFim = {
+                        order: currentOrder,
+                        client_name: PONTO_PARTIDA.nome,
+                        address: PONTO_PARTIDA.endereco,
+                        latitude: matrizGeocodificada.latitude,
+                        longitude: matrizGeocodificada.longitude,
+                        estimated_arrival: result.optimized_route[result.optimized_route.length - 1]?.estimated_arrival
+                      };
 
-              finalRoute = [matrizInicio, ...beforeItems, ...optimizedItems, matrizFim];
-            } else {
-              // Só tem um item após a prioridade, não precisa otimizar
-              finalRoute = buildManualRoute(matrizGeocodificada, newEntregas, startTime);
-            }
-          } else {
-            // Não tem itens após a prioridade, usar ordem manual
-            finalRoute = buildManualRoute(matrizGeocodificada, newEntregas, startTime);
-          }
+                      finalRoute = [matrizInicio, ...beforeItems, ...optimizedItems, matrizFim];
 
-          setOptimizedRoute(finalRoute);
+                      // Atualizar estatísticas
+                      setStats(prev => ({
+                        ...prev,
+                        distance: result.total_distance_km,
+                        time: result.total_time_minutes,
+                        routeGeometry: result.route_geometry
+                      }));
+                    } else {
+                      // Só tem um item após a prioridade, não precisa otimizar
+                      finalRoute = buildManualRoute(matrizGeocodificada, newEntregas, startTime);
+                    }
+                  } else {
+                    // Não tem itens após a prioridade, usar ordem manual
+                    finalRoute = buildManualRoute(matrizGeocodificada, newEntregas, startTime);
+                  }
+
+                  setOptimizedRoute(finalRoute);
 
         } catch (error) {
           console.error("Erro ao reordenar rota:", error);
