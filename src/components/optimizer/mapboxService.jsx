@@ -1,16 +1,61 @@
+// --- FUNÇÃO DE LIMPEZA DE ENDEREÇO ---
+// Remove quebras de linha, caracteres especiais inúteis e espaços extras
+function sanitizeAddress(address) {
+  if (!address) return "";
+  return address
+    .toString()
+    .replace(/[\n\r\t]/g, " ") // Remove quebras de linha
+    .replace(/\s+/g, " ")      // Remove espaços duplos
+    .trim();                   // Remove espaços nas pontas
+}
+
 // Geocodificar um endereço para obter coordenadas
 export async function geocodeAddress(address, mapboxToken) {
-  const query = encodeURIComponent(address + ", Rio de Janeiro, Brazil");
+  // 1. Limpa o endereço antes de enviar
+  const cleanAddress = sanitizeAddress(address);
+  
+  // 2. Adiciona contexto (Rio de Janeiro, Brasil) para melhorar precisão
+  const query = encodeURIComponent(cleanAddress + ", Rio de Janeiro, Brazil");
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${mapboxToken}&country=BR&limit=1`;
   
-  const response = await fetch(url);
-  const data = await response.json();
-  
-  if (data.features && data.features.length > 0) {
-    const [lng, lat] = data.features[0].center;
-    return { latitude: lat, longitude: lng, place_name: data.features[0].place_name };
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Erro na API Mapbox");
+    
+    const data = await response.json();
+    
+    if (data.features && data.features.length > 0) {
+      const [lng, lat] = data.features[0].center;
+      // Retorna números garantidos
+      return { latitude: Number(lat), longitude: Number(lng), place_name: data.features[0].place_name };
+    }
+    
+    // Se falhar com endereço completo, TENTATIVA DE RESGATE:
+    // Tenta geocodificar removendo números ou complementos (ex: "Rua A, 100 - Apt 20" -> "Rua A, Rio de Janeiro")
+    // Isso garante que o pino apareça pelo menos na rua certa, mesmo que não no número exato.
+    console.warn(`Geocodificação exata falhou para: ${cleanAddress}. Tentando busca genérica...`);
+    
+    // Pega só a primeira parte do endereço (geralmente a rua)
+    const streetOnly = cleanAddress.split(",")[0]; 
+    if (streetOnly && streetOnly !== cleanAddress) {
+        const queryGeneric = encodeURIComponent(streetOnly + ", Rio de Janeiro, Brazil");
+        const urlGeneric = `https://api.mapbox.com/geocoding/v5/mapbox.places/${queryGeneric}.json?access_token=${mapboxToken}&country=BR&limit=1`;
+        
+        const responseGen = await fetch(urlGeneric);
+        const dataGen = await responseGen.json();
+        
+        if (dataGen.features && dataGen.features.length > 0) {
+            const [lng, lat] = dataGen.features[0].center;
+            return { latitude: Number(lat), longitude: Number(lng), place_name: dataGen.features[0].place_name };
+        }
+    }
+
+  } catch (err) {
+    console.error("Erro Mapbox Fetch:", err);
   }
-  throw new Error(`Não foi possível geocodificar: ${address}`);
+
+  // Se falhar tudo, retorna null (será tratado no Optimizer)
+  return null;
 }
 
 // Geocodificar múltiplos endereços
@@ -18,29 +63,54 @@ export async function geocodeMultiple(addresses, mapboxToken) {
   const results = await Promise.all(
     addresses.map(async (item) => {
       try {
+        // Se o item já tem latitude/longitude VÁLIDAS do banco, usa elas e economiza API
+        if (item.latitude && item.longitude && !isNaN(Number(item.latitude))) {
+            return { 
+                ...item, 
+                latitude: Number(item.latitude), 
+                longitude: Number(item.longitude) 
+            };
+        }
+
         const coords = await geocodeAddress(item.endereco, mapboxToken);
+        
+        // Se a geocodificação falhou completamente (retornou null)
+        if (!coords) {
+            console.error(`❌ FALHA FATAL: Não foi possível localizar: ${item.nome}`);
+            // Retorna o item sem coordenadas (o Optimizer vai filtrar ou usar backup)
+            return { ...item, latitude: null, longitude: null };
+        }
+
         return { ...item, ...coords };
       } catch (error) {
-        console.error(`Erro ao geocodificar ${item.nome}:`, error);
-        return null;
+        console.error(`Erro ao processar ${item.nome}:`, error);
+        return { ...item, latitude: null, longitude: null };
       }
     })
   );
-  return results.filter(Boolean);
+  return results; // Retorna todos, inclusive os falhos (null)
 }
 
 // Otimizar rota usando Mapbox Optimization API (Perfil Trânsito)
 export async function optimizeRoute(coordinates, mapboxToken) {
-  const coords = coordinates.map(c => `${c.longitude},${c.latitude}`).join(';');
+  // Filtra apenas coordenadas válidas para não quebrar a API de Otimização
+  const validCoords = coordinates.filter(c => c.latitude && c.longitude);
   
-  // Usamos driving-traffic para considerar congestionamentos
-  const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic/${coords}?access_token=${mapboxToken}&roundtrip=true&source=first&destination=last&geometries=geojson&overview=full&steps=true`;
+  if (validCoords.length < 2) {
+      // Retorna estrutura vazia para não quebrar o front
+      return { trips: [], waypoints: [] }; 
+  }
+
+  const coordsString = validCoords.map(c => `${c.longitude},${c.latitude}`).join(';');
+  
+  const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic/${coordsString}?access_token=${mapboxToken}&roundtrip=true&source=first&destination=last&geometries=geojson&overview=full&steps=true`;
   
   const response = await fetch(url);
   const data = await response.json();
   
-  if (data.code !== 'Ok') {
-    throw new Error(`Erro na otimização: ${data.message || data.code}`);
+  if (data.code !== 'Ok' && data.code !== undefined) {
+    // Se der erro (ex: rota impossível), lança exceção
+    throw new Error(`Erro Mapbox Optimization: ${data.message || data.code}`);
   }
   
   return data;
@@ -48,9 +118,10 @@ export async function optimizeRoute(coordinates, mapboxToken) {
 
 // Obter direções entre pontos
 export async function getDirections(coordinates, mapboxToken) {
-  const coords = coordinates.map(c => `${c.longitude},${c.latitude}`).join(';');
+  const validCoords = coordinates.filter(c => c.latitude && c.longitude);
+  const coordsString = validCoords.map(c => `${c.longitude},${c.latitude}`).join(';');
   
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coords}?access_token=${mapboxToken}&geometries=geojson&overview=full`;
+  const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coordsString}?access_token=${mapboxToken}&geometries=geojson&overview=full`;
   
   const response = await fetch(url);
   const data = await response.json();
@@ -62,21 +133,45 @@ export async function getDirections(coordinates, mapboxToken) {
   return data;
 }
 
-// --- LÓGICA DE CÁLCULO DE TEMPO (AQUI ESTÁ A MUDANÇA) ---
+// --- PROCESSAMENTO FINAL (Com Buffers de Tempo) ---
 export function processOptimizationResult(optimizationData, originalPoints, startTime) {
+  // Se a otimização falhou ou não retornou trips, tenta montar rota sequencial simples
+  if (!optimizationData.trips || optimizationData.trips.length === 0) {
+      console.warn("Mapbox não otimizou. Retornando ordem original.");
+      // Fallback simples aqui se necessário, ou retorna vazio
+      return { 
+          optimized_route: [], 
+          route_geometry: [],
+          total_distance_km: 0,
+          total_time_minutes: 0,
+          optimization_notes: "Erro: Não foi possível calcular rota para os endereços fornecidos."
+      };
+  }
+
   const trip = optimizationData.trips[0];
   const waypoints = optimizationData.waypoints;
   const legs = trip.legs || [];
   
-  // 1. Configurações de Tempo
-  const TRAFFIC_BUFFER = 1.25; // Adiciona 25% de margem no tempo de estrada (segurança)
-  const SERVICE_TIME = 15;     // 15 minutos de permanência em cada parada
+  // Configurações
+  const TRAFFIC_BUFFER = 1.25; // +25% tempo segurança
+  const SERVICE_TIME = 15;     // 15 min parado
 
-  // Mapear e ordenar pontos
-  const waypointsWithOriginal = waypoints.map((wp, index) => ({
-    ...wp,
-    originalPoint: originalPoints[index]
-  }));
+  // Filtra apenas os pontos originais que foram enviados para otimização (com coordenadas válidas)
+  // Isso é crucial: se um ponto falhou na geocodificação, ele não está no result do Mapbox
+  const validOriginalPoints = originalPoints.filter(p => p.latitude && p.longitude);
+
+  // Mapeia resposta do Mapbox de volta para os nossos dados
+  const waypointsWithOriginal = waypoints.map((wp, index) => {
+      // O Mapbox retorna na ordem que enviamos os VALID_COORDS
+      // Precisamos garantir que estamos pegando o cliente certo da lista de válidos
+      const original = validOriginalPoints[wp.waypoint_index]; 
+      // Nota: waypoint_index é a ordem na rota OTIMIZADA? Não, é o índice do input original.
+      // O array 'waypoints' vem ordenado pelo input. 
+      return {
+          ...wp,
+          originalPoint: validOriginalPoints[index] 
+      };
+  });
   
   const orderedPoints = waypointsWithOriginal
     .sort((a, b) => a.waypoint_index - b.waypoint_index)
@@ -90,7 +185,6 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   const optimizedRoute = orderedPoints.map((point, index) => {
     const isFirst = index === 0;
     
-    // Se for o primeiro ponto (Matriz - Saída)
     if (isFirst) {
       return {
         order: index + 1,
@@ -98,27 +192,18 @@ export function processOptimizationResult(optimizationData, originalPoints, star
         address: point.endereco,
         latitude: point.latitude,
         longitude: point.longitude,
-        estimated_arrival: formatTime(currentTime), // Hora de saída
+        estimated_arrival: formatTime(currentTime),
         travel_time_from_previous: 0,
         delivery_time: 0
       };
     }
     
-    // --- CÁLCULO DO DESLOCAMENTO ---
     const legIndex = index - 1;
     let rawDuration = legs[legIndex] ? legs[legIndex].duration : 0;
-    
-    // Aplica margem de segurança no trânsito
     const travelTimeMinutes = Math.round((rawDuration * TRAFFIC_BUFFER) / 60);
     
-    // Adiciona tempo de viagem ao relógio
     currentTime += travelTimeMinutes;
-    
-    // Registra a HORA DE CHEGADA neste cliente
     const arrivalTime = formatTime(currentTime);
-    
-    // --- CÁLCULO DA PERMANÊNCIA (SERVICE TIME) ---
-    // Adiciona 15 min ao relógio para que a PRÓXIMA viagem comece depois da descarga
     currentTime += SERVICE_TIME;
     
     return {
@@ -129,26 +214,25 @@ export function processOptimizationResult(optimizationData, originalPoints, star
       longitude: point.longitude,
       estimated_arrival: arrivalTime,
       travel_time_from_previous: travelTimeMinutes,
-      delivery_time: SERVICE_TIME // Registra que parou 15 min
+      delivery_time: SERVICE_TIME
     };
   });
   
-  // --- CÁLCULO DO RETORNO À MATRIZ ---
+  // Retorno à Matriz
   const lastLegIndex = legs.length - 1;
   let rawReturnDuration = legs[lastLegIndex] ? legs[lastLegIndex].duration : 0;
-  
-  // Tempo de volta também com margem de segurança
   const returnTravelTime = Math.round((rawReturnDuration * TRAFFIC_BUFFER) / 60);
-  
-  // Soma ao relógio (que já inclui os 15 min da última entrega)
   currentTime += returnTravelTime;
   
+  // Pega dados da matriz (primeiro ponto válido)
+  const matrizOriginal = validOriginalPoints[0];
+
   const matrizRetorno = {
     order: optimizedRoute.length + 1,
-    client_name: originalPoints[0].nome,
-    address: originalPoints[0].endereco,
-    latitude: originalPoints[0].latitude,
-    longitude: originalPoints[0].longitude,
+    client_name: matrizOriginal.nome,
+    address: matrizOriginal.endereco,
+    latitude: matrizOriginal.latitude,
+    longitude: matrizOriginal.longitude,
     estimated_arrival: formatTime(currentTime),
     travel_time_from_previous: returnTravelTime,
     delivery_time: 0
@@ -156,17 +240,15 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   
   const routeGeometry = trip.geometry?.coordinates || [];
   
-  // Recalcula tempo total considerando as paradas
-  // Tempo Total = (Tempo Dirigindo * Buffer) + (Número de Entregas * 15 min)
   const totalDrivingTime = Math.round(((trip.duration || 0) * TRAFFIC_BUFFER) / 60);
-  const totalServiceTime = (orderedPoints.length - 1) * SERVICE_TIME; // -1 pois não conta a saída da matriz
+  const totalServiceTime = (orderedPoints.length - 1) * SERVICE_TIME;
   
   return {
     optimized_route: [...optimizedRoute, matrizRetorno],
     route_geometry: routeGeometry,
     total_distance_km: (trip.distance || 0) / 1000,
     total_time_minutes: totalDrivingTime + totalServiceTime,
-    optimization_notes: `Rota calculada com trânsito real (+25% margem). Inclui ${SERVICE_TIME} min de permanência em cada entrega.`
+    optimization_notes: `Rota calculada com trânsito real (+25% margem). Inclui ${SERVICE_TIME} min de permanência.`
   };
 }
 
