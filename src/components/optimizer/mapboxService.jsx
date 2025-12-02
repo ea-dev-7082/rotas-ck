@@ -31,13 +31,11 @@ export async function geocodeMultiple(addresses, mapboxToken) {
 
 // Otimizar rota usando Mapbox Optimization API
 export async function optimizeRoute(coordinates, mapboxToken) {
-  // coordinates: array de {longitude, latitude, nome, endereco}
-  // O primeiro ponto é a origem (Matriz) e deve retornar a ela
-  
   const coords = coordinates.map(c => `${c.longitude},${c.latitude}`).join(';');
   
-  // source=first, destination=last, roundtrip=true para voltar à matriz
-  const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${coords}?access_token=${mapboxToken}&roundtrip=true&source=first&destination=last&geometries=geojson&overview=full&steps=true`;
+  // --- ALTERAÇÃO 1: MUDANÇA DE PERFIL ---
+  // Mudamos de 'driving' para 'driving-traffic' para considerar o trânsito real
+  const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic/${coords}?access_token=${mapboxToken}&roundtrip=true&source=first&destination=last&geometries=geojson&overview=full&steps=true`;
   
   const response = await fetch(url);
   const data = await response.json();
@@ -49,11 +47,12 @@ export async function optimizeRoute(coordinates, mapboxToken) {
   return data;
 }
 
-// Obter direções entre pontos para desenhar a rota
+// Obter direções entre pontos
 export async function getDirections(coordinates, mapboxToken) {
   const coords = coordinates.map(c => `${c.longitude},${c.latitude}`).join(';');
   
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?access_token=${mapboxToken}&geometries=geojson&overview=full`;
+  // Aqui também mudamos para driving-traffic
+  const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coords}?access_token=${mapboxToken}&geometries=geojson&overview=full`;
   
   const response = await fetch(url);
   const data = await response.json();
@@ -65,21 +64,19 @@ export async function getDirections(coordinates, mapboxToken) {
   return data;
 }
 
-// Processar resultado da otimização para o formato esperado pela aplicação
+// Processar resultado da otimização
 export function processOptimizationResult(optimizationData, originalPoints, startTime) {
   const trip = optimizationData.trips[0];
   const waypoints = optimizationData.waypoints;
   const legs = trip.legs || [];
   
-  // Mapear waypoints otimizados para os pontos originais usando a posição no array
-  // O Mapbox retorna waypoints na mesma ordem que foram enviados, 
-  // mas cada um tem waypoint_index indicando a posição na rota otimizada
+  // Mapeamento original
   const waypointsWithOriginal = waypoints.map((wp, index) => ({
     ...wp,
-    originalPoint: originalPoints[index] // índice no array = ordem original de envio
+    originalPoint: originalPoints[index]
   }));
   
-  // Ordenar pela ordem otimizada (waypoint_index)
+  // Ordenação
   const orderedPoints = waypointsWithOriginal
     .sort((a, b) => a.waypoint_index - b.waypoint_index)
     .map(wp => ({
@@ -87,15 +84,17 @@ export function processOptimizationResult(optimizationData, originalPoints, star
       waypoint_index: wp.waypoint_index
     }));
   
-  // Calcular horários estimados usando os tempos reais do Mapbox
-  // Os legs estão na ordem correta da rota otimizada
   let currentTime = parseTime(startTime);
   
+  // --- ALTERAÇÃO 2: FATOR DE SEGURANÇA (TRAFFIC BUFFER) ---
+  // Multiplicamos o tempo de estrada por 1.25 (25% a mais)
+  // Isso compensa estacionamento, semáforos longos e velocidade menor de vans
+  const TRAFFIC_BUFFER = 1.25; 
+
   const optimizedRoute = orderedPoints.map((point, index) => {
     const isFirst = index === 0;
     const isLast = index === orderedPoints.length - 1;
     
-    // Para o primeiro ponto (matriz), o horário é o de saída
     if (isFirst) {
       return {
         order: index + 1,
@@ -109,16 +108,20 @@ export function processOptimizationResult(optimizationData, originalPoints, star
       };
     }
     
-    // Pegar o tempo de viagem do leg anterior (legs[0] = matriz -> primeiro destino)
+    // Pegar o tempo de viagem do leg anterior
     const legIndex = index - 1;
-    const travelTimeMinutes = legs[legIndex] ? Math.round(legs[legIndex].duration / 60) : 0;
+    let rawDuration = legs[legIndex] ? legs[legIndex].duration : 0;
     
-    // Adicionar tempo de viagem
+    // Aplica o Buffer de segurança no tempo de viagem
+    const bufferedDuration = rawDuration * TRAFFIC_BUFFER;
+    const travelTimeMinutes = Math.round(bufferedDuration / 60);
+    
+    // Adicionar tempo de viagem bufferizado
     currentTime += travelTimeMinutes;
     
     const arrivalTime = formatTime(currentTime);
     
-    // Adicionar tempo de entrega (15 min) exceto para matriz e último ponto
+    // Tempo de descarga (15 min)
     if (!isLast) {
       currentTime += 15;
     }
@@ -135,9 +138,12 @@ export function processOptimizationResult(optimizationData, originalPoints, star
     };
   });
   
-  // Adicionar retorno à matriz (último leg)
+  // Retorno à matriz (último leg)
   const lastLegIndex = legs.length - 1;
-  const returnTravelTime = legs[lastLegIndex] ? Math.round(legs[lastLegIndex].duration / 60) : 0;
+  let rawReturnDuration = legs[lastLegIndex] ? legs[lastLegIndex].duration : 0;
+  
+  // Aplica buffer na volta também
+  const returnTravelTime = Math.round((rawReturnDuration * TRAFFIC_BUFFER) / 60);
   currentTime += returnTravelTime;
   
   const matrizRetorno = {
@@ -151,15 +157,15 @@ export function processOptimizationResult(optimizationData, originalPoints, star
     delivery_time: 0
   };
   
-  // Extrair geometria da rota para desenhar no mapa
   const routeGeometry = trip.geometry?.coordinates || [];
   
   return {
     optimized_route: [...optimizedRoute, matrizRetorno],
     route_geometry: routeGeometry,
     total_distance_km: (trip.distance || 0) / 1000,
-    total_time_minutes: Math.round((trip.duration || 0) / 60),
-    optimization_notes: `Rota otimizada pelo Mapbox com ${orderedPoints.length} paradas. Distância total: ${((trip.distance || 0) / 1000).toFixed(1)} km.`
+    // Ajusta o tempo total nas estatísticas também
+    total_time_minutes: Math.round(((trip.duration || 0) * TRAFFIC_BUFFER) / 60),
+    optimization_notes: `Rota otimizada (perfil tráfego real + margem de segurança) com ${orderedPoints.length} paradas. Distância: ${((trip.distance || 0) / 1000).toFixed(1)} km.`
   };
 }
 
