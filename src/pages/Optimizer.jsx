@@ -15,7 +15,7 @@ import PrintModal from "../components/optimizer/PrintModal";
 import VehicleDriverSelector from "../components/optimizer/VehicleDriverSelector";
 import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
 
-// --- SERVIÇOS ---
+// --- SERVIÇOS (MAPBOX) ---
 import { geocodeMultiple, optimizeRoute, processOptimizationResult } from "../components/optimizer/mapboxService";
 
 const DEFAULT_MATRIZ = "Configure o endereço da matriz em Configurações";
@@ -36,7 +36,7 @@ export default function Optimizer() {
   const [showNotaFiscalDialog, setShowNotaFiscalDialog] = useState(false);
   const [currentClientForNota, setCurrentClientForNota] = useState("");
 
-  // --- CARREGAMENTO DE DADOS ---
+  // --- CARREGAMENTO DE DADOS (QUERIES) ---
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
   }, []);
@@ -69,6 +69,7 @@ export default function Optimizer() {
     initialData: [],
   });
 
+  // Configurações
   const enderecoMatriz = configs.find(c => c.chave === "endereco_matriz")?.valor || "";
   const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || "";
 
@@ -80,7 +81,7 @@ export default function Optimizer() {
   const selectedVeiculoData = veiculos.find(v => v.id === selectedVeiculo);
   const selectedMotoristaData = motoristas.find(m => m.id === selectedMotorista);
 
-  // --- HELPERS ---
+  // --- HELPERS (CÁLCULOS) ---
   const calcularDistancia = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -121,6 +122,8 @@ export default function Optimizer() {
     return ordenados;
   };
 
+  // --- HANDLERS (AÇÕES) ---
+
   const handleReset = () => {
     setSelectedClients([]);
     setOptimizedRoute(null);
@@ -142,12 +145,13 @@ export default function Optimizer() {
     }));
   };
 
-  // --- OTIMIZAÇÃO PRINCIPAL ---
+  // 1. OTIMIZAÇÃO INICIAL (BLINDADA)
   const handleOptimize = async () => {
     if (selectedClients.length === 0 || !enderecoMatriz || !mapboxToken) return;
 
     setIsOptimizing(true);
     try {
+      // Prepara dados brutos
       const selectedClientesData = selectedClients.map(id => {
         const cliente = clientes.find(c => c.id === id);
         let enderecoFinal;
@@ -158,35 +162,44 @@ export default function Optimizer() {
             ? `${cliente.endereco}, ${cliente.endereco_num}`
             : cliente.endereco;
         }
+        // Preserva lat/lng originais do banco como backup
         return { 
           nome: cliente.nome, 
-          endereco: enderecoFinal
+          endereco: enderecoFinal,
+          latitude: cliente.latitude,
+          longitude: cliente.longitude
         };
       });
-
-      const allClientesData = clientes.map(c => ({
-        nome: c.nome,
-        endereco: c.endereco,
-        endereco_num: c.endereco_num,
-        telefone: c.telefone,
-        observacoes: c.observacoes
-      }));
 
       const now = new Date();
       const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       
+      // Geocodificação
       const matrizData = [{ nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco }];
       const [matrizGeocodificada] = await geocodeMultiple(matrizData, mapboxToken);
       
       const clientesGeocodificados = await geocodeMultiple(selectedClientesData, mapboxToken);
 
-      if (clientesGeocodificados.length === 0) {
-        throw new Error("Não foi possível geocodificar os endereços dos clientes");
+      // BLINDAGEM: Mescla resultado da API com backup do Banco de Dados
+      const clientesFinal = clientesGeocodificados.map((item, index) => {
+         const original = selectedClientesData[index];
+         return {
+             ...item,
+             // Se API falhou (null/undefined), usa do banco
+             latitude: item.latitude || original.latitude, 
+             longitude: item.longitude || original.longitude
+         };
+      });
+
+      setGeocodedClients(clientesFinal);
+      
+      // Filtra apenas pontos com coordenadas válidas para otimizar
+      const pontosParaOtimizar = [matrizGeocodificada, ...clientesFinal].filter(p => p.latitude && p.longitude);
+
+      if (pontosParaOtimizar.length < 2) {
+          throw new Error("Não há coordenadas suficientes para traçar a rota. Verifique os endereços.");
       }
 
-      setGeocodedClients(clientesGeocodificados);
-      
-      const pontosParaOtimizar = [matrizGeocodificada, ...clientesGeocodificados];
       const optimizationData = await optimizeRoute(pontosParaOtimizar, mapboxToken);
       const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime);
 
@@ -198,11 +211,18 @@ export default function Optimizer() {
         routeGeometry: result.route_geometry
       });
 
+      // IA - Clientes Próximos
+      const allClientesData = clientes.map(c => ({
+        nome: c.nome,
+        endereco: c.endereco,
+        telefone: c.telefone
+      }));
+
       const nearbyResult = await base44.integrations.Core.InvokeLLM({
         prompt: `Você é um especialista em análise geográfica no Rio de Janeiro.
-PONTO DE PARTIDA (MATRIZ): ${PONTO_PARTIDA.endereco}
-CLIENTES SELECIONADOS: ${JSON.stringify(selectedClientesData, null, 2)}
-TODOS OS CLIENTES: ${JSON.stringify(allClientesData, null, 2)}
+PONTO DE PARTIDA: ${PONTO_PARTIDA.endereco}
+CLIENTES ROTA ATUAL: ${JSON.stringify(selectedClientesData.map(c => ({nome: c.nome, endereco: c.endereco})), null, 2)}
+TODOS CLIENTES: ${JSON.stringify(allClientesData, null, 2)}
 CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         add_context_from_internet: true,
         response_json_schema: {
@@ -232,7 +252,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     setIsOptimizing(false);
   };
 
-  // --- REORDENAÇÃO (AQUI ESTAVA O PROBLEMA DE PINOS SUMINDO) ---
+  // 2. REORDENAÇÃO (CORRIGIDO: DICIONÁRIO MESTRE)
   const handleReorderRoute = async (newEntregas, priorityIndex) => {
     if (newEntregas.length === 0) return;
 
@@ -241,37 +261,35 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       const now = new Date();
       const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-      // 1. Recarrega Matriz
       const matrizData = [{ nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco }];
       const [matrizGeocodificada] = await geocodeMultiple(matrizData, mapboxToken);
 
-      // --- SOLUÇÃO ROBUSTA: DICIONÁRIO MESTRE DE COORDENADAS ---
-      // Cria um mapa único com TODAS as coordenadas disponíveis para evitar falhas
+      // --- CRIAÇÃO DO DICIONÁRIO MESTRE DE COORDENADAS ---
       const coordsMap = {};
 
-      // A. Do Banco de Dados
+      // 1. Popula com dados do Banco (Garantia Base)
       clientes.forEach(c => {
         if (c.nome && c.latitude) coordsMap[c.nome.trim()] = { lat: c.latitude, lng: c.longitude };
       });
 
-      // B. Do Cache de Geocodificação
+      // 2. Popula com Cache Recente (Garantia API)
       geocodedClients.forEach(g => {
         if (g.nome && g.latitude) coordsMap[g.nome.trim()] = { lat: g.latitude, lng: g.longitude };
       });
 
-      // C. Dos Itens Atuais
+      // 3. Popula com Itens da Lista Atual (Garantia Estado Anterior)
       newEntregas.forEach(item => {
         if (item.client_name && item.latitude) {
             coordsMap[item.client_name.trim()] = { lat: item.latitude, lng: item.longitude };
         }
       });
 
-      // Helper para buscar com segurança
+      // Helper seguro para buscar coordenada
       const getSafeCoords = (name) => {
         const key = name?.trim();
         return coordsMap[key] || null;
       };
-      // -----------------------------------------------------------
+      // ----------------------------------------------------
 
       const beforePriority = newEntregas.slice(0, priorityIndex + 1);
       const afterPriority = newEntregas.slice(priorityIndex + 1);
@@ -279,7 +297,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       let finalRoute;
 
       if (afterPriority.length > 0) {
-        // Usa o Mapa Mestre para garantir coordenadas
+        // Garante coordenadas antes de processar
         const afterPriorityWithCoords = afterPriority.map(item => {
           const coords = getSafeCoords(item.client_name);
           return {
@@ -311,14 +329,14 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
             }))
         ];
 
-        // Filtra para API do Mapbox
+        // Filtra para Mapbox
         const pontosValidos = todosOsPontos.filter(p => p.latitude && p.longitude);
 
         const optimizationData = await optimizeRoute(pontosValidos, mapboxToken);
         const trip = optimizationData.trips?.[0];
         const legs = trip?.legs || [];
 
-        // Reconstrói a rota visual
+        // Reconstrói Rota Visual
         const parseTime = (timeStr) => {
           const [hours, minutes] = timeStr.split(':').map(Number);
           return hours * 60 + minutes;
@@ -348,13 +366,13 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           const arrivalTime = formatTime(currentTime);
           currentTime += 15;
 
-          // Busca coordenada segura novamente para o Estado Final
+          // AQUI: Recupera a coordenada do Dicionário Mestre para o estado final
           const coords = getSafeCoords(item.client_name);
 
           return {
             ...item,
             order: currentOrder++,
-            latitude: coords?.lat || item.latitude,
+            latitude: coords?.lat || item.latitude, // Blindagem Final
             longitude: coords?.lng || item.longitude,
             estimated_arrival: arrivalTime
           };
@@ -393,7 +411,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     setIsOptimizing(false);
   };
 
-  // --- ROTA MANUAL ---
+  // 3. ROTA MANUAL (FALLBACK)
   const buildManualRoute = (matrizGeocodificada, entregas, startTime) => {
     const parseTime = (timeStr) => {
       const [hours, minutes] = timeStr.split(':').map(Number);
@@ -419,7 +437,9 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     });
 
     entregas.forEach((item, idx) => {
-      const geocoded = geocodedClients.find(g => g.nome === item.client_name) || item;
+      // Tenta achar coordenada no cache ou usa do item
+      const geocoded = geocodedClients.find(g => g.nome?.trim() === item.client_name?.trim()) || item;
+      
       if (idx > 0) currentTime += 25; else currentTime += 10;
 
       route.push({
@@ -446,6 +466,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     return route;
   };
 
+  // --- RENDER ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       <div className="container mx-auto px-4 py-8">
@@ -527,7 +548,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           </motion.div>
         )}
 
-        {/* MAIN LAYOUT */}
+        {/* LAYOUT PRINCIPAL */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
