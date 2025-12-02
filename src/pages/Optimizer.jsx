@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Route, MapPin, TrendingUp, Loader2, Users, Home } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Componentes Filhos
 import ClientSelector from "../components/optimizer/ClientSelector";
 import RouteMap from "../components/optimizer/RouteMap";
 import DraggableRouteList from "../components/optimizer/DraggableRouteList";
@@ -13,11 +14,14 @@ import NearbyClients from "../components/optimizer/NearbyClients";
 import PrintModal from "../components/optimizer/PrintModal";
 import VehicleDriverSelector from "../components/optimizer/VehicleDriverSelector";
 import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
+
+// Serviços (Mapbox)
 import { geocodeMultiple, optimizeRoute, processOptimizationResult } from "../components/optimizer/mapboxService";
 
 const DEFAULT_MATRIZ = "Configure o endereço da matriz em Configurações";
 
 export default function Optimizer() {
+  // --- ESTADOS ---
   const [selectedClients, setSelectedClients] = useState([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimizedRoute, setOptimizedRoute] = useState(null);
@@ -32,6 +36,7 @@ export default function Optimizer() {
   const [showNotaFiscalDialog, setShowNotaFiscalDialog] = useState(false);
   const [currentClientForNota, setCurrentClientForNota] = useState("");
 
+  // --- EFEITOS E QUERIES ---
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
   }, []);
@@ -64,6 +69,7 @@ export default function Optimizer() {
     initialData: [],
   });
 
+  // --- CONFIGURAÇÕES GERAIS ---
   const enderecoMatriz = configs.find(c => c.chave === "endereco_matriz")?.valor || "";
   const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || "";
 
@@ -72,6 +78,74 @@ export default function Optimizer() {
     endereco: enderecoMatriz || DEFAULT_MATRIZ
   };
 
+  const selectedVeiculoData = veiculos.find(v => v.id === selectedVeiculo);
+  const selectedMotoristaData = motoristas.find(m => m.id === selectedMotorista);
+
+  // --- FUNÇÕES AUXILIARES DE CÁLCULO ---
+  const calcularDistancia = (lat1, lon1, lat2, lon2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const ordenarPorProximidade = (pontos, pontoInicial) => {
+    if (pontos.length === 0) return [];
+    const ordenados = [];
+    let restantes = [...pontos];
+    let atual = pontoInicial;
+
+    while (restantes.length > 0) {
+      let maisProximoIdx = 0;
+      let menorDistancia = Infinity;
+
+      restantes.forEach((ponto, idx) => {
+        const dist = calcularDistancia(
+          atual.latitude, atual.longitude,
+          ponto.latitude, ponto.longitude
+        );
+        if (dist < menorDistancia) {
+          menorDistancia = dist;
+          maisProximoIdx = idx;
+        }
+      });
+
+      const maisProximo = restantes[maisProximoIdx];
+      ordenados.push(maisProximo);
+      restantes.splice(maisProximoIdx, 1);
+      atual = maisProximo;
+    }
+    return ordenados;
+  };
+
+  // --- HANDLERS PRINCIPAIS ---
+
+  const handleReset = () => {
+    setSelectedClients([]);
+    setOptimizedRoute(null);
+    setStats(null);
+    setNearbyClients(null);
+    setGeocodedClients([]);
+    setNotasFiscais({});
+  };
+
+  const handleOpenNotaFiscal = (clientName) => {
+    setCurrentClientForNota(clientName);
+    setShowNotaFiscalDialog(true);
+  };
+
+  const handleSaveNotaFiscal = (notas) => {
+    setNotasFiscais(prev => ({
+      ...prev,
+      [currentClientForNota]: notas
+    }));
+  };
+
+  // 1. OTIMIZAÇÃO INICIAL (Botão Grande)
   const handleOptimize = async () => {
     if (selectedClients.length === 0 || !enderecoMatriz || !mapboxToken) return;
 
@@ -127,43 +201,13 @@ export default function Optimizer() {
         routeGeometry: result.route_geometry
       });
 
+      // Chamada para IA (Clientes Próximos)
       const nearbyResult = await base44.integrations.Core.InvokeLLM({
         prompt: `Você é um especialista em análise geográfica no Rio de Janeiro.
-
-PONTO DE PARTIDA (MATRIZ):
-${PONTO_PARTIDA.endereco}
-
-CLIENTES QUE RECEBERÃO ENTREGAS HOJE:
-${JSON.stringify(selectedClientesData, null, 2)}
-
-TODOS OS CLIENTES DISPONÍVEIS (incluindo os selecionados):
-${JSON.stringify(allClientesData, null, 2)}
-
-CRITÉRIOS OBRIGATÓRIOS PARA CLIENTES PRÓXIMOS:
-
-1. DISTÂNCIA DA MATRIZ:
-   - Identifique qual cliente da lista de entregas está MAIS LONGE da matriz
-   - Clientes próximos devem estar em um raio de 5-7 km de distância deste cliente mais distante
-   - OU devem pertencer ao MESMO BAIRRO de algum cliente que receberá entrega
-
-2. ANÁLISE GEOGRÁFICA:
-   - Calcule distâncias reais usando as coordenadas geográficas
-   - Considere a geografia do Rio de Janeiro (não incluir clientes em direção totalmente oposta)
-   - Priorize clientes que estão realmente "no caminho" ou na mesma região
-
-3. SELEÇÃO:
-   - NÃO inclua clientes que já estão na lista de entregas de hoje
-   - Liste no máximo 6-8 clientes mais estratégicos
-   - Para cada um, calcule a distância aproximada do cliente de entrega mais próximo
-
-4. JUSTIFICATIVA:
-   - Explique claramente por que cada cliente próximo foi selecionado
-   - Mencione se está no mesmo bairro ou dentro do raio de 5-7km 
-   - Informe qual cliente de entrega está mais próximo (Não inclua a Matriz como entrega)
-
-IMPORTANTE:
-- Seja rigoroso com os critérios de distância (5-7 km do mais longe OU mesmo bairro)
-- Só sugira clientes que realmente valem a visita pela proximidade`,
+PONTO DE PARTIDA (MATRIZ): ${PONTO_PARTIDA.endereco}
+CLIENTES QUE RECEBERÃO ENTREGAS HOJE: ${JSON.stringify(selectedClientesData, null, 2)}
+TODOS OS CLIENTES DISPONÍVEIS: ${JSON.stringify(allClientesData, null, 2)}
+CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro. Liste max 6 clientes.`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
@@ -192,72 +236,8 @@ IMPORTANTE:
     setIsOptimizing(false);
   };
 
-  const handleReset = () => {
-    setSelectedClients([]);
-    setOptimizedRoute(null);
-    setStats(null);
-    setNearbyClients(null);
-    setGeocodedClients([]);
-    setNotasFiscais({});
-  };
-
-  const handleOpenNotaFiscal = (clientName) => {
-    setCurrentClientForNota(clientName);
-    setShowNotaFiscalDialog(true);
-  };
-
-  const handleSaveNotaFiscal = (notas) => {
-    setNotasFiscais(prev => ({
-      ...prev,
-      [currentClientForNota]: notas
-    }));
-  };
-
-  const selectedVeiculoData = veiculos.find(v => v.id === selectedVeiculo);
-  const selectedMotoristaData = motoristas.find(m => m.id === selectedMotorista);
-
-  const calcularDistancia = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const ordenarPorProximidade = (pontos, pontoInicial) => {
-    if (pontos.length === 0) return [];
-
-    const ordenados = [];
-    let restantes = [...pontos];
-    let atual = pontoInicial;
-
-    while (restantes.length > 0) {
-      let maisProximoIdx = 0;
-      let menorDistancia = Infinity;
-
-      restantes.forEach((ponto, idx) => {
-        const dist = calcularDistancia(
-          atual.latitude, atual.longitude,
-          ponto.latitude, ponto.longitude
-        );
-        if (dist < menorDistancia) {
-          menorDistancia = dist;
-          maisProximoIdx = idx;
-        }
-      });
-
-      const maisProximo = restantes[maisProximoIdx];
-      ordenados.push(maisProximo);
-      restantes.splice(maisProximoIdx, 1);
-      atual = maisProximo;
-    }
-
-    return ordenados;
-  };
-
+  // 2. REORDENAÇÃO (Drag & Drop) - AQUI ESTAVA O PROBLEMA
+  // Versão corrigida com "findCoords" para garantir que os pinos não sumam
   const handleReorderRoute = async (newEntregas, priorityIndex) => {
     if (newEntregas.length === 0) return;
 
@@ -266,8 +246,22 @@ IMPORTANTE:
       const now = new Date();
       const startTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
+      // Recarrega Matriz
       const matrizData = [{ nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco }];
       const [matrizGeocodificada] = await geocodeMultiple(matrizData, mapboxToken);
+
+      // --- FUNÇÃO DE SEGURANÇA: Busca coordenada em 3 lugares ---
+      const findCoords = (clientName, itemFallback) => {
+        // 1. Cache Geocodificado
+        const cached = geocodedClients.find(g => g.nome?.trim() === clientName?.trim());
+        if (cached?.latitude) return { lat: cached.latitude, lng: cached.longitude };
+        // 2. Item Atual (se já tiver)
+        if (itemFallback?.latitude) return { lat: itemFallback.latitude, lng: itemFallback.longitude };
+        // 3. Lista Bruta do Banco
+        const rawClient = clientes.find(c => c.nome?.trim() === clientName?.trim());
+        if (rawClient?.latitude) return { lat: rawClient.latitude, lng: rawClient.longitude };
+        return null;
+      };
 
       const beforePriority = newEntregas.slice(0, priorityIndex + 1);
       const afterPriority = newEntregas.slice(priorityIndex + 1);
@@ -275,48 +269,47 @@ IMPORTANTE:
       let finalRoute;
 
       if (afterPriority.length > 0) {
+        // Garante coordenadas para itens a reordenar
         const afterPriorityWithCoords = afterPriority.map(item => {
-          const geocoded = geocodedClients.find(g => g.nome === item.client_name);
+          const coords = findCoords(item.client_name, item);
           return {
             ...item,
-            latitude: geocoded?.latitude || item.latitude,
-            longitude: geocoded?.longitude || item.longitude,
+            latitude: coords?.lat || item.latitude,
+            longitude: coords?.lng || item.longitude,
             nome: item.client_name
           };
         });
 
+        // Garante coordenada para referência de distância
         const lastPriorityItem = beforePriority[beforePriority.length - 1];
-        const lastPriorityCoords = geocodedClients.find(g => g.nome === lastPriorityItem.client_name) || {
-          latitude: lastPriorityItem.latitude,
-          longitude: lastPriorityItem.longitude
+        const lastCoords = findCoords(lastPriorityItem.client_name, lastPriorityItem);
+        const lastPriorityRef = {
+          latitude: lastCoords?.lat || lastPriorityItem.latitude,
+          longitude: lastCoords?.lng || lastPriorityItem.longitude
         };
 
-        const ordenadosPorProximidade = ordenarPorProximidade(afterPriorityWithCoords, lastPriorityCoords);
+        const ordenadosPorProximidade = ordenarPorProximidade(afterPriorityWithCoords, lastPriorityRef);
 
+        // Monta lista para Mapbox
         const todosOsPontos = [
           matrizGeocodificada,
           ...beforePriority.map(item => {
-            const geocoded = geocodedClients.find(g => g.nome === item.client_name);
-            return {
-              nome: item.client_name,
-              endereco: item.address,
-              latitude: geocoded?.latitude || item.latitude,
-              longitude: geocoded?.longitude || item.longitude
-            };
+             const c = findCoords(item.client_name, item);
+             return { nome: item.client_name, latitude: c?.lat, longitude: c?.lng };
           }),
           ...ordenadosPorProximidade.map(item => ({
-            nome: item.client_name,
-            endereco: item.address,
-            latitude: item.latitude,
-            longitude: item.longitude
+             nome: item.client_name, latitude: item.latitude, longitude: item.longitude
           }))
         ];
 
-        const optimizationData = await optimizeRoute(todosOsPontos, mapboxToken);
+        // Filtra inválidos antes de chamar API
+        const pontosValidos = todosOsPontos.filter(p => p.latitude && p.longitude);
+
+        const optimizationData = await optimizeRoute(pontosValidos, mapboxToken);
         const trip = optimizationData.trips?.[0];
         const legs = trip?.legs || [];
 
-        // Calcular horários estimados com base nos tempos reais + 15min de descarga
+        // Reconstrução da Rota com Tempos
         const parseTime = (timeStr) => {
           const [hours, minutes] = timeStr.split(':').map(Number);
           return hours * 60 + minutes;
@@ -342,26 +335,22 @@ IMPORTANTE:
         const allDeliveries = [...beforePriority, ...ordenadosPorProximidade];
         
         const deliveryItems = allDeliveries.map((item, idx) => {
-          // Adicionar tempo de viagem do trecho anterior
-          if (legs[idx]) {
-            currentTime += legs[idx].duration / 60; // segundos para minutos
-          }
+          if (legs[idx]) currentTime += legs[idx].duration / 60;
           const arrivalTime = formatTime(currentTime);
-          
-          // Adicionar 15 min de tempo de descarga
           currentTime += 15;
 
-          const geocoded = geocodedClients.find(g => g.nome === item.client_name);
+          // Busca segura novamente para salvar no estado final
+          const coords = findCoords(item.client_name, item);
+
           return {
             ...item,
             order: currentOrder++,
-            latitude: geocoded?.latitude || item.latitude,
-            longitude: geocoded?.longitude || item.longitude,
+            latitude: coords?.lat || item.latitude,
+            longitude: coords?.lng || item.longitude,
             estimated_arrival: arrivalTime
           };
         });
 
-        // Tempo de volta à matriz
         if (legs[legs.length - 1]) {
           currentTime += legs[legs.length - 1].duration / 60;
         }
@@ -397,6 +386,7 @@ IMPORTANTE:
     setIsOptimizing(false);
   };
 
+  // 3. ROTA MANUAL (Fallback)
   const buildManualRoute = (matrizGeocodificada, entregas, startTime) => {
     const parseTime = (timeStr) => {
       const [hours, minutes] = timeStr.split(':').map(Number);
@@ -424,12 +414,8 @@ IMPORTANTE:
     entregas.forEach((item, idx) => {
       const geocoded = geocodedClients.find(g => g.nome === item.client_name) || item;
       
-      // Estimar 10 min de deslocamento entre pontos + 15 min de descarga do anterior
-      if (idx > 0) {
-        currentTime += 10 + 15; // deslocamento + descarga
-      } else {
-        currentTime += 10; // apenas deslocamento da matriz
-      }
+      if (idx > 0) currentTime += 25; // 10 min viagem + 15 descarga
+      else currentTime += 10;
 
       route.push({
         order: currentOrder++,
@@ -441,8 +427,7 @@ IMPORTANTE:
       });
     });
 
-    // Volta à matriz
-    currentTime += 15 + 10; // descarga última entrega + volta
+    currentTime += 25;
 
     route.push({
       order: currentOrder,
@@ -456,9 +441,11 @@ IMPORTANTE:
     return route;
   };
 
+  // --- RENDERIZAÇÃO ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       <div className="container mx-auto px-4 py-8">
+        
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -475,7 +462,7 @@ IMPORTANTE:
             Selecione os clientes e planeje as entregas do dia
           </p>
           
-          {/* Ponto de Partida Display */}
+          {/* Display Ponto de Partida */}
           <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${enderecoMatriz ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
             <Home className={`w-5 h-5 ${enderecoMatriz ? 'text-green-600' : 'text-yellow-600'}`} />
             <div className="text-left">
@@ -489,7 +476,7 @@ IMPORTANTE:
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
+        {/* Cards de Estatísticas */}
         {stats && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -546,9 +533,10 @@ IMPORTANTE:
           </motion.div>
         )}
 
-        {/* Main Content */}
+        {/* Conteúdo Principal */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Client Selection */}
+          
+          {/* Coluna Esquerda - Seleção */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -560,9 +548,9 @@ IMPORTANTE:
                   <Users className="w-5 h-5 text-blue-600" />
                   Selecione os Clientes
                 </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                {/* Seletor de Veículo e Motorista */}
+              </CardHeader>
+              <CardContent className="p-6">
+                
                 <VehicleDriverSelector
                   veiculos={veiculos}
                   motoristas={motoristas}
@@ -611,7 +599,7 @@ IMPORTANTE:
               </CardContent>
             </Card>
 
-            {/* Optimization Notes */}
+            {/* Notas de Otimização */}
             {stats?.notes && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -633,7 +621,7 @@ IMPORTANTE:
             )}
           </motion.div>
 
-          {/* Right Column - Results */}
+          {/* Coluna Direita - Resultados */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -643,7 +631,11 @@ IMPORTANTE:
             <AnimatePresence mode="wait">
               {optimizedRoute ? (
                 <>
-                  <RouteMap route={optimizedRoute} pontoPartida={PONTO_PARTIDA} routeGeometry={stats?.routeGeometry} />
+                  <RouteMap 
+                    route={optimizedRoute} 
+                    pontoPartida={PONTO_PARTIDA} 
+                    routeGeometry={stats?.routeGeometry} 
+                  />
                   <DraggableRouteList 
                     route={optimizedRoute} 
                     onReorder={handleReorderRoute}
@@ -674,7 +666,7 @@ IMPORTANTE:
         </div>
       </div>
 
-      {/* Print Modal */}
+      {/* MODAL DE IMPRESSÃO SÉRIO */}
       <PrintModal
         open={showPrintModal}
         onClose={() => setShowPrintModal(false)}
@@ -687,7 +679,7 @@ IMPORTANTE:
         motoristaData={selectedMotoristaData}
       />
 
-      {/* Nota Fiscal Dialog */}
+      {/* DIALOGO DE NOTA FISCAL */}
       <NotaFiscalDialog
         open={showNotaFiscalDialog}
         onClose={() => setShowNotaFiscalDialog(false)}
