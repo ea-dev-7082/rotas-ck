@@ -18,13 +18,32 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
     setExpedidor(responsavelExpedicao || "");
   }, [responsavelExpedicao]);
 
+  // Função auxiliar para calcular volumes
+  const calcularVolumeTotal = () => {
+    if (!route || !notasFiscais) return 0;
+    let total = 0;
+    route.forEach(point => {
+        const notas = notasFiscais[point.client_name] || [];
+        notas.forEach(nota => {
+            // Tenta converter para número, se for texto considera 0 ou ajusta conforme sua regra de negócio
+            total += Number(nota.volume) || 0;
+        });
+    });
+    return total;
+  };
+
+  const totalVolumesGeral = calcularVolumeTotal();
+
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     
     // Gerar linhas da tabela para a impressão
     const tableRows = route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
         const clientNotas = notasFiscais?.[point.client_name] || [];
-        const notasString = clientNotas.map(n => `NF: ${n.numero}`).join(', ');
+        const notasString = clientNotas.map(n => `NF ${n.numero}`).join(', ');
+        
+        // Soma volumes deste cliente específico
+        const volCliente = clientNotas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
         
         return `
           <tr>
@@ -34,8 +53,9 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                 <div class="client-address">${point.address}</div>
             </td>
             <td style="text-align: center;">${point.estimated_arrival || '-'}</td>
+            <td style="text-align: center; font-weight: bold;">${volCliente > 0 ? volCliente : '-'}</td>
             <td>${notasString || '<span style="color:#999">-</span>'}</td>
-            <td style="width: 100px;"> </td>
+            <td style="width: 80px;"> </td>
           </tr>
         `;
     }).join('');
@@ -57,7 +77,7 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             .doc-title { font-size: 14px; font-weight: bold; border: 1px solid #000; padding: 5px 10px; display: inline-block; background: #eee; }
             
             /* Grids de Informação */
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; border: 1px solid #000; padding: 10px; }
+            .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; border: 1px solid #000; padding: 10px; }
             .info-item { display: flex; flex-direction: column; }
             .label { font-size: 9px; text-transform: uppercase; color: #555; font-weight: bold; margin-bottom: 2px; }
             .value { font-size: 11px; font-weight: normal; border-bottom: 1px dotted #ccc; padding-bottom: 2px; }
@@ -65,13 +85,13 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             /* Tabela Principal */
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; }
             th { border: 1px solid #000; background-color: #eee; padding: 6px; text-align: left; text-transform: uppercase; font-size: 9px; }
-            td { border: 1px solid #000; padding: 6px; vertical-align: top; }
+            td { border: 1px solid #000; padding: 6px; vertical-align: middle; }
             
             .client-name { font-weight: bold; font-size: 11px; }
             .client-address { font-size: 9px; color: #444; margin-top: 2px; }
 
             /* Rodapé e Assinaturas */
-            .footer-stats { margin-bottom: 30px; border-top: 2px solid #000; padding-top: 5px; display: flex; justify-content: space-between; font-weight: bold; }
+            .footer-stats { margin-bottom: 30px; border: 1px solid #000; background: #f9f9f9; padding: 10px; display: flex; justify-content: space-around; font-weight: bold; font-size: 12px; }
             
             .signatures { display: flex; justify-content: space-between; margin-top: 50px; }
             .sig-box { width: 40%; text-align: center; }
@@ -98,7 +118,7 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                 <span class="value">${motoristaData?.nome || 'N/D'}</span>
               </div>
               <div class="info-item">
-                <span class="label">Veículo / Placa</span>
+                <span class="label">Veículo</span>
                 <span class="value">${veiculoData?.descricao || ''} ${veiculoData?.placa ? `(${veiculoData.placa})` : ''}</span>
               </div>
                <div class="info-item">
@@ -106,16 +126,8 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                 <span class="value">${expedidor || '____________'}</span>
               </div>
               <div class="info-item">
-                <span class="label">Previsão de Saída</span>
+                <span class="label">Saída Prevista</span>
                 <span class="value">${route?.[0]?.estimated_arrival || '-'}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Qtd. Entregas</span>
-                <span class="value">${route ? route.length - 2 : 0}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Distância Total</span>
-                <span class="value">${stats?.distance?.toFixed(1) || 0} km</span>
               </div>
             </div>
 
@@ -124,9 +136,10 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                 <tr>
                   <th style="width: 30px; text-align: center;">#</th>
                   <th>Destinatário / Endereço</th>
-                  <th style="width: 70px; text-align: center;">Chegada</th>
+                  <th style="width: 60px; text-align: center;">Chegada</th>
+                  <th style="width: 40px; text-align: center;">Vol.</th>
                   <th>Documentos (NFs)</th>
-                  <th style="width: 100px;">Confirmação / Assinatura</th>
+                  <th style="width: 80px;">Confere</th>
                 </tr>
               </thead>
               <tbody>
@@ -135,16 +148,19 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             </table>
 
             <div class="footer-stats">
-               <span>Tempo Estimado de Rota: ${stats?.time ? `${Math.floor(stats.time / 60)}h ${stats.time % 60}min` : '-'}</span>
-               <span>Total Volumes: ______</span>
+               <span>Distância: ${stats?.distance?.toFixed(1) || 0} km</span>
+               <span>Tempo Est.: ${stats?.time ? `${Math.floor(stats.time / 60)}h ${stats.time % 60}min` : '-'}</span>
+               <span>TOTAL VOLUMES: ${totalVolumesGeral}</span>
             </div>
 
             <div class="signatures">
               <div class="sig-box">
                 <div class="sig-line">Visto do Motorista</div>
+                <div style="font-size: 8px; color: #666; margin-top: 2px;">Declaro ter recebido a carga conferida</div>
               </div>
               <div class="sig-box">
                 <div class="sig-line">Conferência / Portaria</div>
+                <div style="font-size: 8px; color: #666; margin-top: 2px;">Liberação de Saída</div>
               </div>
             </div>
 
@@ -163,10 +179,9 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
 
   const today = new Date().toLocaleDateString('pt-BR');
 
-  // Preview simplificado no modal (visualização rápida)
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto z-[9999]">
+      <DialogContent className="sm:max-w-[850px] max-h-[90vh] overflow-y-auto z-[9999]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
@@ -186,8 +201,8 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
              </div>
           </div>
 
-          {/* Preview Visual - Estilo "Documento" */}
-          <div className="border border-gray-300 bg-white p-8 shadow-sm min-h-[400px]" ref={printRef}>
+          {/* Preview Visual na Tela */}
+          <div className="border border-gray-300 bg-white p-6 shadow-sm min-h-[400px]" ref={printRef}>
             
             {/* Cabeçalho Preview */}
             <div className="flex justify-between border-b-2 border-black pb-4 mb-6">
@@ -197,19 +212,23 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                 </div>
                 <div className="text-right">
                     <div className="text-sm font-bold">{today}</div>
-                    <div className="text-xs text-gray-500">ID: {Math.floor(Math.random() * 10000)}</div>
+                    <div className="text-xs text-gray-500">Emissão Digital</div>
                 </div>
             </div>
 
-            {/* Grid de Informações Preview */}
-            <div className="grid grid-cols-3 gap-4 mb-6 text-sm border p-4 bg-gray-50">
+            {/* Grid Preview */}
+            <div className="grid grid-cols-4 gap-4 mb-6 text-sm border p-4 bg-gray-50">
                 <div>
                     <span className="block text-xs font-bold text-gray-500 uppercase">Motorista</span>
-                    <span className="font-semibold">{motoristaData?.nome || '-'}</span>
+                    <span className="font-semibold truncate block">{motoristaData?.nome || '-'}</span>
                 </div>
                 <div>
                     <span className="block text-xs font-bold text-gray-500 uppercase">Veículo</span>
-                    <span className="font-semibold">{veiculoData?.descricao || '-'}</span>
+                    <span className="font-semibold truncate block">{veiculoData?.descricao || '-'}</span>
+                </div>
+                <div>
+                    <span className="block text-xs font-bold text-gray-500 uppercase">Volumes Total</span>
+                    <span className="font-bold text-lg">{totalVolumesGeral}</span>
                 </div>
                 <div>
                     <span className="block text-xs font-bold text-gray-500 uppercase">Saída</span>
@@ -221,31 +240,38 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             <div className="border border-gray-300">
                 <div className="grid grid-cols-12 bg-gray-100 border-b border-gray-300 p-2 text-xs font-bold uppercase">
                     <div className="col-span-1 text-center">#</div>
-                    <div className="col-span-6">Cliente</div>
+                    <div className="col-span-5">Cliente</div>
+                    <div className="col-span-2 text-center">Vol.</div>
                     <div className="col-span-2 text-center">Horário</div>
-                    <div className="col-span-3">Obs/NFs</div>
+                    <div className="col-span-2">NFs</div>
                 </div>
-                {route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => (
+                {route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
+                    const clientNotas = notasFiscais?.[point.client_name] || [];
+                    const volCliente = clientNotas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
+                    
+                    return (
                     <div key={index} className="grid grid-cols-12 border-b border-gray-200 p-2 text-xs items-center hover:bg-gray-50">
                         <div className="col-span-1 text-center font-bold">{index + 1}</div>
-                        <div className="col-span-6 pr-2">
-                            <div className="font-bold text-gray-800">{point.client_name}</div>
+                        <div className="col-span-5 pr-2">
+                            <div className="font-bold text-gray-800 truncate">{point.client_name}</div>
                             <div className="text-gray-500 text-[10px] truncate">{point.address}</div>
                         </div>
+                        <div className="col-span-2 text-center font-bold bg-gray-50 rounded mx-2 py-1">
+                            {volCliente > 0 ? volCliente : '-'}
+                        </div>
                         <div className="col-span-2 text-center">{point.estimated_arrival}</div>
-                        <div className="col-span-3 text-[10px] text-gray-600">
-                             {notasFiscais?.[point.client_name]?.length > 0 
-                                ? `NFs: ${notasFiscais[point.client_name].map(n => n.numero).join(', ')}` 
-                                : '-'}
+                        <div className="col-span-2 text-[10px] text-gray-600 truncate">
+                             {clientNotas.length > 0 ? clientNotas.map(n => n.numero).join(', ') : '-'}
                         </div>
                     </div>
-                ))}
+                )})}
             </div>
 
             {/* Footer Preview */}
-            <div className="mt-8 pt-4 border-t border-black flex justify-between text-xs font-bold">
+            <div className="mt-8 p-4 border border-black bg-gray-50 flex justify-between text-xs font-bold items-center">
                  <div>Total Km: {stats?.distance?.toFixed(1)}</div>
-                 <div>Assinatura Resp: ___________________</div>
+                 <div className="text-sm border px-4 py-1 bg-white">TOTAL VOLUMES: {totalVolumesGeral}</div>
+                 <div>Assinatura: ___________________</div>
             </div>
 
           </div>
