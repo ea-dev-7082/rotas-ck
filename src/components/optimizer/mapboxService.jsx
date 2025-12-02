@@ -131,7 +131,7 @@ export function processOptimizationResult(optimizationData, originalPoints, star
       longitude: point.longitude,
       estimated_arrival: arrivalTime,
       travel_time_from_previous: travelTimeMinutes,
-      delivery_time: (!isLast) ? 15 : 0
+      delivery_time: (!isLast) ? 20 : 0
     };
   });
   
