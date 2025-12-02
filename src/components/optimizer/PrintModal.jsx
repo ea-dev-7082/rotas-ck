@@ -156,4 +156,145 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             <div class="footer-stats">
                <span>Distância Total: ${stats?.distance?.toFixed(1) || 0} km</span>
                <span>Tempo Est.: ${stats?.time ? `${Math.floor(stats.time / 60)}h ${stats.time % 60}min` : '-'}</span>
-               <span>TOTAL VOLUMES: ${totalVolumesG
+               <span>TOTAL VOLUMES: ${totalVolumesGeral}</span>
+            </div>
+
+            <div class="signatures">
+              <div class="sig-box">
+                <div class="sig-line">Assinatura Motorista</div>
+              </div>
+              <div class="sig-box">
+                <div class="sig-line">Conferência Expedição</div>
+              </div>
+            </div>
+
+          </div>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  const today = new Date().toLocaleDateString('pt-BR');
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[850px] max-h-[90vh] overflow-y-auto z-[9999]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Visualizar Romaneio
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+             <div className="space-y-2">
+                <Label>Responsável pela Expedição</Label>
+                <Input
+                  value={expedidor}
+                  onChange={(e) => setExpedidor(e.target.value)}
+                  placeholder="Nome do responsável..."
+                />
+             </div>
+          </div>
+
+          {/* Preview Visual na Tela */}
+          <div className="border border-gray-300 bg-white p-6 shadow-sm min-h-[400px]" ref={printRef}>
+            
+            {/* Cabeçalho Preview */}
+            <div className="flex justify-between border-b-2 border-black pb-4 mb-6">
+                <div>
+                    <h1 className="text-xl font-bold uppercase tracking-wider">Romaneio de Carga</h1>
+                    <p className="text-xs text-gray-500">Logística & Distribuição</p>
+                </div>
+                <div className="text-right">
+                    <div className="text-sm font-bold">{today}</div>
+                    <div className="text-xs text-gray-500">Emissão Digital</div>
+                </div>
+            </div>
+
+            {/* Grid Info Preview */}
+            <div className="grid grid-cols-4 gap-4 mb-6 text-sm border p-4 bg-gray-50">
+                <div>
+                    <span className="block text-xs font-bold text-gray-500 uppercase">Motorista</span>
+                    <span className="font-semibold truncate block">{motoristaData?.nome || '-'}</span>
+                </div>
+                <div>
+                    <span className="block text-xs font-bold text-gray-500 uppercase">Veículo</span>
+                    <span className="font-semibold truncate block">{veiculoData?.descricao || '-'}</span>
+                </div>
+                <div>
+                    <span className="block text-xs font-bold text-gray-500 uppercase">Vol. Total</span>
+                    <span className="font-bold text-lg">{totalVolumesGeral}</span>
+                </div>
+                <div>
+                    <span className="block text-xs font-bold text-gray-500 uppercase">Saída</span>
+                    <span className="font-semibold">{route?.[0]?.estimated_arrival || '-'}</span>
+                </div>
+            </div>
+
+            {/* Tabela Preview */}
+            <div className="border border-gray-300">
+                <div className="grid grid-cols-12 bg-gray-100 border-b border-gray-300 p-2 text-xs font-bold uppercase">
+                    <div className="col-span-1 text-center">#</div>
+                    <div className="col-span-5">Cliente</div>
+                    <div className="col-span-1 text-center">Vol.</div>
+                    <div className="col-span-2 text-center">NF</div>
+                    <div className="col-span-2 text-center">Data NF</div>
+                    <div className="col-span-1 text-center">Chegada</div>
+                </div>
+                {route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
+                    const clientNotas = notasFiscais?.[point.client_name] || [];
+                    const volCliente = clientNotas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
+                    
+                    return (
+                    <div key={index} className="grid grid-cols-12 border-b border-gray-200 p-2 text-xs items-center hover:bg-gray-50">
+                        <div className="col-span-1 text-center font-bold">{index + 1}</div>
+                        <div className="col-span-5 pr-2">
+                            <div className="font-bold text-gray-800 truncate">{point.client_name}</div>
+                            <div className="text-gray-500 text-[10px] truncate">{point.address}</div>
+                        </div>
+                        <div className="col-span-1 text-center font-bold">
+                            {volCliente > 0 ? volCliente : '-'}
+                        </div>
+                        <div className="col-span-2 text-center text-[10px]">
+                             {clientNotas.map(n => n.numero).join(', ') || '-'}
+                        </div>
+                        <div className="col-span-2 text-center text-[10px]">
+                             {clientNotas.map(n => n.data ? new Date(n.data).toLocaleDateString('pt-BR') : '-').join(', ') || '-'}
+                        </div>
+                        <div className="col-span-1 text-center text-[10px]">{point.estimated_arrival}</div>
+                    </div>
+                )})}
+            </div>
+
+            {/* Footer Preview */}
+            <div className="mt-8 p-4 border border-black bg-gray-50 flex justify-between text-xs font-bold items-center">
+                 <div>Distância: {stats?.distance?.toFixed(1)} km</div>
+                 <div className="text-sm border px-4 py-1 bg-white">TOTAL VOLUMES: {totalVolumesGeral}</div>
+                 <div>Assinaturas: ___________________</div>
+            </div>
+
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={onClose}>
+              Fechar
+            </Button>
+            <Button onClick={handlePrint} className="bg-black hover:bg-gray-800 text-white">
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimir Romaneio
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
