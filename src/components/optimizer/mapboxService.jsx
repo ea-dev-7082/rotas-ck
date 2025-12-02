@@ -120,7 +120,7 @@ export function processOptimizationResult(optimizationData, originalPoints, star
     
     // Adicionar tempo de entrega (15 min) exceto para matriz e último ponto
     if (!isLast) {
-      currentTime += 15;
+      currentTime += 20;
     }
     
     return {
