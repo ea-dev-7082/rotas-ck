@@ -70,12 +70,15 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
             <MapPin className="w-4 h-4 text-gray-500 mt-1 flex-shrink-0" />
             <p className="text-gray-700 leading-relaxed">{point.address}</p>
           </div>
-          {point.estimated_arrival && (
+          
+          {/* ALTERAÇÃO AQUI: Só mostra chegada se NÃO for o primeiro (isFirst false) */}
+          {!isFirst && point.estimated_arrival && (
             <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
               <Clock className="w-4 h-4" />
               <span>Chegada prevista: {point.estimated_arrival}</span>
             </div>
           )}
+          
         </div>
       </div>
     </div>
@@ -130,7 +133,7 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
         </CardHeader>
         <CardContent className="p-6">
           <div className="space-y-3">
-            {/* Matriz Início */}
+            {/* Matriz Início - Passa isFirst=true */}
             {renderMatrizCard(matrizInicio, "Saída - Matriz", true)}
 
             {/* Entregas Draggable */}
@@ -220,7 +223,7 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
               </Droppable>
             </DragDropContext>
 
-            {/* Matriz Fim */}
+            {/* Matriz Fim - Passa isFirst=false */}
             {renderMatrizCard(matrizFim, "Retorno - Matriz", false)}
           </div>
 
