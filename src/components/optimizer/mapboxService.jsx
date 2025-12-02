@@ -29,12 +29,11 @@ export async function geocodeMultiple(addresses, mapboxToken) {
   return results.filter(Boolean);
 }
 
-// Otimizar rota usando Mapbox Optimization API
+// Otimizar rota usando Mapbox Optimization API (Perfil Trânsito)
 export async function optimizeRoute(coordinates, mapboxToken) {
   const coords = coordinates.map(c => `${c.longitude},${c.latitude}`).join(';');
   
-  // --- ALTERAÇÃO 1: MUDANÇA DE PERFIL ---
-  // Mudamos de 'driving' para 'driving-traffic' para considerar o trânsito real
+  // Usamos driving-traffic para considerar congestionamentos
   const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic/${coords}?access_token=${mapboxToken}&roundtrip=true&source=first&destination=last&geometries=geojson&overview=full&steps=true`;
   
   const response = await fetch(url);
@@ -51,7 +50,6 @@ export async function optimizeRoute(coordinates, mapboxToken) {
 export async function getDirections(coordinates, mapboxToken) {
   const coords = coordinates.map(c => `${c.longitude},${c.latitude}`).join(';');
   
-  // Aqui também mudamos para driving-traffic
   const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coords}?access_token=${mapboxToken}&geometries=geojson&overview=full`;
   
   const response = await fetch(url);
@@ -64,19 +62,22 @@ export async function getDirections(coordinates, mapboxToken) {
   return data;
 }
 
-// Processar resultado da otimização
+// --- LÓGICA DE CÁLCULO DE TEMPO (AQUI ESTÁ A MUDANÇA) ---
 export function processOptimizationResult(optimizationData, originalPoints, startTime) {
   const trip = optimizationData.trips[0];
   const waypoints = optimizationData.waypoints;
   const legs = trip.legs || [];
   
-  // Mapeamento original
+  // 1. Configurações de Tempo
+  const TRAFFIC_BUFFER = 1.25; // Adiciona 25% de margem no tempo de estrada (segurança)
+  const SERVICE_TIME = 15;     // 15 minutos de permanência em cada parada
+
+  // Mapear e ordenar pontos
   const waypointsWithOriginal = waypoints.map((wp, index) => ({
     ...wp,
     originalPoint: originalPoints[index]
   }));
   
-  // Ordenação
   const orderedPoints = waypointsWithOriginal
     .sort((a, b) => a.waypoint_index - b.waypoint_index)
     .map(wp => ({
@@ -86,15 +87,10 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   
   let currentTime = parseTime(startTime);
   
-  // --- ALTERAÇÃO 2: FATOR DE SEGURANÇA (TRAFFIC BUFFER) ---
-  // Multiplicamos o tempo de estrada por 1.25 (25% a mais)
-  // Isso compensa estacionamento, semáforos longos e velocidade menor de vans
-  const TRAFFIC_BUFFER = 1.25; 
-
   const optimizedRoute = orderedPoints.map((point, index) => {
     const isFirst = index === 0;
-    const isLast = index === orderedPoints.length - 1;
     
+    // Se for o primeiro ponto (Matriz - Saída)
     if (isFirst) {
       return {
         order: index + 1,
@@ -102,29 +98,28 @@ export function processOptimizationResult(optimizationData, originalPoints, star
         address: point.endereco,
         latitude: point.latitude,
         longitude: point.longitude,
-        estimated_arrival: formatTime(currentTime),
+        estimated_arrival: formatTime(currentTime), // Hora de saída
         travel_time_from_previous: 0,
         delivery_time: 0
       };
     }
     
-    // Pegar o tempo de viagem do leg anterior
+    // --- CÁLCULO DO DESLOCAMENTO ---
     const legIndex = index - 1;
     let rawDuration = legs[legIndex] ? legs[legIndex].duration : 0;
     
-    // Aplica o Buffer de segurança no tempo de viagem
-    const bufferedDuration = rawDuration * TRAFFIC_BUFFER;
-    const travelTimeMinutes = Math.round(bufferedDuration / 60);
+    // Aplica margem de segurança no trânsito
+    const travelTimeMinutes = Math.round((rawDuration * TRAFFIC_BUFFER) / 60);
     
-    // Adicionar tempo de viagem bufferizado
+    // Adiciona tempo de viagem ao relógio
     currentTime += travelTimeMinutes;
     
+    // Registra a HORA DE CHEGADA neste cliente
     const arrivalTime = formatTime(currentTime);
     
-    // Tempo de descarga (15 min)
-    if (!isLast) {
-      currentTime += 15;
-    }
+    // --- CÁLCULO DA PERMANÊNCIA (SERVICE TIME) ---
+    // Adiciona 15 min ao relógio para que a PRÓXIMA viagem comece depois da descarga
+    currentTime += SERVICE_TIME;
     
     return {
       order: index + 1,
@@ -134,16 +129,18 @@ export function processOptimizationResult(optimizationData, originalPoints, star
       longitude: point.longitude,
       estimated_arrival: arrivalTime,
       travel_time_from_previous: travelTimeMinutes,
-      delivery_time: (!isLast) ? 15 : 0
+      delivery_time: SERVICE_TIME // Registra que parou 15 min
     };
   });
   
-  // Retorno à matriz (último leg)
+  // --- CÁLCULO DO RETORNO À MATRIZ ---
   const lastLegIndex = legs.length - 1;
   let rawReturnDuration = legs[lastLegIndex] ? legs[lastLegIndex].duration : 0;
   
-  // Aplica buffer na volta também
+  // Tempo de volta também com margem de segurança
   const returnTravelTime = Math.round((rawReturnDuration * TRAFFIC_BUFFER) / 60);
+  
+  // Soma ao relógio (que já inclui os 15 min da última entrega)
   currentTime += returnTravelTime;
   
   const matrizRetorno = {
@@ -159,13 +156,17 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   
   const routeGeometry = trip.geometry?.coordinates || [];
   
+  // Recalcula tempo total considerando as paradas
+  // Tempo Total = (Tempo Dirigindo * Buffer) + (Número de Entregas * 15 min)
+  const totalDrivingTime = Math.round(((trip.duration || 0) * TRAFFIC_BUFFER) / 60);
+  const totalServiceTime = (orderedPoints.length - 1) * SERVICE_TIME; // -1 pois não conta a saída da matriz
+  
   return {
     optimized_route: [...optimizedRoute, matrizRetorno],
     route_geometry: routeGeometry,
     total_distance_km: (trip.distance || 0) / 1000,
-    // Ajusta o tempo total nas estatísticas também
-    total_time_minutes: Math.round(((trip.duration || 0) * TRAFFIC_BUFFER) / 60),
-    optimization_notes: `Rota otimizada (perfil tráfego real + margem de segurança) com ${orderedPoints.length} paradas. Distância: ${((trip.distance || 0) / 1000).toFixed(1)} km.`
+    total_time_minutes: totalDrivingTime + totalServiceTime,
+    optimization_notes: `Rota calculada com trânsito real (+25% margem). Inclui ${SERVICE_TIME} min de permanência em cada entrega.`
   };
 }
 
