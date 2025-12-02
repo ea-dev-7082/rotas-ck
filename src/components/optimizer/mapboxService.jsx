@@ -120,7 +120,7 @@ export function processOptimizationResult(optimizationData, originalPoints, star
     
     // Adicionar tempo de entrega (15 min) exceto para matriz e último ponto
     if (!isLast) {
-      currentTime += 20;
+      currentTime += 15;
     }
     
     return {
@@ -131,7 +131,7 @@ export function processOptimizationResult(optimizationData, originalPoints, star
       longitude: point.longitude,
       estimated_arrival: arrivalTime,
       travel_time_from_previous: travelTimeMinutes,
-      delivery_time: (!isLast) ? 20 : 0
+      delivery_time: (!isLast) ? 15 : 0
     };
   });
   
