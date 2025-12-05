@@ -20,13 +20,11 @@ const customMarkerStyle = `
 `;
 
 // --- 2. FUNÇÃO DE BLINDAGEM DE COORDENADAS ---
-// Converte texto com vírgula/ponto para número real
 const parseCoordinate = (coord) => {
   if (coord === null || coord === undefined) return null;
   if (typeof coord === "number") return coord;
   
   if (typeof coord === "string") {
-    // Troca vírgula por ponto e converte
     const stringCoord = coord.replace(",", ".");
     const parsed = parseFloat(stringCoord);
     return isNaN(parsed) ? null : parsed;
@@ -48,7 +46,6 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
   if (!route || route.length === 0) return null;
 
   // --- 3. FILTRAGEM SEGURA ---
-  // Mapeia e sanitiza a rota. Se a coordenada for inválida, loga aviso mas não quebra.
   const validRoute = route.map(point => {
     const lat = parseCoordinate(point.latitude);
     const lng = parseCoordinate(point.longitude);
@@ -71,13 +68,40 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
     );
   }
 
-  // Define o centro do mapa
+  // --- 4. CORREÇÃO DE SOBREPOSIÇÃO (JITTER) ---
+  // Isso resolve o problema do pino 5 sumir se o 6 for no mesmo lugar
+  const occupiedPositions = new Set();
+  const jitterAmount = 0.00015; // Aprox. 15 metros de deslocamento
+
+  const markersData = validRoute.map((point) => {
+    let visualLat = point.latitude;
+    let visualLng = point.longitude;
+    
+    // Cria chave para detectar colisão (arredondada para 5 casas decimais)
+    let posKey = `${visualLat.toFixed(5)},${visualLng.toFixed(5)}`;
+    let attempts = 0;
+
+    // Se a posição já tem um pino, move o próximo levemente
+    while (occupiedPositions.has(posKey) && attempts < 10) {
+      visualLat += jitterAmount;
+      visualLng += jitterAmount;
+      posKey = `${visualLat.toFixed(5)},${visualLng.toFixed(5)}`;
+      attempts++;
+    }
+
+    occupiedPositions.add(posKey);
+
+    // Retorna o objeto com as coordenadas originais (para a linha) e visuais (para o pino)
+    return { ...point, visualLat, visualLng };
+  });
+
+  // --- 5. CÁLCULO DE ROTAS E GEOMETRIA ---
   const center = [
     validRoute.reduce((sum, point) => sum + point.latitude, 0) / validRoute.length,
     validRoute.reduce((sum, point) => sum + point.longitude, 0) / validRoute.length,
   ];
 
-  // Prepara a linha da rota (Geometria do Mapbox ou Linha Reta fallback)
+  // A linha da rota deve usar as coordenadas ORIGINAIS para seguir a rua corretamente
   const routePositions = routeGeometry && routeGeometry.length > 0
     ? routeGeometry.map(coord => [coord[1], coord[0]]) // Mapbox [lng, lat] -> Leaflet [lat, lng]
     : validRoute.sort((a, b) => a.order - b.order).map(point => [point.latitude, point.longitude]);
@@ -130,8 +154,6 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
               zoom={12}
               className="h-full w-full"
               zoomControl={true}
-              // --- 4. CHAVE DE RESET ---
-              // Força o React a recriar o mapa se a rota mudar, prevenindo pinos fantasmas
               key={`map-${validRoute.length}-${center[0].toFixed(4)}`} 
             >
               <TileLayer
@@ -153,8 +175,8 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
                 />
               )}
 
-              {/* Marcadores */}
-              {validRoute.map((point, index) => {
+              {/* Marcadores - Usando markersData com coordenadas visuais */}
+              {markersData.map((point, index) => {
                 const isMatriz = point.client_name?.toLowerCase().includes("matriz") || point.order === 1 || point.order === route.length;
                 const displayLabel = isMatriz ? '🏠' : (point.order - 1);
 
@@ -187,9 +209,9 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
 
                 return (
                   <Marker
-                    // Chave única e robusta
                     key={`marker-${point.client_name}-${index}-${point.order}`}
-                    position={[point.latitude, point.longitude]}
+                    // AQUI ESTÁ A MÁGICA: Usamos visualLat/visualLng
+                    position={[point.visualLat, point.visualLng]}
                     icon={icon}
                   >
                     <Popup>
@@ -226,4 +248,5 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
       </Card>
     </motion.div>
   );
+}
 }
