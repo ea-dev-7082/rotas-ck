@@ -153,8 +153,8 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   const legs = trip.legs || [];
   
   // Configurações
-  const TRAFFIC_BUFFER = 1.25; // +25% tempo segurança
-  const SERVICE_TIME = 15;     // 15 min parado
+  const TRAFFIC_BUFFER = 1.45; // +25% tempo segurança
+  const SERVICE_TIME = 20;     // 15 min parado
 
   // Filtra apenas os pontos originais que foram enviados para otimização (com coordenadas válidas)
   // Isso é crucial: se um ponto falhou na geocodificação, ele não está no result do Mapbox
