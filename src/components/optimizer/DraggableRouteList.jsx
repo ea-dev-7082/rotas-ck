@@ -9,9 +9,27 @@ import { motion } from "framer-motion";
 export default function DraggableRouteList({ route, onReorder, onPrint, notasFiscais, onOpenNotaFiscal }) {
   const [copied, setCopied] = React.useState(false);
 
+  // --- NOVA FUNÇÃO AUXILIAR ---
+  const calcularHorarioComAdicional = (horarioString) => {
+    if (!horarioString) return "";
+    
+    // Divide "14:30" em horas e minutos
+    const [horas, minutos] = horarioString.split(':').map(Number);
+    
+    const data = new Date();
+    data.setHours(horas);
+    data.setMinutes(minutos + 20); // Adiciona os 20 minutos aqui
+    
+    // Retorna formatado como HH:MM
+    return data.toLocaleTimeString('pt-BR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+  // -----------------------------
+
   if (!route || route.length === 0) return null;
 
-  // Separar matriz (início e fim) das entregas
   const matrizInicio = route[0];
   const matrizFim = route[route.length - 1];
   const entregas = route.slice(1, -1);
@@ -41,12 +59,10 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
     
     if (sourceIndex === destIndex) return;
 
-    // Reordenar apenas as entregas (não a matriz)
     const newEntregas = Array.from(entregas);
     const [movedItem] = newEntregas.splice(sourceIndex, 1);
     newEntregas.splice(destIndex, 0, movedItem);
 
-    // Chamar callback para recalcular rota baseado na nova prioridade
     onReorder(newEntregas, destIndex);
   };
 
@@ -71,11 +87,11 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
             <p className="text-gray-700 leading-relaxed">{point.address}</p>
           </div>
           
-          {/* ALTERAÇÃO AQUI: Só mostra chegada se NÃO for o primeiro (isFirst false) */}
           {!isFirst && point.estimated_arrival && (
             <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
               <Clock className="w-4 h-4" />
-              <span>Chegada prevista: {point.estimated_arrival}</span>
+              {/* AQUI: Aplicando a função no Card da Matriz (Retorno) */}
+              <span>Chegada prevista: {calcularHorarioComAdicional(point.estimated_arrival)}</span>
             </div>
           )}
           
@@ -133,10 +149,8 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
         </CardHeader>
         <CardContent className="p-6">
           <div className="space-y-3">
-            {/* Matriz Início - Passa isFirst=true */}
             {renderMatrizCard(matrizInicio, "Saída - Matriz", true)}
 
-            {/* Entregas Draggable */}
             <DragDropContext onDragEnd={handleDragEnd}>
               <Droppable droppableId="entregas">
                 {(provided) => (
@@ -188,10 +202,10 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
                                 {point.estimated_arrival && (
                                   <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
                                     <Clock className="w-4 h-4" />
-                                    <span>Chegada prevista: {point.estimated_arrival}</span>
+                                    {/* AQUI: Aplicando a função nos Cards de Entrega */}
+                                    <span>Chegada prevista: {calcularHorarioComAdicional(point.estimated_arrival)}</span>
                                   </div>
                                 )}
-                                {/* Notas Fiscais */}
                                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                                   <Button
                                     variant="outline"
@@ -223,11 +237,9 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
               </Droppable>
             </DragDropContext>
 
-            {/* Matriz Fim - Passa isFirst=false */}
             {renderMatrizCard(matrizFim, "Retorno - Matriz", false)}
           </div>
 
-          {/* Waze Navigation Button */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <Button
               onClick={handleOpenWaze}
