@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, MapPin, Phone, Edit, Trash2, Users, Warehouse } from "lucide-react";
+import { Plus, MapPin, Phone, Edit, Trash2, Users, Warehouse, Upload, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -21,6 +21,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export default function Clientes() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingCliente, setEditingCliente] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef(null);
+
   const [formData, setFormData] = useState({
     nome: "",
     endereco: "",
@@ -66,6 +69,89 @@ export default function Clientes() {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
     },
   });
+
+  // --- Lógica de Importação de CSV ---
+
+  const parseCSV = (text) => {
+    const lines = text.split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+    
+    const result = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+
+      // Regex complexo para lidar com vírgulas dentro de aspas (ex: endereços)
+      const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+      
+      // Fallback simples se o regex falhar ou para linhas simples
+      const values = row 
+        ? row.map(val => val.replace(/^"|"$/g, '').trim())
+        : lines[i].split(',').map(val => val.replace(/^"|"$/g, '').trim());
+
+      if (values.length > 0) {
+        const obj = {};
+        headers.forEach((header, index) => {
+          // Mapeamento básico de campos do CSV para o objeto
+          if (values[index] !== undefined) {
+             obj[header] = values[index];
+          }
+        });
+        result.push(obj);
+      }
+    }
+    return result;
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !currentUser) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      try {
+        const text = e.target.result;
+        const parsedData = parseCSV(text);
+        
+        // Filtrar e mapear os dados para o formato correto
+        const promises = parsedData.map(item => {
+          // Verifica se tem pelo menos o nome para importar
+          if (!item.nome) return null;
+
+          return base44.entities.Cliente.create({
+            nome: item.nome,
+            endereco: item.endereco || "",
+            // Mapeia colunas comuns ou deixa vazio
+            telefone: item.telefone || "",
+            observacoes: item.observacoes || "",
+            // Campos padrão
+            endereco_entrega: "",
+            usar_endereco_entrega: false,
+            owner: currentUser.email
+          });
+        }).filter(p => p !== null);
+
+        await Promise.all(promises);
+        
+        queryClient.invalidateQueries({ queryKey: ["clientes"] });
+        alert(`${promises.length} clientes importados com sucesso!`);
+      } catch (error) {
+        console.error("Erro ao importar CSV:", error);
+        alert("Erro ao processar o arquivo. Verifique o formato.");
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ""; // Limpar input
+        }
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
+  // --- Fim Lógica de Importação ---
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -125,13 +211,38 @@ export default function Clientes() {
                 Gerencie os clientes para otimização de rotas
               </p>
             </div>
-            <Button
-              onClick={() => setShowDialog(true)}
-              className="h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Novo Cliente
-            </Button>
+            
+            <div className="flex gap-3">
+              {/* Botão de Importar CSV */}
+              <input
+                type="file"
+                accept=".csv"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting}
+                className="h-12 border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm"
+              >
+                {isImporting ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="w-5 h-5 mr-2" />
+                )}
+                {isImporting ? "Importando..." : "Importar CSV"}
+              </Button>
+
+              <Button
+                onClick={() => setShowDialog(true)}
+                className="h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Novo Cliente
+              </Button>
+            </div>
           </div>
         </motion.div>
 
