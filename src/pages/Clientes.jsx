@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, MapPin, Phone, Edit, Trash2, Users, Warehouse, Upload, Loader2 } from "lucide-react";
+// 1. Adicionado o ícone 'Search' na importação
+import { Plus, MapPin, Phone, Edit, Trash2, Users, Warehouse, Upload, Loader2, Search } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -22,6 +23,10 @@ export default function Clientes() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingCliente, setEditingCliente] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
+  
+  // 2. Novo estado para a busca
+  const [searchTerm, setSearchTerm] = useState("");
+  
   const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
@@ -45,6 +50,16 @@ export default function Clientes() {
     queryFn: () => currentUser ? base44.entities.Cliente.filter({ owner: currentUser.email }, "nome") : [],
     enabled: !!currentUser,
     initialData: [],
+  });
+
+  // 3. Lógica de filtragem (Busca por nome, telefone ou endereço)
+  const filteredClientes = clientes.filter((cliente) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      cliente.nome.toLowerCase().includes(term) ||
+      (cliente.telefone && cliente.telefone.includes(term)) ||
+      (cliente.endereco && cliente.endereco.toLowerCase().includes(term))
+    );
   });
 
   const createMutation = useMutation({
@@ -71,7 +86,6 @@ export default function Clientes() {
   });
 
   // --- Lógica de Importação de CSV ---
-
   const parseCSV = (text) => {
     const lines = text.split('\n');
     const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
@@ -81,10 +95,8 @@ export default function Clientes() {
     for (let i = 1; i < lines.length; i++) {
       if (!lines[i].trim()) continue;
 
-      // Regex complexo para lidar com vírgulas dentro de aspas (ex: endereços)
       const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
       
-      // Fallback simples se o regex falhar ou para linhas simples
       const values = row 
         ? row.map(val => val.replace(/^"|"$/g, '').trim())
         : lines[i].split(',').map(val => val.replace(/^"|"$/g, '').trim());
@@ -92,7 +104,6 @@ export default function Clientes() {
       if (values.length > 0) {
         const obj = {};
         headers.forEach((header, index) => {
-          // Mapeamento básico de campos do CSV para o objeto
           if (values[index] !== undefined) {
              obj[header] = values[index];
           }
@@ -115,18 +126,14 @@ export default function Clientes() {
         const text = e.target.result;
         const parsedData = parseCSV(text);
         
-        // Filtrar e mapear os dados para o formato correto
         const promises = parsedData.map(item => {
-          // Verifica se tem pelo menos o nome para importar
           if (!item.nome) return null;
 
           return base44.entities.Cliente.create({
             nome: item.nome,
             endereco: item.endereco || "",
-            // Mapeia colunas comuns ou deixa vazio
             telefone: item.telefone || "",
             observacoes: item.observacoes || "",
-            // Campos padrão
             endereco_entrega: "",
             usar_endereco_entrega: false,
             owner: currentUser.email
@@ -143,14 +150,13 @@ export default function Clientes() {
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) {
-          fileInputRef.current.value = ""; // Limpar input
+          fileInputRef.current.value = "";
         }
       }
     };
 
     reader.readAsText(file);
   };
-
   // --- Fim Lógica de Importação ---
 
   const handleSubmit = (e) => {
@@ -213,7 +219,6 @@ export default function Clientes() {
             </div>
             
             <div className="flex gap-3">
-              {/* Botão de Importar CSV */}
               <input
                 type="file"
                 accept=".csv"
@@ -272,91 +277,111 @@ export default function Clientes() {
         {/* Client List */}
         <Card className="bg-white shadow-xl">
           <CardHeader className="border-b border-gray-100">
-            <CardTitle className="text-xl">Lista de Clientes</CardTitle>
+            {/* 4. Layout do Header alterado para incluir a busca */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <CardTitle className="text-xl">Lista de Clientes</CardTitle>
+              <div className="relative w-full md:w-72">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar por nome, endereço ou tel..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-6">
             <ScrollArea className="h-[600px] pr-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <AnimatePresence>
-                  {clientes.map((cliente) => (
-                    <motion.div
-                      key={cliente.id}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                    >
-                      <Card className="hover:shadow-lg transition-shadow border-2 border-gray-200 hover:border-purple-300">
-                        <CardContent className="p-5">
-                          <div className="flex items-start justify-between mb-3">
-                            <h3 className="font-bold text-lg text-gray-900">
-                              {cliente.nome}
-                            </h3>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEdit(cliente)}
-                                className="hover:bg-blue-50 hover:text-blue-600"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => deleteMutation.mutate(cliente.id)}
-                                className="hover:bg-red-50 hover:text-red-600"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+              {/* 5. Verificação se a lista filtrada está vazia */}
+              {filteredClientes.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                   {searchTerm ? "Nenhum cliente encontrado para sua busca." : "Nenhum cliente cadastrado ainda."}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <AnimatePresence>
+                    {/* 6. Map alterado para usar filteredClientes */}
+                    {filteredClientes.map((cliente) => (
+                      <motion.div
+                        key={cliente.id}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                      >
+                        <Card className="hover:shadow-lg transition-shadow border-2 border-gray-200 hover:border-purple-300">
+                          <CardContent className="p-5">
+                            <div className="flex items-start justify-between mb-3">
+                              <h3 className="font-bold text-lg text-gray-900">
+                                {cliente.nome}
+                              </h3>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEdit(cliente)}
+                                  className="hover:bg-blue-50 hover:text-blue-600"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => deleteMutation.mutate(cliente.id)}
+                                  className="hover:bg-red-50 hover:text-red-600"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="space-y-2">
-                            <div className="flex items-start gap-2 text-sm text-gray-600">
-                              <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-purple-500" />
-                              <p className="leading-relaxed">{cliente.endereco}</p>
-                            </div>
-                            {cliente.endereco_entrega && (
+                            <div className="space-y-2">
                               <div className="flex items-start gap-2 text-sm text-gray-600">
-                                <Warehouse className="w-4 h-4 mt-0.5 flex-shrink-0 text-orange-500" />
-                                <div>
-                                  <p className="leading-relaxed">{cliente.endereco_entrega}</p>
-                                  {cliente.usar_endereco_entrega && (
-                                    <Badge className="mt-1 bg-orange-100 text-orange-700 text-xs">
-                                      Usar para entregas
-                                    </Badge>
-                                  )}
+                                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-purple-500" />
+                                <p className="leading-relaxed">{cliente.endereco}</p>
+                              </div>
+                              {cliente.endereco_entrega && (
+                                <div className="flex items-start gap-2 text-sm text-gray-600">
+                                  <Warehouse className="w-4 h-4 mt-0.5 flex-shrink-0 text-orange-500" />
+                                  <div>
+                                    <p className="leading-relaxed">{cliente.endereco_entrega}</p>
+                                    {cliente.usar_endereco_entrega && (
+                                      <Badge className="mt-1 bg-orange-100 text-orange-700 text-xs">
+                                        Usar para entregas
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                            {cliente.telefone && (
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <Phone className="w-4 h-4 text-purple-500" />
-                                <span>{cliente.telefone}</span>
-                              </div>
-                            )}
-                            {cliente.observacoes && (
-                              <div className="mt-3 pt-3 border-t border-gray-100">
-                                <Badge variant="outline" className="mb-2">
-                                  Observação
-                                </Badge>
-                                <p className="text-xs text-gray-600 italic">
-                                  {cliente.observacoes}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
+                              )}
+                              {cliente.telefone && (
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <Phone className="w-4 h-4 text-purple-500" />
+                                  <span>{cliente.telefone}</span>
+                                </div>
+                              )}
+                              {cliente.observacoes && (
+                                <div className="mt-3 pt-3 border-t border-gray-100">
+                                  <Badge variant="outline" className="mb-2">
+                                    Observação
+                                  </Badge>
+                                  <p className="text-xs text-gray-600 italic">
+                                    {cliente.observacoes}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
             </ScrollArea>
           </CardContent>
         </Card>
 
-        {/* Dialog */}
+        {/* Dialog (Sem alterações) */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
