@@ -115,7 +115,8 @@ export default function NotaFiscalDialog({
                     </Badge>
                     {nota.data && (
                       <span className="text-sm text-gray-600">
-                        {new Date(nota.data).toLocaleDateString("pt-BR")}
+                        {/* CORREÇÃO APLICADA AQUI ABAIXO: */}
+                        {new Date(nota.data).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                       </span>
                     )}
                     {nota.volume && (
@@ -149,4 +150,5 @@ export default function NotaFiscalDialog({
       </DialogContent>
     </Dialog>
   );
+}
 }
