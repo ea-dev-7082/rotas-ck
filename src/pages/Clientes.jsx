@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+// Importação da biblioteca para ler Excel/CSV
+import * as XLSX from "xlsx";
 
 export default function Clientes() {
   const [showDialog, setShowDialog] = useState(false);
@@ -84,87 +86,85 @@ export default function Clientes() {
     },
   });
 
-  // --- Lógica de Importação de CSV (Atualizada para seu arquivo) ---
-  const parseCSV = (text) => {
-    const lines = text.split('\n');
-    // Ajustado para split por ponto e vírgula (;)
-    const headers = lines[0].split(';').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
-    
-    const result = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue;
-
-      // Ajustado para split por ponto e vírgula (;)
-      const row = lines[i].match(/(".*?"|[^";\s]+)(?=\s*;|\s*$)/g);
-      
-      const values = row 
-        ? row.map(val => val.replace(/^"|"$/g, '').trim())
-        : lines[i].split(';').map(val => val.replace(/^"|"$/g, '').trim());
-
-      if (values.length > 0) {
-        const obj = {};
-        headers.forEach((header, index) => {
-          if (values[index] !== undefined) {
-             obj[header] = values[index];
-          }
-        });
-        result.push(obj);
-      }
-    }
-    return result;
-  };
-
+  // --- Lógica de Importação de Excel/CSV (Atualizada) ---
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !currentUser) return;
 
     setIsImporting(true);
-    const reader = new FileReader();
 
-    reader.onload = async (e) => {
-      try {
-        const text = e.target.result;
-        const parsedData = parseCSV(text);
-        
-        const promises = parsedData.map(item => {
-          // Mapeia a coluna 'CLIENTE' do CSV para 'nome'
-          const nomeCliente = item.cliente || item.nome;
+    try {
+      // Lê o ficheiro como ArrayBuffer (funciona para Excel e CSV)
+      const data = await file.arrayBuffer();
+      
+      // Lê o workbook
+      const workbook = XLSX.read(data);
+      
+      // Pega a primeira aba da planilha
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      
+      // Converte para JSON
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
-          if (!nomeCliente) return null;
-
-          // Cria uma observação com o código antigo se existir
-          const obsExtra = item.cod_cli ? `Cód. Antigo: ${item.cod_cli}` : "";
-          const obsFinal = item.observacoes ? `${item.observacoes}. ${obsExtra}` : obsExtra;
-
-          return base44.entities.Cliente.create({
-            nome: nomeCliente,
-            endereco: item.endereco || "",
-            telefone: item.telefone || "",
-            observacoes: obsFinal,
-            endereco_entrega: "",
-            usar_endereco_entrega: false,
-            owner: currentUser.email
-          });
-        }).filter(p => p !== null);
-
-        await Promise.all(promises);
-        
-        queryClient.invalidateQueries({ queryKey: ["clientes"] });
-        alert(`${promises.length} clientes importados com sucesso!`);
-      } catch (error) {
-        console.error("Erro ao importar CSV:", error);
-        alert("Erro ao processar o arquivo. Verifique o formato.");
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
+      if (jsonData.length === 0) {
+        throw new Error("O ficheiro está vazio ou não pôde ser lido.");
       }
-    };
 
-    // Importante: Lê como ISO-8859-1 para corrigir acentos do Excel/CSV brasileiro
-    reader.readAsText(file, "ISO-8859-1");
+      const promises = jsonData.map(item => {
+        // Normaliza as chaves para minúsculas (para aceitar 'CLIENTE', 'Cliente', 'Nome', etc.)
+        const normalizedItem = {};
+        Object.keys(item).forEach(key => {
+            normalizedItem[key.trim().toLowerCase()] = item[key];
+        });
+
+        // Procura pelo nome em colunas comuns
+        const nomeCliente = normalizedItem['cliente'] || normalizedItem['nome'] || normalizedItem['name'];
+
+        if (!nomeCliente) return null;
+
+        // Mapeia outros campos comuns (flexível)
+        const endereco = normalizedItem['endereco'] || normalizedItem['endereço'] || normalizedItem['address'] || "";
+        const telefone = normalizedItem['telefone'] || normalizedItem['tel'] || normalizedItem['phone'] || "";
+        const obs = normalizedItem['observacoes'] || normalizedItem['observações'] || "";
+        const cod = normalizedItem['cod_cli'] || normalizedItem['codigo'] || normalizedItem['id'] || "";
+
+        // Monta observação com código antigo se existir
+        let obsFinal = obs;
+        if (cod) {
+            obsFinal = obsFinal ? `${obsFinal}. Cód. Antigo: ${cod}` : `Cód. Antigo: ${cod}`;
+        }
+
+        return base44.entities.Cliente.create({
+          nome: String(nomeCliente),
+          endereco: String(endereco),
+          telefone: String(telefone),
+          observacoes: String(obsFinal),
+          endereco_entrega: "",
+          usar_endereco_entrega: false,
+          owner: currentUser.email
+        });
+      }).filter(p => p !== null);
+
+      if (promises.length === 0) {
+         alert("Nenhum cliente válido encontrado. Verifique se existe uma coluna 'Nome' ou 'Cliente'.");
+         setIsImporting(false);
+         return;
+      }
+
+      await Promise.all(promises);
+      
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      alert(`${promises.length} clientes importados com sucesso!`);
+    } catch (error) {
+      console.error("Erro ao importar ficheiro:", error);
+      alert("Erro ao processar o ficheiro. Certifique-se que é um Excel (.xlsx/.xls) ou CSV válido.");
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
   // --- Fim Lógica de Importação ---
 
@@ -228,9 +228,10 @@ export default function Clientes() {
             </div>
             
             <div className="flex gap-3">
+              {/* Input aceita CSV e Excel agora */}
               <input
                 type="file"
-                accept=".csv"
+                accept=".csv, .xlsx, .xls"
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleFileUpload}
@@ -246,7 +247,7 @@ export default function Clientes() {
                 ) : (
                   <Upload className="w-5 h-5 mr-2" />
                 )}
-                {isImporting ? "Importando..." : "Importar CSV"}
+                {isImporting ? "Importando..." : "Importar Excel/CSV"}
               </Button>
 
               <Button
