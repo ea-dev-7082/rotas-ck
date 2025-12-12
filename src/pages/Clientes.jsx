@@ -84,7 +84,7 @@ export default function Clientes() {
     },
   });
 
-  // --- Parser Manual Inteligente (Funciona com aspas e quebras de linha) ---
+  // --- Parser Manual Inteligente (Lê seu arquivo CSV complexo) ---
   const parseComplexCSV = (text) => {
     const rows = [];
     let currentRow = [];
@@ -153,7 +153,8 @@ export default function Clientes() {
         }
 
         // 2. Identifica os cabeçalhos (primeira linha)
-        const headers = rows[0].map(h => h.toLowerCase().replace(/_/g, '').trim()); // ex: COD_CLI -> codcli
+        // Remove espaços e converte para minúsculo para facilitar (COD_CLI -> cod_cli)
+        const headers = rows[0].map(h => h.toLowerCase().trim()); 
         
         // 3. Mapeia os dados
         const promises = rows.slice(1).map(row => {
@@ -170,9 +171,9 @@ export default function Clientes() {
             if (!nome) return null; // Pula linhas vazias
 
             const endereco = obj['endereco'] || obj['endereço'] || "";
-            const cod = obj['codcli'] || obj['codigo'] || "";
+            const cod = obj['cod_cli'] || obj['codigo'] || "";
             
-            // Coloca o código antigo na observação
+            // Coloca o código antigo na observação para não perder essa informação
             const obs = cod ? `Cód. Antigo: ${cod}` : "";
 
             return base44.entities.Cliente.create({
@@ -206,7 +207,7 @@ export default function Clientes() {
       }
     };
 
-    // Lê como Latin1 (ISO-8859-1) para corrigir acentos do Excel brasileiro
+    // Importante: Lê como Latin1 (ISO-8859-1) para corrigir acentos do Excel brasileiro
     reader.readAsText(file, "ISO-8859-1");
   };
   // --- Fim Lógica de Importação ---
