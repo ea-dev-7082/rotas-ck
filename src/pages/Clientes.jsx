@@ -1,614 +1,496 @@
 import React, { useState, useEffect, useRef } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+// 1. Adicionado o ícone 'Search' na importação
 import { Plus, MapPin, Phone, Edit, Trash2, Users, Warehouse, Upload, Loader2, Search } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+importação {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-// Importações do Firebase
-import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
-  signInWithCustomToken, 
-  signInAnonymously, 
-  onAuthStateChanged 
-} from "firebase/auth";
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  onSnapshot, 
-  query, 
-  orderBy 
-} from "firebase/firestore";
-
-// Inicialização do Firebase
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
 export default function Clientes() {
-  const [showDialog, setShowDialog] = useState(false);
-  const [editingCliente, setEditingCliente] = useState(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const fileInputRef = useRef(null);
+  const [showDialog, setShowDialog] = useState(false);
+  const [editingCliente, setEditingCliente] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
+  
+  // 2. Novo estado para a busca
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  const fileInputRef = useRef(null);
 
-  // Estados do Usuário, Dados e Busca
-  const [user, setUser] = useState(null);
-  const [clientes, setClientes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [formData, setFormData] = useState({
+    nome: "",
+    endereco: "",
+    endereco_entrega: "",
+    usar_endereco_entrega: false,
+    telefone: "",
+    observacoes: "",
+  });
 
-  const [formData, setFormData] = useState({
-    nome: "",
-    endereco: "",
-    endereco_entrega: "",
-    usar_endereco_entrega: false,
-    telefone: "",
-    observacoes: "",
-  });
+  const queryClient = useQueryClient();
+  const [currentUser, setCurrentUser] = useState(null);
 
-  // 1. Efeito de Autenticação
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.error("Erro na autenticação:", error);
-      }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
-  }, []);
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser);
+  }, []);
 
-  // 2. Efeito de Carregamento de Dados (Firestore)
-  useEffect(() => {
-    if (!user) {
-      setClientes([]);
-      return;
-    }
+  const { data: clientes, isLoading } = useQuery({
+    queryKey: ["clientes", currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Cliente.filter({ owner: currentUser.email }, "nome") : [],
+ Habilitado:!! Usuário atual,
+    initialData: [],
+  });
 
-    // Caminho seguro para dados do usuário
-    const q = query(
-      collection(db, 'artifacts', appId, 'users', user.uid, 'clientes')
-    );
+  // 3. Lógica de filtragem (Busca por nome, telefone ou endereço)
+  const filteredClientes = clientes.filter((cliente) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      cliente.nome.toLowerCase().includes(term) ||
+      (cliente.telefone && cliente.telefone.includes(term)) ||
+      (cliente.endereco && cliente.endereco.toLowerCase().includes(term))
+    );
+  });
 
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const docs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        // Ordenação local para evitar índices complexos
-        setClientes(docs.sort((a, b) => a.nome.localeCompare(b.nome)));
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Erro ao buscar clientes:", error);
-        setLoading(false);
-      }
-    );
+  const createMutation = useMutation({
+    mutationFn: (data) => base44.entities.Cliente.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      handleCloseDialog();
+    },
+  });
 
-    return () => unsubscribe();
-  }, [user]);
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Cliente.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      handleCloseDialog();
+    },
+  });
 
-  // Lógica de Filtragem (Busca)
-  const filteredClientes = clientes.filter((cliente) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      cliente.nome.toLowerCase().includes(term) ||
-      (cliente.telefone && cliente.telefone.includes(term)) ||
-      (cliente.endereco && cliente.endereco.toLowerCase().includes(term))
-    );
-  });
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Cliente.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+    },
+  });
 
-  // --- Operações CRUD ---
+  // --- Lógica de Importação de CSV ---
+  const parseCSV = (text) => {
+    const lines = text.split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+    
+    const result = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
 
-  const handleCreate = async (data) => {
-    if (!user) return;
-    try {
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'clientes'), {
-        ...data,
-        createdAt: new Date().toISOString()
-      });
-      handleCloseDialog();
-    } catch (error) {
-      console.error("Erro ao criar cliente:", error);
-      alert("Erro ao criar cliente. Tente novamente.");
-    }
-  };
+      const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+      
+      const values = row 
+        ? row.map(val => val.replace(/^"|"$/g, '').trim())
+        : lines[i].split(',').map(val => val.replace(/^"|"$/g, '').trim());
 
-  const handleUpdate = async (id, data) => {
-    if (!user) return;
-    try {
-      const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'clientes', id);
-      await updateDoc(docRef, {
-        ...data,
-        updatedAt: new Date().toISOString()
-      });
-      handleCloseDialog();
-    } catch (error) {
-      console.error("Erro ao atualizar cliente:", error);
-      alert("Erro ao atualizar cliente.");
-    }
-  };
+      if (values.length > 0) {
+        const obj = {};
+        headers.forEach((header, index) => {
+          if (values[index] !== undefined) {
+             obj[header] = values[index];
+          }
+        });
+        result.push(obj);
+      }
+    }
+    return result;
+  };
 
-  const handleDelete = async (id) => {
-    if (!user) return;
-    if (!window.confirm("Tem certeza que deseja excluir este cliente?")) return;
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clientes', id));
-    } catch (error) {
-      console.error("Erro ao excluir cliente:", error);
-      alert("Erro ao excluir cliente.");
-    }
-  };
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !currentUser) return;
 
-  // --- Lógica de Importação de CSV Melhorada ---
+    setIsImporting(true);
+    const reader = new FileReader();
 
-  const parseCSV = (text) => {
-    const lines = text.split('\n');
-    // Pega o cabeçalho e normaliza para minúsculo e sem aspas
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
-    
-    const result = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-      let line = lines[i].trim();
-      if (!line) continue;
+    reader.onload = async (e) => {
+      try {
+        const text = e.target.result;
+        const parsedData = parseCSV(text);
+        
+        const promises = parsedData.map(item => {
+          if (!item.nome) return null;
 
-      const values = [];
-      let currentVal = '';
-      let inQuote = false;
+          return base44.entities.Cliente.create({
+            nome: item.nome,
+            endereco: item.endereco || "",
+            telefone: item.telefone || "",
+            observacoes: item.observacoes || "",
+            endereco_entrega: "",
+            usar_endereco_entrega: false,
+            owner: currentUser.email
+          });
+        }).filter(p => p !== null);
 
-      // Parser caractere por caractere para lidar corretamente com vírgulas dentro de aspas
-      for (let j = 0; j < line.length; j++) {
-        const char = line[j];
-        
-        if (char === '"') {
-          inQuote = !inQuote;
-        } else if (char === ',' && !inQuote) {
-          values.push(currentVal.trim().replace(/^"|"$/g, '')); 
-          currentVal = '';
-        } else {
-          currentVal += char;
-        }
-      }
-      // Adiciona o último valor
-      values.push(currentVal.trim().replace(/^"|"$/g, ''));
+        await Promise.all(promises);
+        
+        queryClient.invalidateQueries({ queryKey: ["clientes"] });
+        alert(`${promises.length} clientes importados com sucesso!`);
+      } catch (error) {
+        console.error("Erro ao importar CSV:", error);
+        alert("Erro ao processar o arquivo. Verifique o formato.");
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    };
 
-      if (values.length > 0) {
-        const obj = {};
-        headers.forEach((header, index) => {
-          if (values[index] !== undefined) {
-             obj[header] = values[index];
-          }
-        });
-        result.push(obj);
-      }
-    }
-    return result;
-  };
+    reader.readAsText(file);
+  };
+  // --- Fim Lógica de Importação ---
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file || !user) return;
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (editingCliente) {
+      updateMutation.mutate({ id: editingCliente.id, data: formData });
+    } else {
+      createMutation.mutate({ ...formData, owner: currentUser?.email });
+    }
+  };
 
-    setIsImporting(true);
-    const reader = new FileReader();
+  const handleEdit = (cliente) => {
+    setEditingCliente(cliente);
+    setFormData({
+      nome: cliente.nome,
+      endereco: cliente.endereco,
+      endereco_entrega: cliente.endereco_entrega || "",
+      usar_endereco_entrega: cliente.usar_endereco_entrega || false,
+      telefone: cliente.telefone || "",
+      observacoes: cliente.observacoes || "",
+    });
+    setShowDialog(true);
+  };
 
-    reader.onload = async (e) => {
-      try {
-        const text = e.target.result;
-        const parsedData = parseCSV(text);
-        
-        const promises = parsedData.map(item => {
-          // Suporte para múltiplos formatos de coluna
-          // Formato 1: nome, endereco
-          // Formato 2: CLIENTE, ENDERECO, COD_CLI (do seu novo CSV)
-          const nome = item.nome || item.cliente;
-          
-          if (!nome) return null;
+  const handleCloseDialog = () => {
+    setShowDialog(false);
+    setEditingCliente(null);
+    setFormData({
+      nome: "",
+      endereco: "",
+      endereco_entrega: "",
+      usar_endereco_entrega: false,
+      telefone: "",
+      observacoes: "",
+    });
+  };
 
-          // Monta observação com código antigo se existir
-          let obs = item.observacoes || "";
-          if (item.cod_cli) {
-            const codObs = `Cód Antigo: ${item.cod_cli}`;
-            obs = obs ? `${obs} | ${codObs}` : codObs;
-          }
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6">
+      <div className="container mx-auto max-w-6xl">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <h1 className="text-4xl font-bold text-gray-900">
+                  Cadastro de Clientes
+                </h1>
+              </div>
+              <p className="text-gray-600 text-lg">
+                Gerencie os clientes para otimização de rotas
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <input
+                type="file"
+                accept=".csv"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting}
+                className="h-12 border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm"
+              >
+                {isImporting ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="w-5 h-5 mr-2" />
+                )}
+                {isImporting ? "Importando..." : "Importar CSV"}
+              </Button>
 
-          return addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'clientes'), {
-            nome: nome,
-            endereco: item.endereco || "",
-            telefone: item.telefone || "",
-            observacoes: obs,
-            endereco_entrega: "",
-            usar_endereco_entrega: false,
-            createdAt: new Date().toISOString()
-          });
-        }).filter(p => p !== null);
+              <Button
+                onClick={() => setShowDialog(true)}
+                className="h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Novo Cliente
+              </Button>
+            </div>
+          </div>
+        </motion.div>
 
-        if (promises.length === 0) {
-          alert("Nenhum cliente válido encontrado no arquivo. Verifique se as colunas (nome/CLIENTE) estão corretas.");
-          return;
-        }
+        {/* Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <Card className="bg-white shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Total de Clientes</p>
+                  <p className="text-3xl font-bold text-purple-600">
+                    {clientes.length}
+                  </p>
+                </div>
+                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center">
+                  <Users className="w-8 h-8 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        await Promise.all(promises);
-        
-        alert(`${promises.length} clientes importados com sucesso!`);
-      } catch (error) {
-        console.error("Erro ao importar CSV:", error);
-        alert("Erro ao processar o arquivo. Verifique o formato.");
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ""; // Limpar input
-        }
-      }
-    };
+        {/* Client List */}
+        <Card className="bg-white shadow-xl">
+          <CardHeader className="border-b border-gray-100">
+            {/* 4. Layout do Header alterado para incluir a busca */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <CardTitle className="text-xl">Lista de Clientes</CardTitle>
+              <div className="relative w-full md:w-72">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar por nome, endereço ou tel..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <ScrollArea className="h-[600px] pr-4">
+              {/* 5. Verificação se a lista filtrada está vazia */}
+              {filteredClientes.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                   {searchTerm ? "Nenhum cliente encontrado para sua busca." : "Nenhum cliente cadastrado ainda."}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <AnimatePresence>
+                    {/* 6. Map alterado para usar filteredClientes */}
+                    {filteredClientes.map((cliente) => (
+                      <motion.div
+                        key={cliente.id}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                      >
+                        <Card className="hover:shadow-lg transition-shadow border-2 border-gray-200 hover:border-purple-300">
+                          <CardContent className="p-5">
+                            <div className="flex items-start justify-between mb-3">
+                              <h3 className="font-bold text-lg text-gray-900">
+                                {cliente.nome}
+                              </h3>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEdit(cliente)}
+                                  className="hover:bg-blue-50 hover:text-blue-600"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => deleteMutation.mutate(cliente.id)}
+                                  className="hover:bg-red-50 hover:text-red-600"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
 
-    reader.readAsText(file);
-  };
+                            <div className="space-y-2">
+                              <div className="flex items-start gap-2 text-sm text-gray-600">
+                                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-purple-500" />
+                                <p className="leading-relaxed">{cliente.endereco}</p>
+                              </div>
+                              {cliente.endereco_entrega && (
+                                <div className="flex items-start gap-2 text-sm text-gray-600">
+                                  <Warehouse className="w-4 h-4 mt-0.5 flex-shrink-0 text-orange-500" />
+                                  <div>
+                                    <p className="leading-relaxed">{cliente.endereco_entrega}</p>
+                                    {cliente.usar_endereco_entrega && (
+                                      <Badge className="mt-1 bg-orange-100 text-orange-700 text-xs">
+                                        Usar para entregas
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              {cliente.telefone && (
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <Phone className="w-4 h-4 text-purple-500" />
+                                  <span>{cliente.telefone}</span>
+                                </div>
+                              )}
+                              {cliente.observacoes && (
+                                <div className="mt-3 pt-3 border-t border-gray-100">
+                                  <Badge variant="outline" className="mb-2">
+                                    Observação
+                                  </Badge>
+                                  <p className="text-xs text-gray-600 italic">
+                                    {cliente.observacoes}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
 
-  // --- Fim Lógica de Importação ---
+        {/* Dialog (Sem alterações) */}
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>
+                {editingCliente ? "Editar Cliente" : "Novo Cliente"}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome do Cliente *</Label>
+                <Input
+                  id="nome"
+                  value={formData.nome}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nome: e.target.value })
+                  }
+                  placeholder="Ex: Padaria São João"
+                  required
+                />
+              </div>
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (editingCliente) {
-      handleUpdate(editingCliente.id, formData);
-    } else {
-      handleCreate(formData);
-    }
-  };
+              <div className="space-y-2">
+                <Label htmlFor="endereco">Endereço da Loja *</Label>
+                <Textarea
+                  id="endereco"
+                  value={formData.endereco}
+                  onChange={(e) =>
+                    setFormData({ ...formData, endereco: e.target.value })
+                  }
+                  placeholder="Ex: Rua Augusta, 1234 - Consolação, São Paulo - SP"
+                  className="min-h-[80px]"
+                  required
+                />
+              </div>
 
-  const handleEdit = (cliente) => {
-    setEditingCliente(cliente);
-    setFormData({
-      nome: cliente.nome,
-      endereco: cliente.endereco,
-      endereco_entrega: cliente.endereco_entrega || "",
-      usar_endereco_entrega: cliente.usar_endereco_entrega || false,
-      telefone: cliente.telefone || "",
-      observacoes: cliente.observacoes || "",
-    });
-    setShowDialog(true);
-  };
+              <div className="space-y-2 p-4 border-2 border-dashed border-orange-200 rounded-lg bg-orange-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Warehouse className="w-4 h-4 text-orange-600" />
+                  <Label htmlFor="endereco_entrega" className="text-orange-800">Endereço de Entrega Alternativo (Galpão/Depósito)</Label>
+                </div>
+                <Textarea
+                  id="endereco_entrega"
+                  value={formData.endereco_entrega}
+                  onChange={(e) =>
+                    setFormData({ ...formData, endereco_entrega: e.target.value })
+                  }
+                  placeholder="Ex: Av. Industrial, 500 - Galpão 3, Zona Industrial"
+                  className="min-h-[60px]"
+                />
+                {formData.endereco_entrega && (
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-orange-200">
+                    <Label htmlFor="usar_endereco_entrega" className="text-sm text-orange-700">
+                      Usar este endereço para entregas
+                    </Label>
+                    <Switch
+                      id="usar_endereco_entrega"
+                      checked={formData.usar_endereco_entrega}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, usar_endereco_entrega: checked })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
 
-  const handleCloseDialog = () => {
-    setShowDialog(false);
-    setEditingCliente(null);
-    setFormData({
-      nome: "",
-      endereco: "",
-      endereco_entrega: "",
-      usar_endereco_entrega: false,
-      telefone: "",
-      observacoes: "",
-    });
-  };
+              <div className="space-y-2">
+                <Label htmlFor="telefone">Telefone</Label>
+                <Input
+                  id="telefone"
+                  value={formData.telefone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, telefone: e.target.value })
+                  }
+                  placeholder="Ex: (11) 3456-7890"
+                />
+              </div>
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6">
-      <div className="container mx-auto max-w-6xl">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <h1 className="text-4xl font-bold text-gray-900">
-                  Cadastro de Clientes
-                </h1>
-              </div>
-              <p className="text-gray-600 text-lg">
-                Gerencie os clientes para otimização de rotas
-              </p>
-            </div>
-            
-            <div className="flex gap-3">
-              {/* Botão de Importar CSV */}
-              <input
-                type="file"
-                accept=".csv"
-                ref={fileInputRef}
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-              <Button
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isImporting || !user}
-                className="h-12 border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm"
-              >
-                {isImporting ? (
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                ) : (
-                  <Upload className="w-5 h-5 mr-2" />
-                )}
-                {isImporting ? "Importando..." : "Importar CSV"}
-              </Button>
+              <div className="space-y-2">
+                <Label htmlFor="observacoes">Observações</Label>
+                <Textarea
+                  id="observacoes"
+                  value={formData.observacoes}
+                  onChange={(e) =>
+                    setFormData({ ...formData, observacoes: e.target.value })
+                  }
+                  placeholder="Ex: Preferência de entrega pela manhã"
+                  className="min-h-[80px]"
+                />
+              </div>
 
-              <Button
-                onClick={() => setShowDialog(true)}
-                disabled={!user}
-                className="h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Novo Cliente
-              </Button>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <Card className="bg-white shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Total de Clientes</p>
-                  <p className="text-3xl font-bold text-purple-600">
-                    {clientes.length}
-                  </p>
-                </div>
-                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center">
-                  <Users className="w-8 h-8 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Client List */}
-        <Card className="bg-white shadow-xl">
-          <CardHeader className="border-b border-gray-100">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <CardTitle className="text-xl">Lista de Clientes</CardTitle>
-              {/* Barra de Busca */}
-              <div className="relative w-full md:w-72">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar por nome, endereço ou tel..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <ScrollArea className="h-[600px] pr-4">
-              {loading ? (
-                <div className="flex justify-center p-10">
-                  <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
-                </div>
-              ) : filteredClientes.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">
-                  {searchTerm ? "Nenhum cliente encontrado para sua busca." : "Nenhum cliente cadastrado ainda."}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <AnimatePresence>
-                    {filteredClientes.map((cliente) => (
-                      <motion.div
-                        key={cliente.id}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                      >
-                        <Card className="hover:shadow-lg transition-shadow border-2 border-gray-200 hover:border-purple-300">
-                          <CardContent className="p-5">
-                            <div className="flex items-start justify-between mb-3">
-                              <h3 className="font-bold text-lg text-gray-900 line-clamp-1" title={cliente.nome}>
-                                {cliente.nome}
-                              </h3>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEdit(cliente)}
-                                  className="hover:bg-blue-50 hover:text-blue-600"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDelete(cliente.id)}
-                                  className="hover:bg-red-50 hover:text-red-600"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <div className="flex items-start gap-2 text-sm text-gray-600">
-                                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-purple-500" />
-                                <p className="leading-relaxed line-clamp-2">{cliente.endereco}</p>
-                              </div>
-                              {cliente.endereco_entrega && (
-                                <div className="flex items-start gap-2 text-sm text-gray-600">
-                                  <Warehouse className="w-4 h-4 mt-0.5 flex-shrink-0 text-orange-500" />
-                                  <div>
-                                    <p className="leading-relaxed line-clamp-2">{cliente.endereco_entrega}</p>
-                                    {cliente.usar_endereco_entrega && (
-                                      <Badge className="mt-1 bg-orange-100 text-orange-700 text-xs">
-                                        Usar para entregas
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              {cliente.telefone && (
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                  <Phone className="w-4 h-4 text-purple-500" />
-                                  <span>{cliente.telefone}</span>
-                                </div>
-                              )}
-                              {cliente.observacoes && (
-                                <div className="mt-3 pt-3 border-t border-gray-100">
-                                  <Badge variant="outline" className="mb-2">
-                                    Observação
-                                  </Badge>
-                                  <p className="text-xs text-gray-600 italic line-clamp-3">
-                                    {cliente.observacoes}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* Dialog */}
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>
-                {editingCliente ? "Editar Cliente" : "Novo Cliente"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="nome">Nome do Cliente *</Label>
-                <Input
-                  id="nome"
-                  value={formData.nome}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nome: e.target.value })
-                  }
-                  placeholder="Ex: Padaria São João"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="endereco">Endereço da Loja *</Label>
-                <Textarea
-                  id="endereco"
-                  value={formData.endereco}
-                  onChange={(e) =>
-                    setFormData({ ...formData, endereco: e.target.value })
-                  }
-                  placeholder="Ex: Rua Augusta, 1234 - Consolação, São Paulo - SP"
-                  className="min-h-[80px]"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2 p-4 border-2 border-dashed border-orange-200 rounded-lg bg-orange-50">
-                <div className="flex items-center gap-2 mb-2">
-                  <Warehouse className="w-4 h-4 text-orange-600" />
-                  <Label htmlFor="endereco_entrega" className="text-orange-800">Endereço de Entrega Alternativo (Galpão/Depósito)</Label>
-                </div>
-                <Textarea
-                  id="endereco_entrega"
-                  value={formData.endereco_entrega}
-                  onChange={(e) =>
-                    setFormData({ ...formData, endereco_entrega: e.target.value })
-                  }
-                  placeholder="Ex: Av. Industrial, 500 - Galpão 3, Zona Industrial"
-                  className="min-h-[60px]"
-                />
-                {formData.endereco_entrega && (
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-orange-200">
-                    <Label htmlFor="usar_endereco_entrega" className="text-sm text-orange-700">
-                      Usar este endereço para entregas
-                    </Label>
-                    <Switch
-                      id="usar_endereco_entrega"
-                      checked={formData.usar_endereco_entrega}
-                      onCheckedChange={(checked) =>
-                        setFormData({ ...formData, usar_endereco_entrega: checked })
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="telefone">Telefone</Label>
-                <Input
-                  id="telefone"
-                  value={formData.telefone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, telefone: e.target.value })
-                  }
-                  placeholder="Ex: (11) 3456-7890"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="observacoes">Observações</Label>
-                <Textarea
-                  id="observacoes"
-                  value={formData.observacoes}
-                  onChange={(e) =>
-                    setFormData({ ...formData, observacoes: e.target.value })
-                  }
-                  placeholder="Ex: Preferência de entrega pela manhã"
-                  className="min-h-[80px]"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCloseDialog}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                >
-                  {editingCliente ? "Salvar Alterações" : "Criar Cliente"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </div>
-  );
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCloseDialog}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                >
+                  {editingCliente ? "Salvar Alterações" : "Criar Cliente"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  );
 }
