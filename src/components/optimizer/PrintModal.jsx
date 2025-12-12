@@ -42,9 +42,9 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
         // Formata os números das NFs com quebra de linha se houver muitas
         const notasString = clientNotas.map(n => n.numero).join('<br/>');
         
-        // Formata as datas das NFs
+        // --- CORREÇÃO 1: Adicionado { timeZone: 'UTC' } ---
         const datasString = clientNotas.map(n => 
-            n.data ? new Date(n.data).toLocaleDateString('pt-BR') : '-'
+            n.data ? new Date(n.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-'
         ).join('<br/>');
         
         const volCliente = clientNotas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
@@ -268,7 +268,8 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                              {clientNotas.map(n => n.numero).join(', ') || '-'}
                         </div>
                         <div className="col-span-2 text-center text-[10px]">
-                             {clientNotas.map(n => n.data ? new Date(n.data).toLocaleDateString('pt-BR') : '-').join(', ') || '-'}
+                            {/* --- CORREÇÃO 2: Adicionado { timeZone: 'UTC' } --- */}
+                             {clientNotas.map(n => n.data ? new Date(n.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-').join(', ') || '-'}
                         </div>
                         <div className="col-span-1 text-center text-[10px]">{point.estimated_arrival}</div>
                     </div>
