@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-// 1. Adicionado o ícone 'Search' na importação
 import { Plus, MapPin, Phone, Edit, Trash2, Users, Warehouse, Upload, Loader2, Search } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,7 +23,7 @@ export default function Clientes() {
   const [editingCliente, setEditingCliente] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
   
-  // 2. Novo estado para a busca
+  // Estado para a busca
   const [searchTerm, setSearchTerm] = useState("");
   
   const fileInputRef = useRef(null);
@@ -52,7 +51,7 @@ export default function Clientes() {
     initialData: [],
   });
 
-  // 3. Lógica de filtragem (Busca por nome, telefone ou endereço)
+  // Lógica de filtragem
   const filteredClientes = clientes.filter((cliente) => {
     const term = searchTerm.toLowerCase();
     return (
@@ -85,21 +84,23 @@ export default function Clientes() {
     },
   });
 
-  // --- Lógica de Importação de CSV ---
+  // --- Lógica de Importação de CSV (Atualizada para seu arquivo) ---
   const parseCSV = (text) => {
     const lines = text.split('\n');
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+    // Ajustado para split por ponto e vírgula (;)
+    const headers = lines[0].split(';').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
     
     const result = [];
     
     for (let i = 1; i < lines.length; i++) {
       if (!lines[i].trim()) continue;
 
-      const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+      // Ajustado para split por ponto e vírgula (;)
+      const row = lines[i].match(/(".*?"|[^";\s]+)(?=\s*;|\s*$)/g);
       
       const values = row 
         ? row.map(val => val.replace(/^"|"$/g, '').trim())
-        : lines[i].split(',').map(val => val.replace(/^"|"$/g, '').trim());
+        : lines[i].split(';').map(val => val.replace(/^"|"$/g, '').trim());
 
       if (values.length > 0) {
         const obj = {};
@@ -127,13 +128,20 @@ export default function Clientes() {
         const parsedData = parseCSV(text);
         
         const promises = parsedData.map(item => {
-          if (!item.nome) return null;
+          // Mapeia a coluna 'CLIENTE' do CSV para 'nome'
+          const nomeCliente = item.cliente || item.nome;
+
+          if (!nomeCliente) return null;
+
+          // Cria uma observação com o código antigo se existir
+          const obsExtra = item.cod_cli ? `Cód. Antigo: ${item.cod_cli}` : "";
+          const obsFinal = item.observacoes ? `${item.observacoes}. ${obsExtra}` : obsExtra;
 
           return base44.entities.Cliente.create({
-            nome: item.nome,
+            nome: nomeCliente,
             endereco: item.endereco || "",
             telefone: item.telefone || "",
-            observacoes: item.observacoes || "",
+            observacoes: obsFinal,
             endereco_entrega: "",
             usar_endereco_entrega: false,
             owner: currentUser.email
@@ -155,7 +163,8 @@ export default function Clientes() {
       }
     };
 
-    reader.readAsText(file);
+    // Importante: Lê como ISO-8859-1 para corrigir acentos do Excel/CSV brasileiro
+    reader.readAsText(file, "ISO-8859-1");
   };
   // --- Fim Lógica de Importação ---
 
@@ -277,7 +286,6 @@ export default function Clientes() {
         {/* Client List */}
         <Card className="bg-white shadow-xl">
           <CardHeader className="border-b border-gray-100">
-            {/* 4. Layout do Header alterado para incluir a busca */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <CardTitle className="text-xl">Lista de Clientes</CardTitle>
               <div className="relative w-full md:w-72">
@@ -293,7 +301,6 @@ export default function Clientes() {
           </CardHeader>
           <CardContent className="p-6">
             <ScrollArea className="h-[600px] pr-4">
-              {/* 5. Verificação se a lista filtrada está vazia */}
               {filteredClientes.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">
                    {searchTerm ? "Nenhum cliente encontrado para sua busca." : "Nenhum cliente cadastrado ainda."}
@@ -301,7 +308,6 @@ export default function Clientes() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <AnimatePresence>
-                    {/* 6. Map alterado para usar filteredClientes */}
                     {filteredClientes.map((cliente) => (
                       <motion.div
                         key={cliente.id}
@@ -381,7 +387,7 @@ export default function Clientes() {
           </CardContent>
         </Card>
 
-        {/* Dialog (Sem alterações) */}
+        {/* Dialog Form */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
