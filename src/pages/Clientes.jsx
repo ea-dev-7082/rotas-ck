@@ -86,7 +86,7 @@ export default function Clientes() {
     },
   });
 
-  // --- Lógica de Importação de Excel/CSV (Atualizada) ---
+  // --- Lógica de Importação ROBUSTA para seu arquivo ---
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !currentUser) return;
@@ -94,76 +94,97 @@ export default function Clientes() {
     setIsImporting(true);
 
     try {
-      // Lê o ficheiro como ArrayBuffer (funciona para Excel e CSV)
-      const data = await file.arrayBuffer();
-      
-      // Lê o workbook
-      const workbook = XLSX.read(data);
-      
-      // Pega a primeira aba da planilha
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      
-      // Converte para JSON
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+      const reader = new FileReader();
 
-      if (jsonData.length === 0) {
-        throw new Error("O ficheiro está vazio ou não pôde ser lido.");
-      }
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          
+          // Lê o arquivo tentando detectar se é CSV ou Excel automaticamente
+          // 'codepage: 1252' ajuda com acentos do Excel brasileiro (Windows-1252)
+          const workbook = XLSX.read(data, { type: 'array', codepage: 1252 });
+          
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Converte para JSON, forçando raw: false para pegar os valores como strings
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+            defval: "",
+            raw: false 
+          });
 
-      const promises = jsonData.map(item => {
-        // Normaliza as chaves para minúsculas (para aceitar 'CLIENTE', 'Cliente', 'Nome', etc.)
-        const normalizedItem = {};
-        Object.keys(item).forEach(key => {
-            normalizedItem[key.trim().toLowerCase()] = item[key];
-        });
+          console.log("Dados lidos:", jsonData); // Para debug no console
 
-        // Procura pelo nome em colunas comuns
-        const nomeCliente = normalizedItem['cliente'] || normalizedItem['nome'] || normalizedItem['name'];
+          if (jsonData.length === 0) {
+            throw new Error("O arquivo está vazio.");
+          }
 
-        if (!nomeCliente) return null;
+          const promises = jsonData.map(item => {
+            // Normaliza as chaves (remove espaços e põe minúsculo)
+            const normalizedItem = {};
+            Object.keys(item).forEach(key => {
+                const cleanKey = key.trim().toLowerCase().replace(/_/g, ''); // transforma COD_CLI em codcli
+                normalizedItem[cleanKey] = item[key];
+            });
 
-        // Mapeia outros campos comuns (flexível)
-        const endereco = normalizedItem['endereco'] || normalizedItem['endereço'] || normalizedItem['address'] || "";
-        const telefone = normalizedItem['telefone'] || normalizedItem['tel'] || normalizedItem['phone'] || "";
-        const obs = normalizedItem['observacoes'] || normalizedItem['observações'] || "";
-        const cod = normalizedItem['cod_cli'] || normalizedItem['codigo'] || normalizedItem['id'] || "";
+            // Tenta encontrar o nome nas colunas prováveis
+            // No seu arquivo a coluna é 'CLIENTE' -> 'cliente'
+            const nomeCliente = normalizedItem['cliente'] || normalizedItem['nome'] || normalizedItem['name'];
 
-        // Monta observação com código antigo se existir
-        let obsFinal = obs;
-        if (cod) {
-            obsFinal = obsFinal ? `${obsFinal}. Cód. Antigo: ${cod}` : `Cód. Antigo: ${cod}`;
+            if (!nomeCliente) return null;
+
+            // Mapeia endereço
+            const endereco = normalizedItem['endereco'] || normalizedItem['endereço'] || "";
+            
+            // Tenta pegar telefone se existir
+            const telefone = normalizedItem['telefone'] || normalizedItem['tel'] || "";
+
+            // Pega o COD_CLI para por na observação
+            const cod = normalizedItem['codcli'] || normalizedItem['cod'] || normalizedItem['codigo'] || "";
+            const obs = normalizedItem['observacoes'] || "";
+
+            let obsFinal = obs;
+            if (cod) {
+                obsFinal = obsFinal ? `${obsFinal}. Cód. Antigo: ${cod}` : `Cód. Antigo: ${cod}`;
+            }
+
+            return base44.entities.Cliente.create({
+              nome: String(nomeCliente).trim(),
+              endereco: String(endereco).trim(),
+              telefone: String(telefone).trim(),
+              observacoes: String(obsFinal).trim(),
+              endereco_entrega: "",
+              usar_endereco_entrega: false,
+              owner: currentUser.email
+            });
+          }).filter(p => p !== null);
+
+          if (promises.length === 0) {
+             alert("Não foi possível identificar a coluna de nomes. Verifique se o cabeçalho tem 'CLIENTE' ou 'NOME'.");
+             setIsImporting(false);
+             return;
+          }
+
+          await Promise.all(promises);
+          
+          queryClient.invalidateQueries({ queryKey: ["clientes"] });
+          alert(`${promises.length} clientes importados com sucesso!`);
+
+        } catch (innerError) {
+          console.error("Erro processando dados:", innerError);
+          alert("Erro ao ler dados do arquivo. Verifique se é um CSV válido.");
+        } finally {
+            setIsImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
+      };
 
-        return base44.entities.Cliente.create({
-          nome: String(nomeCliente),
-          endereco: String(endereco),
-          telefone: String(telefone),
-          observacoes: String(obsFinal),
-          endereco_entrega: "",
-          usar_endereco_entrega: false,
-          owner: currentUser.email
-        });
-      }).filter(p => p !== null);
+      reader.readAsArrayBuffer(file);
 
-      if (promises.length === 0) {
-         alert("Nenhum cliente válido encontrado. Verifique se existe uma coluna 'Nome' ou 'Cliente'.");
-         setIsImporting(false);
-         return;
-      }
-
-      await Promise.all(promises);
-      
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
-      alert(`${promises.length} clientes importados com sucesso!`);
     } catch (error) {
-      console.error("Erro ao importar ficheiro:", error);
-      alert("Erro ao processar o ficheiro. Certifique-se que é um Excel (.xlsx/.xls) ou CSV válido.");
-    } finally {
+      console.error("Erro no upload:", error);
       setIsImporting(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      alert("Erro crítico ao carregar arquivo.");
     }
   };
   // --- Fim Lógica de Importação ---
@@ -228,7 +249,6 @@ export default function Clientes() {
             </div>
             
             <div className="flex gap-3">
-              {/* Input aceita CSV e Excel agora */}
               <input
                 type="file"
                 accept=".csv, .xlsx, .xls"
