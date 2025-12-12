@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-// 1. Adicionado o ícone 'Search' na importação
 import { Plus, MapPin, Phone, Edit, Trash2, Users, Warehouse, Upload, Loader2, Search } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,15 +16,44 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+// Importações do Firebase
+import { initializeApp } from "firebase/app";
+import { 
+  getAuth, 
+  signInWithCustomToken, 
+  signInAnonymously, 
+  onAuthStateChanged 
+} from "firebase/auth";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  query, 
+  orderBy 
+} from "firebase/firestore";
+
+// Inicialização do Firebase
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
 export default function Clientes() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingCliente, setEditingCliente] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
-  
-  // 2. Novo estado para a busca
-  const [searchTerm, setSearchTerm] = useState("");
-  
   const fileInputRef = useRef(null);
+
+  // Estados do Usuário, Dados e Busca
+  const [user, setUser] = useState(null);
+  const [clientes, setClientes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [formData, setFormData] = useState({
     nome: "",
@@ -38,21 +64,56 @@ export default function Clientes() {
     observacoes: "",
   });
 
-  const queryClient = useQueryClient();
-  const [currentUser, setCurrentUser] = useState(null);
-
+  // 1. Efeito de Autenticação
   useEffect(() => {
-    base44.auth.me().then(setCurrentUser);
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Erro na autenticação:", error);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
   }, []);
 
-  const { data: clientes, isLoading } = useQuery({
-    queryKey: ["clientes", currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Cliente.filter({ owner: currentUser.email }, "nome") : [],
-    enabled: !!currentUser,
-    initialData: [],
-  });
+  // 2. Efeito de Carregamento de Dados (Firestore)
+  useEffect(() => {
+    if (!user) {
+      setClientes([]);
+      return;
+    }
 
-  // 3. Lógica de filtragem (Busca por nome, telefone ou endereço)
+    // Caminho seguro para dados do usuário
+    const q = query(
+      collection(db, 'artifacts', appId, 'users', user.uid, 'clientes')
+    );
+
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        const docs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        // Ordenação local para evitar índices complexos
+        setClientes(docs.sort((a, b) => a.nome.localeCompare(b.nome)));
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Erro ao buscar clientes:", error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Lógica de Filtragem (Busca)
   const filteredClientes = clientes.filter((cliente) => {
     const term = searchTerm.toLowerCase();
     return (
@@ -62,44 +123,80 @@ export default function Clientes() {
     );
   });
 
-  const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Cliente.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+  // --- Operações CRUD ---
+
+  const handleCreate = async (data) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'clientes'), {
+        ...data,
+        createdAt: new Date().toISOString()
+      });
       handleCloseDialog();
-    },
-  });
+    } catch (error) {
+      console.error("Erro ao criar cliente:", error);
+      alert("Erro ao criar cliente. Tente novamente.");
+    }
+  };
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Cliente.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+  const handleUpdate = async (id, data) => {
+    if (!user) return;
+    try {
+      const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'clientes', id);
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: new Date().toISOString()
+      });
       handleCloseDialog();
-    },
-  });
+    } catch (error) {
+      console.error("Erro ao atualizar cliente:", error);
+      alert("Erro ao atualizar cliente.");
+    }
+  };
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Cliente.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
-    },
-  });
+  const handleDelete = async (id) => {
+    if (!user) return;
+    if (!window.confirm("Tem certeza que deseja excluir este cliente?")) return;
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clientes', id));
+    } catch (error) {
+      console.error("Erro ao excluir cliente:", error);
+      alert("Erro ao excluir cliente.");
+    }
+  };
 
-  // --- Lógica de Importação de CSV ---
+  // --- Lógica de Importação de CSV Melhorada ---
+
   const parseCSV = (text) => {
     const lines = text.split('\n');
+    // Pega o cabeçalho e normaliza para minúsculo e sem aspas
     const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
     
     const result = [];
     
     for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue;
+      let line = lines[i].trim();
+      if (!line) continue;
 
-      const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-      
-      const values = row 
-        ? row.map(val => val.replace(/^"|"$/g, '').trim())
-        : lines[i].split(',').map(val => val.replace(/^"|"$/g, '').trim());
+      const values = [];
+      let currentVal = '';
+      let inQuote = false;
+
+      // Parser caractere por caractere para lidar corretamente com vírgulas dentro de aspas
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
+        
+        if (char === '"') {
+          inQuote = !inQuote;
+        } else if (char === ',' && !inQuote) {
+          values.push(currentVal.trim().replace(/^"|"$/g, '')); 
+          currentVal = '';
+        } else {
+          currentVal += char;
+        }
+      }
+      // Adiciona o último valor
+      values.push(currentVal.trim().replace(/^"|"$/g, ''));
 
       if (values.length > 0) {
         const obj = {};
@@ -116,7 +213,7 @@ export default function Clientes() {
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
-    if (!file || !currentUser) return;
+    if (!file || !user) return;
 
     setIsImporting(true);
     const reader = new FileReader();
@@ -127,22 +224,38 @@ export default function Clientes() {
         const parsedData = parseCSV(text);
         
         const promises = parsedData.map(item => {
-          if (!item.nome) return null;
+          // Suporte para múltiplos formatos de coluna
+          // Formato 1: nome, endereco
+          // Formato 2: CLIENTE, ENDERECO, COD_CLI (do seu novo CSV)
+          const nome = item.nome || item.cliente;
+          
+          if (!nome) return null;
 
-          return base44.entities.Cliente.create({
-            nome: item.nome,
+          // Monta observação com código antigo se existir
+          let obs = item.observacoes || "";
+          if (item.cod_cli) {
+            const codObs = `Cód Antigo: ${item.cod_cli}`;
+            obs = obs ? `${obs} | ${codObs}` : codObs;
+          }
+
+          return addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'clientes'), {
+            nome: nome,
             endereco: item.endereco || "",
             telefone: item.telefone || "",
-            observacoes: item.observacoes || "",
+            observacoes: obs,
             endereco_entrega: "",
             usar_endereco_entrega: false,
-            owner: currentUser.email
+            createdAt: new Date().toISOString()
           });
         }).filter(p => p !== null);
 
+        if (promises.length === 0) {
+          alert("Nenhum cliente válido encontrado no arquivo. Verifique se as colunas (nome/CLIENTE) estão corretas.");
+          return;
+        }
+
         await Promise.all(promises);
         
-        queryClient.invalidateQueries({ queryKey: ["clientes"] });
         alert(`${promises.length} clientes importados com sucesso!`);
       } catch (error) {
         console.error("Erro ao importar CSV:", error);
@@ -150,21 +263,22 @@ export default function Clientes() {
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) {
-          fileInputRef.current.value = "";
+          fileInputRef.current.value = ""; // Limpar input
         }
       }
     };
 
     reader.readAsText(file);
   };
+
   // --- Fim Lógica de Importação ---
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (editingCliente) {
-      updateMutation.mutate({ id: editingCliente.id, data: formData });
+      handleUpdate(editingCliente.id, formData);
     } else {
-      createMutation.mutate({ ...formData, owner: currentUser?.email });
+      handleCreate(formData);
     }
   };
 
@@ -219,6 +333,7 @@ export default function Clientes() {
             </div>
             
             <div className="flex gap-3">
+              {/* Botão de Importar CSV */}
               <input
                 type="file"
                 accept=".csv"
@@ -229,7 +344,7 @@ export default function Clientes() {
               <Button
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isImporting}
+                disabled={isImporting || !user}
                 className="h-12 border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm"
               >
                 {isImporting ? (
@@ -242,6 +357,7 @@ export default function Clientes() {
 
               <Button
                 onClick={() => setShowDialog(true)}
+                disabled={!user}
                 className="h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg"
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -277,9 +393,9 @@ export default function Clientes() {
         {/* Client List */}
         <Card className="bg-white shadow-xl">
           <CardHeader className="border-b border-gray-100">
-            {/* 4. Layout do Header alterado para incluir a busca */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <CardTitle className="text-xl">Lista de Clientes</CardTitle>
+              {/* Barra de Busca */}
               <div className="relative w-full md:w-72">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
@@ -293,15 +409,17 @@ export default function Clientes() {
           </CardHeader>
           <CardContent className="p-6">
             <ScrollArea className="h-[600px] pr-4">
-              {/* 5. Verificação se a lista filtrada está vazia */}
-              {filteredClientes.length === 0 ? (
+              {loading ? (
+                <div className="flex justify-center p-10">
+                  <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                </div>
+              ) : filteredClientes.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">
-                   {searchTerm ? "Nenhum cliente encontrado para sua busca." : "Nenhum cliente cadastrado ainda."}
+                  {searchTerm ? "Nenhum cliente encontrado para sua busca." : "Nenhum cliente cadastrado ainda."}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <AnimatePresence>
-                    {/* 6. Map alterado para usar filteredClientes */}
                     {filteredClientes.map((cliente) => (
                       <motion.div
                         key={cliente.id}
@@ -312,7 +430,7 @@ export default function Clientes() {
                         <Card className="hover:shadow-lg transition-shadow border-2 border-gray-200 hover:border-purple-300">
                           <CardContent className="p-5">
                             <div className="flex items-start justify-between mb-3">
-                              <h3 className="font-bold text-lg text-gray-900">
+                              <h3 className="font-bold text-lg text-gray-900 line-clamp-1" title={cliente.nome}>
                                 {cliente.nome}
                               </h3>
                               <div className="flex gap-2">
@@ -327,7 +445,7 @@ export default function Clientes() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => deleteMutation.mutate(cliente.id)}
+                                  onClick={() => handleDelete(cliente.id)}
                                   className="hover:bg-red-50 hover:text-red-600"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -338,13 +456,13 @@ export default function Clientes() {
                             <div className="space-y-2">
                               <div className="flex items-start gap-2 text-sm text-gray-600">
                                 <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-purple-500" />
-                                <p className="leading-relaxed">{cliente.endereco}</p>
+                                <p className="leading-relaxed line-clamp-2">{cliente.endereco}</p>
                               </div>
                               {cliente.endereco_entrega && (
                                 <div className="flex items-start gap-2 text-sm text-gray-600">
                                   <Warehouse className="w-4 h-4 mt-0.5 flex-shrink-0 text-orange-500" />
                                   <div>
-                                    <p className="leading-relaxed">{cliente.endereco_entrega}</p>
+                                    <p className="leading-relaxed line-clamp-2">{cliente.endereco_entrega}</p>
                                     {cliente.usar_endereco_entrega && (
                                       <Badge className="mt-1 bg-orange-100 text-orange-700 text-xs">
                                         Usar para entregas
@@ -364,7 +482,7 @@ export default function Clientes() {
                                   <Badge variant="outline" className="mb-2">
                                     Observação
                                   </Badge>
-                                  <p className="text-xs text-gray-600 italic">
+                                  <p className="text-xs text-gray-600 italic line-clamp-3">
                                     {cliente.observacoes}
                                   </p>
                                 </div>
@@ -381,7 +499,7 @@ export default function Clientes() {
           </CardContent>
         </Card>
 
-        {/* Dialog (Sem alterações) */}
+        {/* Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
