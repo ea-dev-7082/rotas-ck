@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 
 import { Textarea } from "@/components/ui/textarea";
 
-// Incluído o ícone 'Search' na importação
+// Inclusão do ícone Search
 import { Plus, MapPin, Phone, Edit, Trash2, Users, Warehouse, Upload, Loader2, Search } from "lucide-react";
 
 import { Switch } from "@/components/ui/switch";
@@ -37,7 +37,6 @@ export default function Clientes() {
   const [editingCliente, setEditingCliente] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
 
-  // Novo estado para a busca
   const [searchTerm, setSearchTerm] = useState("");
 
   const fileInputRef = useRef(null);
@@ -68,11 +67,10 @@ export default function Clientes() {
     initialData: [],
   });
 
-  // Lógica de filtragem (Busca por nome, telefone ou endereço)
+  // Filtragem de clientes (nome, telefone ou endereço)
   const filteredClientes = clientes.filter((cliente) => {
     const term = searchTerm.toLowerCase();
 
-    // Converte telefone e endereço para string antes de chamar includes()
     const telefoneStr = cliente.telefone
       ? String(cliente.telefone).toLowerCase()
       : "";
@@ -110,10 +108,11 @@ export default function Clientes() {
     },
   });
 
-  // --- Lógica de Importação de CSV ---
+  // --- Função de importação de CSV ajustada ---
   const parseCSV = (text) => {
-    const lines = text.split("\n");
-    // Converte cabeçalhos para minúsculas
+    const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
+    if (lines.length === 0) return [];
+
     const headers = lines[0]
       .split(",")
       .map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
@@ -121,26 +120,32 @@ export default function Clientes() {
     const result = [];
 
     for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue;
+      const line = lines[i];
+      const values = [];
+      let current = "";
+      let inQuotes = false;
 
-      const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
 
-      const values = row
-        ? row.map((val) => val.replace(/^"|"$/g, "").trim())
-        : lines[i]
-            .split(",")
-            .map((val) => val.replace(/^"|"$/g, "").trim());
-
-      if (values.length > 0) {
-        const obj = {};
-        headers.forEach((header, index) => {
-          if (values[index] !== undefined) {
-            obj[header] = values[index];
-          }
-        });
-        result.push(obj);
+        if (char === '"' && (j === 0 || line[j - 1] !== "\\")) {
+          inQuotes = !inQuotes;
+        } else if (char === "," && !inQuotes) {
+          values.push(current.replace(/^"|"$/g, "").trim());
+          current = "";
+        } else {
+          current += char;
+        }
       }
+      values.push(current.replace(/^"|"$/g, "").trim());
+
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] !== undefined ? values[index] : "";
+      });
+      result.push(obj);
     }
+
     return result;
   };
 
@@ -165,8 +170,10 @@ export default function Clientes() {
               endereco: item.endereco || "",
               telefone: item.telefone || "",
               observacoes: item.observacoes || "",
-              endereco_entrega: "",
-              usar_endereco_entrega: false,
+              endereco_entrega: item.endereco_entrega || "",
+              usar_endereco_entrega:
+                item.usar_endereco_entrega === "true" ||
+                item.usar_endereco_entrega === true,
               owner: currentUser.email,
             });
           })
@@ -189,7 +196,7 @@ export default function Clientes() {
 
     reader.readAsText(file);
   };
-  // --- Fim Lógica de Importação ---
+  // --- Fim da lógica de importação ---
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -309,7 +316,6 @@ export default function Clientes() {
         {/* Client List */}
         <Card className="bg-white shadow-xl">
           <CardHeader className="border-b border-gray-100">
-            {/* Layout do Header alterado para incluir a busca */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <CardTitle className="text-xl">Lista de Clientes</CardTitle>
               <div className="relative w-full md:w-72">
@@ -326,7 +332,6 @@ export default function Clientes() {
 
           <CardContent className="p-6">
             <ScrollArea className="h-[600px] pr-4">
-              {/* Verificação se a lista filtrada está vazia */}
               {filteredClientes.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">
                   {searchTerm
@@ -336,7 +341,6 @@ export default function Clientes() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <AnimatePresence>
-                    {/* Map alterado para usar filteredClientes */}
                     {filteredClientes.map((cliente) => (
                       <motion.div
                         key={cliente.id}
@@ -362,7 +366,9 @@ export default function Clientes() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => deleteMutation.mutate(cliente.id)}
+                                  onClick={() =>
+                                    deleteMutation.mutate(cliente.id)
+                                  }
                                   className="hover:bg-red-50 hover:text-red-600"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -420,7 +426,7 @@ export default function Clientes() {
           </CardContent>
         </Card>
 
-        {/* Dialog (Sem alterações) */}
+        {/* Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
