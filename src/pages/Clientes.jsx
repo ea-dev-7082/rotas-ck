@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label";
 
 import { Textarea } from "@/components/ui/textarea";
 
-// Importa icones, incluindo Search
 import {
   Plus,
   MapPin,
@@ -119,7 +118,7 @@ export default function Clientes() {
     },
   });
 
-  // --- Função parseCSV robusta para lidar com campos vazios ---
+  // Função parseCSV robusta
   const parseCSV = (text) => {
     const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
     if (lines.length === 0) return [];
@@ -160,7 +159,7 @@ export default function Clientes() {
     return result;
   };
 
-  // --- Função de importação sequencial ---
+  // Importação sequencial de clientes
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !currentUser) return;
@@ -192,7 +191,6 @@ export default function Clientes() {
             });
             importedCount++;
           } catch (err) {
-            // Registra o erro e continua
             console.error(`Erro ao importar ${item.nome}:`, err);
           }
         }
@@ -212,7 +210,30 @@ export default function Clientes() {
 
     reader.readAsText(file);
   };
-  // --- Fim da lógica de importação ---
+
+  // Função para excluir todos os clientes do usuário atual
+  const handleDeleteAll = async () => {
+    if (!currentUser) return;
+    // Confirmação para evitar exclusões acidentais
+    const confirmed = window.confirm(
+      "Tem certeza de que deseja excluir todos os clientes?"
+    );
+    if (!confirmed) return;
+
+    let deletedCount = 0;
+
+    for (const cliente of clientes) {
+      try {
+        await base44.entities.Cliente.delete(cliente.id);
+        deletedCount++;
+      } catch (err) {
+        console.error(`Erro ao excluir ${cliente.nome}:`, err);
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["clientes"] });
+    alert(`${deletedCount} clientes excluídos.`);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -273,7 +294,7 @@ export default function Clientes() {
               </p>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col md:flex-row items-stretch gap-3">
               <input
                 type="file"
                 accept=".csv"
@@ -301,6 +322,15 @@ export default function Clientes() {
               >
                 <Plus className="w-5 h-5 mr-2" />
                 Novo Cliente
+              </Button>
+
+              <Button
+                onClick={handleDeleteAll}
+                variant="outline"
+                className="h-12 border-red-200 text-red-700 hover:bg-red-50 shadow-sm"
+              >
+                <Trash2 className="w-5 h-5 mr-2" />
+                Excluir Todos
               </Button>
             </div>
           </div>
@@ -481,7 +511,10 @@ export default function Clientes() {
               <div className="space-y-2 p-4 border-2 border-dashed border-orange-200 rounded-lg bg-orange-50">
                 <div className="flex items-center gap-2 mb-2">
                   <Warehouse className="w-4 h-4 text-orange-600" />
-                  <Label htmlFor="endereco_entrega" className="text-orange-800">
+                  <Label
+                    htmlFor="endereco_entrega"
+                    className="text-orange-800"
+                  >
                     Endereço de Entrega Alternativo (Galpão/Depósito)
                   </Label>
                 </div>
