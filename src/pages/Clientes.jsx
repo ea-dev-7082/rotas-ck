@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+// IMPORTANTE: Certifique-se de ter rodado: npm install xlsx
+import * as XLSX from "xlsx";
 
 export default function Clientes() {
   const [showDialog, setShowDialog] = useState(false);
@@ -84,131 +86,106 @@ export default function Clientes() {
     },
   });
 
-  // --- Parser Manual Inteligente (Lê seu arquivo CSV complexo) ---
-  const parseComplexCSV = (text) => {
-    const rows = [];
-    let currentRow = [];
-    let currentField = '';
-    let insideQuotes = false;
-
-    // Itera caractere por caractere para lidar corretamente com aspas e vírgulas
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      const nextChar = text[i + 1];
-
-      if (char === '"') {
-        if (insideQuotes && nextChar === '"') {
-          // Aspas duplas dentro de um campo (ex: "O ""Grande"" Hotel")
-          currentField += '"';
-          i++; 
-        } else {
-          // Entrando ou saindo de um campo com aspas
-          insideQuotes = !insideQuotes;
-        }
-      } else if (char === ',' && !insideQuotes) {
-        // Vírgula separadora de campo (só se não estiver dentro de aspas)
-        currentRow.push(currentField.trim());
-        currentField = '';
-      } else if ((char === '\n' || char === '\r') && !insideQuotes) {
-        // Quebra de linha separadora de registro
-        if (char === '\r' && nextChar === '\n') i++; // Trata quebra Windows \r\n
-        
-        currentRow.push(currentField.trim());
-        if (currentRow.length > 0 && (currentRow.length > 1 || currentRow[0] !== '')) {
-            rows.push(currentRow);
-        }
-        currentRow = [];
-        currentField = '';
-      } else {
-        // Caractere normal
-        currentField += char;
-      }
-    }
-    // Adiciona a última linha se houver
-    if (currentField || currentRow.length > 0) {
-      currentRow.push(currentField.trim());
-      rows.push(currentRow);
-    }
-    return rows;
-  };
-
+  // --- Lógica de Importação ESPECÍFICA PARA .XLSX ---
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
-    if (!file || !currentUser) return;
+    
+    if (!currentUser) {
+        alert("Erro: Usuário não identificado. Recarregue a página.");
+        return;
+    }
+    if (!file) return;
 
     setIsImporting(true);
-    const reader = new FileReader();
 
-    reader.onload = async (e) => {
-      try {
-        const text = e.target.result;
-        
-        // 1. Usa o parser manual robusto
-        const rows = parseComplexCSV(text);
-        
-        if (rows.length < 2) {
-            alert("O arquivo parece vazio ou inválido.");
-            setIsImporting(false);
-            return;
-        }
+    try {
+      // FileReader para ler binário (ArrayBuffer)
+      const reader = new FileReader();
 
-        // 2. Identifica os cabeçalhos (primeira linha)
-        // Remove espaços e converte para minúsculo para facilitar (COD_CLI -> cod_cli)
-        const headers = rows[0].map(h => h.toLowerCase().trim()); 
-        
-        // 3. Mapeia os dados
-        const promises = rows.slice(1).map(row => {
-            // Cria um objeto temporário mapendo header -> valor
-            const obj = {};
-            headers.forEach((h, index) => {
-                obj[h] = row[index] || "";
+      reader.onload = async (e) => {
+        try {
+          const data = e.target.result;
+          
+          // Lê o arquivo Excel real
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Pega a primeira aba
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Converte para JSON bruto
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+          if (jsonData.length === 0) {
+            throw new Error("A planilha está vazia.");
+          }
+
+          // Processa os dados
+          const promises = jsonData.map(row => {
+            // Normaliza as chaves do objeto (remove espaços e põe minúsculo)
+            // Ex: row["COD_CLI"] vira normalizedRow["cod_cli"]
+            const normalizedRow = {};
+            Object.keys(row).forEach(key => {
+                const cleanKey = key.trim().toLowerCase().replace(/ /g, '_');
+                normalizedRow[cleanKey] = row[key];
             });
 
-            // Procura os campos nas colunas do seu arquivo
-            // Seu arquivo tem: COD_CLI, CLIENTE, ENDERECO
-            const nome = obj['cliente'] || obj['nome'];
+            // Mapeamento Flexível baseada no seu arquivo
+            // Procura por 'cliente' ou 'nome'
+            const nome = normalizedRow['cliente'] || normalizedRow['nome'];
             
-            if (!nome) return null; // Pula linhas vazias
+            if (!nome) return null; // Pula se não tiver nome
 
-            const endereco = obj['endereco'] || obj['endereço'] || "";
-            const cod = obj['cod_cli'] || obj['codigo'] || "";
+            // Mapeia Endereço
+            const endereco = normalizedRow['endereco'] || normalizedRow['endereço'] || "";
             
-            // Coloca o código antigo na observação para não perder essa informação
-            const obs = cod ? `Cód. Antigo: ${cod}` : "";
+            // Mapeia Código do Cliente (COD_CLI)
+            const cod = normalizedRow['cod_cli'] || normalizedRow['codcli'] || normalizedRow['codigo'] || "";
+            
+            // Mapeia Telefone (se houver no futuro)
+            const telefone = normalizedRow['telefone'] || normalizedRow['tel'] || "";
+
+            // Cria observação com o código antigo
+            const obs = cod ? `Cód. Original: ${cod}` : "";
 
             return base44.entities.Cliente.create({
-                nome: nome,
-                endereco: endereco,
-                telefone: "", // Seu arquivo não tem coluna telefone, deixa vazio
+                nome: String(nome).trim(),
+                endereco: String(endereco).trim(),
+                telefone: String(telefone).trim(),
                 observacoes: obs,
                 endereco_entrega: "",
                 usar_endereco_entrega: false,
                 owner: currentUser.email
             });
-        }).filter(p => p !== null);
+          }).filter(p => p !== null);
 
-        if (promises.length === 0) {
-            alert("Nenhum cliente válido encontrado. Verifique se o arquivo tem a coluna 'CLIENTE'.");
-            return;
+          if (promises.length === 0) {
+             alert("Não encontrei a coluna 'CLIENTE' no Excel. Verifique o cabeçalho.");
+             return;
+          }
+
+          await Promise.all(promises);
+          
+          queryClient.invalidateQueries({ queryKey: ["clientes"] });
+          alert(`${promises.length} clientes importados com sucesso!`);
+
+        } catch (innerError) {
+          console.error("Erro processando Excel:", innerError);
+          alert("Erro ao ler a planilha. Certifique-se que é um .xlsx válido.");
+        } finally {
+           setIsImporting(false);
+           if (fileInputRef.current) fileInputRef.current.value = "";
         }
+      };
 
-        await Promise.all(promises);
-        
-        queryClient.invalidateQueries({ queryKey: ["clientes"] });
-        alert(`${promises.length} clientes importados com sucesso!`);
-      } catch (error) {
-        console.error("Erro ao importar:", error);
-        alert("Erro ao processar o arquivo.");
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
-      }
-    };
+      // Importante: Ler como ArrayBuffer para arquivos binários (.xlsx)
+      reader.readAsArrayBuffer(file);
 
-    // Importante: Lê como Latin1 (ISO-8859-1) para corrigir acentos do Excel brasileiro
-    reader.readAsText(file, "ISO-8859-1");
+    } catch (error) {
+      console.error("Erro no upload:", error);
+      setIsImporting(false);
+      alert("Erro crítico no upload.");
+    }
   };
   // --- Fim Lógica de Importação ---
 
@@ -272,9 +249,10 @@ export default function Clientes() {
             </div>
             
             <div className="flex gap-3">
+              {/* Input aceita XLSX especificamente */}
               <input
                 type="file"
-                accept=".csv"
+                accept=".xlsx, .xls"
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleFileUpload}
@@ -290,7 +268,7 @@ export default function Clientes() {
                 ) : (
                   <Upload className="w-5 h-5 mr-2" />
                 )}
-                {isImporting ? "Importando..." : "Importar CSV"}
+                {isImporting ? "Importando..." : "Importar Excel (.xlsx)"}
               </Button>
 
               <Button
