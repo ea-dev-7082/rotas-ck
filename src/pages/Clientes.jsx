@@ -14,8 +14,19 @@ import { Label } from "@/components/ui/label";
 
 import { Textarea } from "@/components/ui/textarea";
 
-// Inclusão do ícone Search
-import { Plus, MapPin, Phone, Edit, Trash2, Users, Warehouse, Upload, Loader2, Search } from "lucide-react";
+// Importa icones, incluindo Search
+import {
+  Plus,
+  MapPin,
+  Phone,
+  Edit,
+  Trash2,
+  Users,
+  Warehouse,
+  Upload,
+  Loader2,
+  Search,
+} from "lucide-react";
 
 import { Switch } from "@/components/ui/switch";
 
@@ -108,7 +119,7 @@ export default function Clientes() {
     },
   });
 
-  // --- Função de importação de CSV ajustada ---
+  // --- Função parseCSV robusta para lidar com campos vazios ---
   const parseCSV = (text) => {
     const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
     if (lines.length === 0) return [];
@@ -149,6 +160,7 @@ export default function Clientes() {
     return result;
   };
 
+  // --- Função de importação sequencial ---
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !currentUser) return;
@@ -161,11 +173,13 @@ export default function Clientes() {
         const text = e.target.result;
         const parsedData = parseCSV(text);
 
-        const promises = parsedData
-          .map((item) => {
-            if (!item.nome) return null;
+        let importedCount = 0;
 
-            return base44.entities.Cliente.create({
+        for (const item of parsedData) {
+          if (!item.nome) continue;
+
+          try {
+            await base44.entities.Cliente.create({
               nome: item.nome,
               endereco: item.endereco || "",
               telefone: item.telefone || "",
@@ -176,13 +190,15 @@ export default function Clientes() {
                 item.usar_endereco_entrega === true,
               owner: currentUser.email,
             });
-          })
-          .filter((p) => p !== null);
-
-        await Promise.all(promises);
+            importedCount++;
+          } catch (err) {
+            // Registra o erro e continua
+            console.error(`Erro ao importar ${item.nome}:`, err);
+          }
+        }
 
         queryClient.invalidateQueries({ queryKey: ["clientes"] });
-        alert(`${promises.length} clientes importados com sucesso!`);
+        alert(`${importedCount} clientes importados com sucesso!`);
       } catch (error) {
         console.error("Erro ao importar CSV:", error);
         alert("Erro ao processar o arquivo. Verifique o formato.");
@@ -465,10 +481,7 @@ export default function Clientes() {
               <div className="space-y-2 p-4 border-2 border-dashed border-orange-200 rounded-lg bg-orange-50">
                 <div className="flex items-center gap-2 mb-2">
                   <Warehouse className="w-4 h-4 text-orange-600" />
-                  <Label
-                    htmlFor="endereco_entrega"
-                    className="text-orange-800"
-                  >
+                  <Label htmlFor="endereco_entrega" className="text-orange-800">
                     Endereço de Entrega Alternativo (Galpão/Depósito)
                   </Label>
                 </div>
