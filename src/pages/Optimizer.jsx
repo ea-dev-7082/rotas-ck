@@ -72,6 +72,7 @@ export default function Optimizer() {
   // Configurações
   const enderecoMatriz = configs.find(c => c.chave === "endereco_matriz")?.valor || "";
   const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || "";
+  const logoUrl = configs.find(c => c.chave === "logo_url")?.valor || "";
 
   const PONTO_PARTIDA = {
     nome: "Matriz - Ponto de Partida",
@@ -477,8 +478,12 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4 shadow-lg">
-            <Route className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4 shadow-lg overflow-hidden">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+            ) : (
+              <Route className="w-8 h-8 text-white" />
+            )}
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Otimizador de Rotas

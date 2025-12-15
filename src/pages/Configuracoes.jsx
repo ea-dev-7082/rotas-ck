@@ -29,8 +29,11 @@ import {
   Home,
   Car,
   Bike,
+  Upload,
+  Image,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Loader2 } from "lucide-react";
 
 export default function Configuracoes() {
   const [mapboxToken, setMapboxToken] = useState("");
@@ -38,6 +41,9 @@ export default function Configuracoes() {
   const [tokenSaved, setTokenSaved] = useState(false);
   const [enderecoMatriz, setEnderecoMatriz] = useState("");
   const [matrizSaved, setMatrizSaved] = useState(false);
+  const [logoUrl, setLogoUrl] = useState("");
+  const [logoSaved, setLogoSaved] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [showMotoristaDialog, setShowMotoristaDialog] = useState(false);
   const [editingMotorista, setEditingMotorista] = useState(null);
   const [motoristaForm, setMotoristaForm] = useState({
@@ -97,6 +103,10 @@ export default function Configuracoes() {
     if (matrizConfig) {
       setEnderecoMatriz(matrizConfig.valor);
     }
+    const logoConfig = configs.find((c) => c.chave === "logo_url");
+    if (logoConfig) {
+      setLogoUrl(logoConfig.valor);
+    }
   }, [configs]);
 
   // Mutations
@@ -116,6 +126,9 @@ export default function Configuracoes() {
       } else if (variables.chave === "endereco_matriz") {
         setMatrizSaved(true);
         setTimeout(() => setMatrizSaved(false), 3000);
+      } else if (variables.chave === "logo_url") {
+        setLogoSaved(true);
+        setTimeout(() => setLogoSaved(false), 3000);
       }
     },
   });
@@ -172,6 +185,23 @@ export default function Configuracoes() {
 
   const handleSaveMatriz = () => {
     saveConfigMutation.mutate({ chave: "endereco_matriz", valor: enderecoMatriz });
+  };
+
+  const handleLogoUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setLogoUrl(file_url);
+      saveConfigMutation.mutate({ chave: "logo_url", valor: file_url });
+    } catch (error) {
+      console.error("Erro ao fazer upload do logo:", error);
+      alert("Erro ao fazer upload do logo. Tente novamente.");
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleEditMotorista = (motorista) => {
@@ -326,6 +356,81 @@ export default function Configuracoes() {
                       >
                         mapbox.com
                       </a>
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Logo da Empresa */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+          >
+            <Card className="bg-white shadow-xl">
+              <CardHeader className="border-b border-gray-100">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Image className="w-5 h-5 text-purple-600" />
+                  Logo da Empresa
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="logo-upload">Upload do Logo</Label>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center gap-4">
+                        <input
+                          id="logo-upload"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                        />
+                        <Button
+                          onClick={() => document.getElementById('logo-upload').click()}
+                          disabled={uploadingLogo}
+                          className="bg-purple-600 hover:bg-purple-700"
+                        >
+                          {uploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Enviando...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              {logoUrl ? "Alterar Logo" : "Enviar Logo"}
+                            </>
+                          )}
+                        </Button>
+                        {logoSaved && (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span className="text-sm font-medium">Logo salvo!</span>
+                          </div>
+                        )}
+                      </div>
+                      {logoUrl && (
+                        <div className="p-4 bg-gray-50 rounded-lg border-2 border-gray-200">
+                          <p className="text-sm text-gray-600 mb-2">Preview do Logo:</p>
+                          <div className="flex items-center justify-center p-4 bg-white rounded border">
+                            <img 
+                              src={logoUrl} 
+                              alt="Logo da empresa" 
+                              className="max-h-24 object-contain"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 p-3 bg-purple-50 rounded-lg text-sm text-purple-700">
+                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <p>
+                      Este logo será exibido no cabeçalho do sistema e na página do otimizador. Formatos aceitos: PNG, JPG, SVG.
                     </p>
                   </div>
                 </div>

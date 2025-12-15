@@ -1,10 +1,26 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Route, Users, Settings } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  const { data: configs } = useQuery({
+    queryKey: ['configuracoes', currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Configuracao.filter({ owner: currentUser.email }) : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
+
+  const logoUrl = configs.find(c => c.chave === "logo_url")?.valor || "";
 
   const navigationItems = [
     {
@@ -31,8 +47,12 @@ export default function Layout({ children, currentPageName }) {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Route className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg overflow-hidden">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <Route className="w-5 h-5 text-white" />
+                )}
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
