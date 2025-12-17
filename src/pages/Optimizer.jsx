@@ -475,17 +475,30 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          className="mb-8"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4 shadow-lg">
-            <Route className="w-8 h-8 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Route className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold text-gray-900">
+                  Otimizador de Rotas
+                </h1>
+                <p className="text-gray-600 text-lg">
+                  Selecione os clientes e planeje as entregas do dia
+                </p>
+              </div>
+            </div>
+            <div className="hidden md:block">
+              <img 
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/23059fc58_image.png" 
+                alt="Logo" 
+                className="w-24 h-24 object-contain"
+              />
+            </div>
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Otimizador de Rotas
-          </h1>
-          <p className="text-gray-600 text-lg">
-            Selecione os clientes e planeje as entregas do dia
-          </p>
           <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${enderecoMatriz ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
             <Home className={`w-5 h-5 ${enderecoMatriz ? 'text-green-600' : 'text-yellow-600'}`} />
             <div className="text-left">
