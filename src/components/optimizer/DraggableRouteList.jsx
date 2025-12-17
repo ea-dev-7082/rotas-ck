@@ -3,7 +3,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { List, MapPin, Clock, Copy, CheckCircle2, User, Home, Navigation, GripVertical, Printer, FileText } from "lucide-react";
+import { List, MapPin, Clock, RefreshCw, User, Home, Navigation, GripVertical, Printer, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function DraggableRouteList({ route, onReorder, onPrint, notasFiscais, onOpenNotaFiscal }) {
