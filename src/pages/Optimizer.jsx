@@ -487,8 +487,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex items-start gap-8">
+            <div className="flex items-center gap-4 flex-1">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
                 <Route className="w-6 h-6 text-white" />
               </div>
@@ -503,7 +503,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
             </div>
 
             {/* Logo do Usuário */}
-            <div className="w-48 h-28 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden shadow-lg">
+            <div className="w-44 h-24 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden shadow-lg -mt-2">
               {logoUrl ? (
                 <img 
                   src={logoUrl} 
@@ -516,6 +516,9 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
                 </div>
               )}
             </div>
+
+            {/* Espaço vazio para balancear */}
+            <div className="flex-1"></div>
           </div>
           <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${enderecoMatriz ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
             <Home className={`w-5 h-5 ${enderecoMatriz ? 'text-green-600' : 'text-yellow-600'}`} />
