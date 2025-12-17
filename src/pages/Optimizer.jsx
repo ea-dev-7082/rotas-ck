@@ -502,6 +502,20 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
               </div>
             </div>
 
+            {/* Logo do Usuário */}
+            <div className="w-40 h-24 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden">
+              {logoUrl ? (
+                <img 
+                  src={logoUrl} 
+                  alt="Logo da Empresa" 
+                  className="w-full h-full object-contain p-2"
+                />
+              ) : (
+                <div className="text-center text-gray-400 p-2">
+                  <p className="text-xs">SUA LOGO</p>
+                </div>
+              )}
+            </div>
           </div>
           <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${enderecoMatriz ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
             <Home className={`w-5 h-5 ${enderecoMatriz ? 'text-green-600' : 'text-yellow-600'}`} />
@@ -623,21 +637,6 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
-            {/* Logo do Usuário */}
-            <div className="w-full h-28 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden">
-              {logoUrl ? (
-                <img 
-                  src={logoUrl} 
-                  alt="Logo da Empresa" 
-                  className="max-h-full object-contain p-3"
-                />
-              ) : (
-                <div className="text-center text-gray-400 p-2">
-                  <p className="text-sm font-medium">SUA LOGO</p>
-                </div>
-              )}
-            </div>
-
             <AnimatePresence mode="wait">
               {optimizedRoute ? (
                 <>
