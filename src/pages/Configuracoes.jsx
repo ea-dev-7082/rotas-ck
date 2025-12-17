@@ -39,6 +39,8 @@ export default function Configuracoes() {
   const [tokenSaved, setTokenSaved] = useState(false);
   const [enderecoMatriz, setEnderecoMatriz] = useState("");
   const [matrizSaved, setMatrizSaved] = useState(false);
+  const [nomeEmpresa, setNomeEmpresa] = useState("");
+  const [empresaSaved, setEmpresaSaved] = useState(false);
 
   const [showMotoristaDialog, setShowMotoristaDialog] = useState(false);
   const [editingMotorista, setEditingMotorista] = useState(null);
@@ -99,7 +101,10 @@ export default function Configuracoes() {
     if (matrizConfig) {
       setEnderecoMatriz(matrizConfig.valor);
     }
-
+    const empresaConfig = configs.find((c) => c.chave === "nome_empresa");
+    if (empresaConfig) {
+      setNomeEmpresa(empresaConfig.valor);
+    }
   }, [configs]);
 
   // Mutations
@@ -119,6 +124,9 @@ export default function Configuracoes() {
       } else if (variables.chave === "endereco_matriz") {
         setMatrizSaved(true);
         setTimeout(() => setMatrizSaved(false), 3000);
+      } else if (variables.chave === "nome_empresa") {
+        setEmpresaSaved(true);
+        setTimeout(() => setEmpresaSaved(false), 3000);
       }
     },
   });
@@ -175,6 +183,10 @@ export default function Configuracoes() {
 
   const handleSaveMatriz = () => {
     saveConfigMutation.mutate({ chave: "endereco_matriz", valor: enderecoMatriz });
+  };
+
+  const handleSaveEmpresa = () => {
+    saveConfigMutation.mutate({ chave: "nome_empresa", valor: nomeEmpresa });
   };
 
   const handleEditMotorista = (motorista) => {
@@ -262,6 +274,55 @@ export default function Configuracoes() {
         </motion.div>
 
         <div className="space-y-6">
+          {/* Nome da Empresa */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+          >
+            <Card className="bg-white shadow-xl">
+              <CardHeader className="border-b border-gray-100">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Settings className="w-5 h-5 text-purple-600" />
+                  Nome da Empresa
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nome-empresa">Nome que aparecerá no Romaneio</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="nome-empresa"
+                        value={nomeEmpresa}
+                        onChange={(e) => setNomeEmpresa(e.target.value)}
+                        placeholder="Ex: Distribuidora ABC Ltda"
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={handleSaveEmpresa}
+                        disabled={saveConfigMutation.isPending}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        {empresaSaved ? (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            Salvo!
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Salvar
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
           {/* Mapbox Token */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
