@@ -715,6 +715,9 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         responsavelExpedicao={currentUser?.full_name}
         veiculoData={selectedVeiculoData}
         motoristaData={selectedMotoristaData}
+        onSaveRelatorio={async (data) => {
+          await base44.entities.Relatorio.create({ ...data, owner: currentUser?.email });
+        }}
       />
 
       <NotaFiscalDialog
