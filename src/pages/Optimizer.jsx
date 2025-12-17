@@ -482,7 +482,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center p-2">
                 <img 
-                  src={logoUrl || "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/250c13318_image.png"} 
+                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/250c13318_image.png" 
                   alt="Logo" 
                   className="w-full h-full object-contain"
                 />
