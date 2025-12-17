@@ -514,8 +514,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="grid grid-cols-2 gap-8">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
                 <Route className="w-6 h-6 text-white" />
               </div>
@@ -530,7 +530,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
             </div>
 
             {/* Logo do Usuário - alinhado com o mapa */}
-            <div className="flex justify-center">
+            <div className="flex justify-end">
               <label className="relative w-52 h-28 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden shadow-lg cursor-pointer group">
                 {logoUrl ? (
                   <img 
