@@ -49,7 +49,7 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
 
   // --- 3. FILTRAGEM SEGURA ---
   // Mapeia e sanitiza a rota. Se a coordenada for inválida, loga aviso mas não quebra.
-  const validRoute = route.map(point => {
+  const validRouteRaw = route.map(point => {
     const lat = parseCoordinate(point.latitude);
     const lng = parseCoordinate(point.longitude);
 
@@ -60,6 +60,40 @@ export default function RouteMap({ route, pontoPartida, routeGeometry }) {
 
     return { ...point, latitude: lat, longitude: lng };
   }).filter(Boolean);
+
+  // --- 3.1 DESLOCAMENTO PARA MARCADORES SOBREPOSTOS ---
+  // Aplica pequeno offset em marcadores com coordenadas muito próximas para evitar sobreposição
+  const PROXIMITY_THRESHOLD = 0.002; // ~200 metros
+  const OFFSET_AMOUNT = 0.0015; // ~150 metros de deslocamento
+
+  const validRoute = validRouteRaw.map((point, index) => {
+    // Conta quantos pontos anteriores estão muito próximos
+    let nearbyCount = 0;
+    for (let i = 0; i < index; i++) {
+      const otherPoint = validRouteRaw[i];
+      const latDiff = Math.abs(point.latitude - otherPoint.latitude);
+      const lngDiff = Math.abs(point.longitude - otherPoint.longitude);
+      
+      if (latDiff < PROXIMITY_THRESHOLD && lngDiff < PROXIMITY_THRESHOLD) {
+        nearbyCount++;
+      }
+    }
+
+    // Se há pontos próximos, aplica offset baseado na contagem
+    if (nearbyCount > 0) {
+      const angle = (nearbyCount * Math.PI) / 2; // 90 graus por ponto
+      const offsetLat = OFFSET_AMOUNT * Math.cos(angle);
+      const offsetLng = OFFSET_AMOUNT * Math.sin(angle);
+      
+      return {
+        ...point,
+        latitude: point.latitude + offsetLat,
+        longitude: point.longitude + offsetLng
+      };
+    }
+
+    return point;
+  });
 
   if (validRoute.length === 0) {
     return (
