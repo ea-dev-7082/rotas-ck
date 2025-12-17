@@ -393,7 +393,7 @@ export default function Configuracoes() {
                       Faça upload do logo da sua empresa. Será exibido no cabeçalho do sistema.
                       <br />
                       <span className="text-xs text-blue-600 font-medium">
-                        📐 Tamanho recomendado: 200x80 pixels (proporção horizontal)
+                        📐 Tamanho recomendado: 300x120 pixels (proporção horizontal)
                       </span>
                     </p>
                     <div className="flex gap-2">
