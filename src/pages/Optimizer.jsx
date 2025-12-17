@@ -364,7 +364,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         
         const deliveryItems = allDeliveries.map((item, idx) => {
           if (legs[idx]) currentTime += legs[idx].duration / 60;
-          const arrivalTime = formatTime(currentTime);
+          // Adiciona 20 minutos de margem ao horário exibido
+          const arrivalTime = formatTime(currentTime + 20);
           currentTime += 15;
 
           // AQUI: Recupera a coordenada do Dicionário Mestre para o estado final
