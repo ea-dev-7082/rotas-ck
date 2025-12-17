@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Printer, FileText } from "lucide-react";
 
-export default function PrintModal({ open, onClose, route, stats, pontoPartida, notasFiscais, responsavelExpedicao, veiculoData, motoristaData, onSaveRelatorio }) {
+export default function PrintModal({ open, onClose, route, stats, pontoPartida, notasFiscais, responsavelExpedicao, veiculoData, motoristaData, onSaveRelatorio, nomeEmpresa }) {
   const [expedidor, setExpedidor] = useState(responsavelExpedicao || "");
   const printRef = useRef();
 
@@ -101,8 +101,8 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             
             <div class="header-box">
               <div class="company-info">
-                <h1>Logística & Distribuição</h1>
-                <p>Controle de Operações Logísticas</p>
+                <h1>${nomeEmpresa || 'Nome da Empresa'}</h1>
+                <p style="font-size: 9px;">Controle de Operações Logísticas</p>
               </div>
               <div class="doc-info">
                 <div class="doc-title">ROMANEIO DE CARGA</div>
@@ -205,7 +205,7 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             <div className="flex justify-between border-b-2 border-black pb-4 mb-6">
                 <div>
                     <h1 className="text-xl font-bold uppercase tracking-wider">Romaneio de Carga</h1>
-                    <p className="text-xs text-gray-500">Logística & Distribuição</p>
+                    <p className="text-xs text-gray-500">{nomeEmpresa || 'Nome da Empresa'}</p>
                 </div>
                 <div className="text-right">
                     <div className="text-sm font-bold">{today}</div>

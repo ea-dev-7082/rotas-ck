@@ -73,6 +73,7 @@ export default function Optimizer() {
   const enderecoMatriz = configs.find(c => c.chave === "endereco_matriz")?.valor || "";
   const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || "";
   const logoUrl = configs.find(c => c.chave === "logo_url")?.valor || "";
+  const nomeEmpresa = configs.find(c => c.chave === "nome_empresa")?.valor || "";
 
   const PONTO_PARTIDA = {
     nome: "Matriz - Ponto de Partida",
@@ -718,6 +719,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         onSaveRelatorio={async (data) => {
           await base44.entities.Relatorio.create({ ...data, owner: currentUser?.email });
         }}
+        nomeEmpresa={nomeEmpresa}
       />
 
       <NotaFiscalDialog
