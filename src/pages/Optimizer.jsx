@@ -412,6 +412,14 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     setIsOptimizing(false);
   };
 
+  // 4. ATUALIZAR HORÁRIOS (RECALCULA COM HORA ATUAL)
+  const handleRefreshTimes = async () => {
+    if (!optimizedRoute || optimizedRoute.length === 0) return;
+    
+    const entregas = optimizedRoute.slice(1, -1);
+    await handleReorderRoute(entregas, entregas.length - 1);
+  };
+
   // 3. ROTA MANUAL (FALLBACK)
   const buildManualRoute = (matrizGeocodificada, entregas, startTime) => {
     const parseTime = (timeStr) => {
