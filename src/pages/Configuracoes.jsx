@@ -29,8 +29,6 @@ import {
   Home,
   Car,
   Bike,
-  Image,
-  Upload,
   Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
