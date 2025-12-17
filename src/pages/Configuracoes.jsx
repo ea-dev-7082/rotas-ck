@@ -41,9 +41,7 @@ export default function Configuracoes() {
   const [tokenSaved, setTokenSaved] = useState(false);
   const [enderecoMatriz, setEnderecoMatriz] = useState("");
   const [matrizSaved, setMatrizSaved] = useState(false);
-  const [logoUrl, setLogoUrl] = useState("");
-  const [logoSaved, setLogoSaved] = useState(false);
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
   const [showMotoristaDialog, setShowMotoristaDialog] = useState(false);
   const [editingMotorista, setEditingMotorista] = useState(null);
   const [motoristaForm, setMotoristaForm] = useState({
