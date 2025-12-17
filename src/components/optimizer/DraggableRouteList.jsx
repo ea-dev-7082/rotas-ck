@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { List, MapPin, Clock, RefreshCw, User, Home, Navigation, GripVertical, Printer, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 
-export default function DraggableRouteList({ route, onReorder, onPrint, notasFiscais, onOpenNotaFiscal }) {
-  const [copied, setCopied] = React.useState(false);
+export default function DraggableRouteList({ route, onReorder, onPrint, notasFiscais, onOpenNotaFiscal, onRefreshTimes }) {
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   // --- NOVA FUNÇÃO AUXILIAR ---
   const calcularHorarioComAdicional = (horarioString) => {
@@ -34,13 +34,11 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
   const matrizFim = route[route.length - 1];
   const entregas = route.slice(1, -1);
 
-  const handleCopyList = () => {
-    const text = route
-      .map((point) => `${point.order}. ${point.client_name} - ${point.address}`)
-      .join("\n");
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleRefreshTimes = async () => {
+    if (!onRefreshTimes) return;
+    setIsRefreshing(true);
+    await onRefreshTimes();
+    setIsRefreshing(false);
   };
 
   const handleOpenWaze = () => {
@@ -126,20 +124,12 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleCopyList}
+                onClick={handleRefreshTimes}
+                disabled={isRefreshing}
                 className="gap-2"
               >
-                {copied ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    Copiado!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    Copiar
-                  </>
-                )}
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Atualizando...' : 'Atualizar Horários'}
               </Button>
             </div>
           </div>
