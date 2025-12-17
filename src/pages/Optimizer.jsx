@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Route, MapPin, TrendingUp, Loader2, Users, Home } from "lucide-react";
+import { Route, MapPin, TrendingUp, Loader2, Users, Home, Edit } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // --- COMPONENTES FILHOS ---
