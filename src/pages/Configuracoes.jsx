@@ -391,6 +391,10 @@ export default function Configuracoes() {
                   <div className="flex-1 space-y-3">
                     <p className="text-sm text-gray-600">
                       Faça upload do logo da sua empresa. Será exibido no cabeçalho do sistema.
+                      <br />
+                      <span className="text-xs text-blue-600 font-medium">
+                        📐 Tamanho recomendado: 200x80 pixels (proporção horizontal)
+                      </span>
                     </p>
                     <div className="flex gap-2">
                       <input
