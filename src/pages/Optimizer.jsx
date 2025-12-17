@@ -636,6 +636,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
                     onPrint={() => setShowPrintModal(true)}
                     notasFiscais={notasFiscais}
                     onOpenNotaFiscal={handleOpenNotaFiscal}
+                    onRefreshTimes={handleRefreshTimes}
                   />
                   <NearbyClients nearbyClients={nearbyClients} />
                 </>
