@@ -497,19 +497,6 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
               </div>
             </div>
 
-            {/* Logo do Usuário */}
-            {logoUrl && (
-              <div className="relative group">
-                <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-2xl blur opacity-40 group-hover:opacity-60 transition duration-300"></div>
-                <div className="relative w-28 h-28 bg-white rounded-2xl shadow-xl flex items-center justify-center p-3 border-2 border-gray-100">
-                  <img 
-                    src={logoUrl} 
-                    alt="Logo da Empresa" 
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              </div>
-            )}
           </div>
           <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${enderecoMatriz ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
             <Home className={`w-5 h-5 ${enderecoMatriz ? 'text-green-600' : 'text-yellow-600'}`} />
