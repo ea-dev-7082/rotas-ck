@@ -480,9 +480,17 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <Route className="w-8 h-8 text-white" />
-              </div>
+              {logoUrl ? (
+                <img 
+                  src={logoUrl} 
+                  alt="Logo" 
+                  className="w-12 h-12 rounded-xl shadow-lg object-contain"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <Route className="w-8 h-8 text-white" />
+                </div>
+              )}
               <div>
                 <h1 className="text-4xl font-bold text-gray-900">
                   Otimizador de Rotas
@@ -492,15 +500,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
                 </p>
               </div>
             </div>
-            {logoUrl && (
-              <div className="hidden md:block">
-                <img 
-                  src={logoUrl} 
-                  alt="Logo" 
-                  className="w-[300px] h-[120px] object-contain"
-                />
-              </div>
-            )}
+
           </div>
           <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${enderecoMatriz ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
             <Home className={`w-5 h-5 ${enderecoMatriz ? 'text-green-600' : 'text-yellow-600'}`} />
