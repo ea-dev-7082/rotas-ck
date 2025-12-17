@@ -173,23 +173,6 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
       printWindow.close();
     }, 250);
 
-    // Salvar relatório ao imprimir
-    if (onSaveRelatorio) {
-      onSaveRelatorio({
-        data_impressao: new Date().toISOString(),
-        motorista_nome: motoristaData?.nome || null,
-        motorista_telefone: motoristaData?.telefone || null,
-        veiculo_descricao: veiculoData?.descricao || null,
-        veiculo_placa: veiculoData?.placa || null,
-        endereco_matriz: pontoPartida?.endereco || null,
-        total_entregas: route ? route.length - 2 : 0,
-        distancia_km: stats?.distance || null,
-        tempo_minutos: stats?.time || null,
-        rota: route || [],
-        notas_fiscais: notasFiscais || {},
-        responsavel_expedicao: expedidor || null,
-      });
-    }
   };
 
   const today = new Date().toLocaleDateString('pt-BR');
@@ -302,6 +285,32 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="outline" onClick={onClose}>
               Fechar
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => {
+                if (onSaveRelatorio) {
+                  onSaveRelatorio({
+                    data_impressao: new Date().toISOString(),
+                    motorista_nome: motoristaData?.nome || null,
+                    motorista_telefone: motoristaData?.telefone || null,
+                    veiculo_descricao: veiculoData?.descricao || null,
+                    veiculo_placa: veiculoData?.placa || null,
+                    endereco_matriz: pontoPartida?.endereco || null,
+                    total_entregas: route ? route.length - 2 : 0,
+                    distancia_km: stats?.distance || null,
+                    tempo_minutos: stats?.time || null,
+                    rota: route || [],
+                    notas_fiscais: notasFiscais || {},
+                    responsavel_expedicao: expedidor || null,
+                  });
+                }
+                onClose();
+              }}
+              className="border-green-500 text-green-600 hover:bg-green-50"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Salvar Relatório
             </Button>
             <Button onClick={handlePrint} className="bg-black hover:bg-gray-800 text-white">
               <Printer className="w-4 h-4 mr-2" />
