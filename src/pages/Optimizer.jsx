@@ -529,9 +529,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
               </div>
             </div>
 
-            {/* Logo do Usuário - alinhado com o mapa */}
-            <div className="flex justify-end">
-              <label className="relative w-52 h-28 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden shadow-lg cursor-pointer group">
+            {/* Logo do Usuário - centralizado verticalmente */}
+            <label className="relative w-52 h-28 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden shadow-lg cursor-pointer group">
                 {logoUrl ? (
                   <img 
                     src={logoUrl} 
