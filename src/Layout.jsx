@@ -34,7 +34,7 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <img 
-                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/250c13318_image.png" 
+                src={LOGO_URL} 
                 alt="Logo" 
                 className="w-12 h-12 object-contain"
               />
