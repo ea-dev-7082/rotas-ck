@@ -388,7 +388,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           address: PONTO_PARTIDA.endereco,
           latitude: matrizGeocodificada.latitude,
           longitude: matrizGeocodificada.longitude,
-          estimated_arrival: formatTime(currentTime)
+          estimated_arrival: formatTime(currentTime + 20)
         };
 
         finalRoute = [matrizInicio, ...deliveryItems, matrizFim];
