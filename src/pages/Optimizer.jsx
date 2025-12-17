@@ -480,9 +480,11 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <Route className="w-8 h-8 text-white" />
-              </div>
+              <img 
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/250c13318_image.png" 
+                alt="Logo" 
+                className="w-16 h-16 object-contain"
+              />
               <div>
                 <h1 className="text-4xl font-bold text-gray-900">
                   Otimizador de Rotas
