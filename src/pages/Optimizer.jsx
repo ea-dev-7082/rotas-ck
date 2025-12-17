@@ -492,7 +492,15 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
                 </p>
               </div>
             </div>
-
+            {logoUrl && (
+              <div className="hidden md:block">
+                <img 
+                  src={logoUrl} 
+                  alt="Logo" 
+                  className="w-[300px] h-[120px] object-contain"
+                />
+              </div>
+            )}
           </div>
           <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${enderecoMatriz ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
             <Home className={`w-5 h-5 ${enderecoMatriz ? 'text-green-600' : 'text-yellow-600'}`} />
