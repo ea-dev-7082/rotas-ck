@@ -31,22 +31,18 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
   };
 
   const totalVolumesGeral = calcularVolumeTotal();
+  const previsaoVolta = route && route.length > 0 ? route[route.length - 1].estimated_arrival : '-';
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     
-    // Gerar linhas da tabela para a impressão
+    // Gerar linhas da tabela
     const tableRows = route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
         const clientNotas = notasFiscais?.[point.client_name] || [];
-        
-        // Formata os números das NFs com quebra de linha se houver muitas
         const notasString = clientNotas.map(n => n.numero).join('<br/>');
-        
-        // --- CORREÇÃO 1: Adicionado { timeZone: 'UTC' } ---
         const datasString = clientNotas.map(n => 
             n.data ? new Date(n.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-'
         ).join('<br/>');
-        
         const volCliente = clientNotas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
         
         return `
@@ -72,7 +68,6 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             @page { size: A4; margin: 10mm; }
             body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: #000; -webkit-print-color-adjust: exact; }
             
-            /* Estrutura */
             .container { width: 100%; max-width: 100%; }
             .header-box { border: 1px solid #000; padding: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
             .company-info h1 { font-size: 18px; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 1px; }
@@ -80,23 +75,20 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             .doc-info { text-align: right; }
             .doc-title { font-size: 14px; font-weight: bold; border: 1px solid #000; padding: 5px 10px; display: inline-block; background: #eee; }
             
-            /* Grids de Informação */
+            /* VOLTA PARA 4 COLUNAS */
             .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; border: 1px solid #000; padding: 10px; }
             .info-item { display: flex; flex-direction: column; }
             .label { font-size: 9px; text-transform: uppercase; color: #555; font-weight: bold; margin-bottom: 2px; }
             .value { font-size: 11px; font-weight: normal; border-bottom: 1px dotted #ccc; padding-bottom: 2px; }
 
-            /* Tabela Principal */
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; }
             th { border: 1px solid #000; background-color: #eee; padding: 6px; text-align: center; text-transform: uppercase; font-size: 9px; }
-            /* Alinhamento específico para a coluna de cliente */
             th:nth-child(2) { text-align: left; } 
             td { border: 1px solid #000; padding: 6px; vertical-align: middle; }
             
             .client-name { font-weight: bold; font-size: 11px; }
             .client-address { font-size: 9px; color: #444; margin-top: 2px; }
 
-            /* Rodapé e Assinaturas */
             .footer-stats { margin-bottom: 30px; border: 1px solid #000; background: #f9f9f9; padding: 10px; display: flex; justify-content: space-around; font-weight: bold; font-size: 12px; }
             
             .signatures { display: flex; justify-content: space-between; margin-top: 50px; }
@@ -156,7 +148,8 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             <div class="footer-stats">
                <span>Distância Total: ${stats?.distance?.toFixed(1) || 0} km</span>
                <span>Tempo Est.: ${stats?.time ? `${Math.floor(stats.time / 60)}h ${stats.time % 60}min` : '-'}</span>
-               <span>TOTAL VOLUMES: ${totalVolumesGeral}</span>
+               <span>Previsão Volta: ${previsaoVolta}</span>
+               <span style="border-left: 1px solid #ccc; padding-left: 15px;">TOTAL VOLUMES: ${totalVolumesGeral}</span>
             </div>
 
             <div class="signatures">
@@ -208,7 +201,6 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
           {/* Preview Visual na Tela */}
           <div className="border border-gray-300 bg-white p-6 shadow-sm min-h-[400px]" ref={printRef}>
             
-            {/* Cabeçalho Preview */}
             <div className="flex justify-between border-b-2 border-black pb-4 mb-6">
                 <div>
                     <h1 className="text-xl font-bold uppercase tracking-wider">Romaneio de Carga</h1>
@@ -220,7 +212,7 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                 </div>
             </div>
 
-            {/* Grid Info Preview */}
+            {/* Grid Info Preview - 4 Colunas */}
             <div className="grid grid-cols-4 gap-4 mb-6 text-sm border p-4 bg-gray-50">
                 <div>
                     <span className="block text-xs font-bold text-gray-500 uppercase">Motorista</span>
@@ -268,7 +260,6 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                              {clientNotas.map(n => n.numero).join(', ') || '-'}
                         </div>
                         <div className="col-span-2 text-center text-[10px]">
-                            {/* --- CORREÇÃO 2: Adicionado { timeZone: 'UTC' } --- */}
                              {clientNotas.map(n => n.data ? new Date(n.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-').join(', ') || '-'}
                         </div>
                         <div className="col-span-1 text-center text-[10px]">{point.estimated_arrival}</div>
@@ -276,11 +267,16 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                 )})}
             </div>
 
-            {/* Footer Preview */}
+            {/* Footer Preview Atualizado */}
             <div className="mt-8 p-4 border border-black bg-gray-50 flex justify-between text-xs font-bold items-center">
-                 <div>Distância: {stats?.distance?.toFixed(1)} km</div>
+                 <div className="flex gap-4 items-center">
+                    <span>Distância: {stats?.distance?.toFixed(1)} km</span>
+                    <span className="text-gray-400">|</span>
+                    <span>Tempo: {stats?.time ? `${Math.floor(stats.time / 60)}h ${stats.time % 60}min` : '-'}</span>
+                    <span className="text-gray-400">|</span>
+                    <span className="text-blue-800">Volta: {previsaoVolta}</span>
+                 </div>
                  <div className="text-sm border px-4 py-1 bg-white">TOTAL VOLUMES: {totalVolumesGeral}</div>
-                 <div>Assinaturas: ___________________</div>
             </div>
 
           </div>
