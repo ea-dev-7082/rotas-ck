@@ -125,23 +125,6 @@ export default function Configuracoes() {
     },
   });
 
-  const handleLogoUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    setIsUploadingLogo(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setLogoUrl(file_url);
-      saveConfigMutation.mutate({ chave: "logo_url", valor: file_url });
-    } catch (error) {
-      console.error("Erro ao fazer upload do logo:", error);
-      alert("Erro ao fazer upload da imagem.");
-    } finally {
-      setIsUploadingLogo(false);
-    }
-  };
-
   const createMotoristaMutation = useMutation({
     mutationFn: (data) => base44.entities.Motorista.create({ ...data, owner: currentUser?.email }),
     onSuccess: () => {
