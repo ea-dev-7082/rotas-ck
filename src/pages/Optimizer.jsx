@@ -82,6 +82,33 @@ export default function Optimizer() {
   const selectedVeiculoData = veiculos.find(v => v.id === selectedVeiculo);
   const selectedMotoristaData = motoristas.find(m => m.id === selectedMotorista);
 
+  // Upload de Logo
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      
+      // Salvar URL da logo nas configurações
+      const existing = configs.find(c => c.chave === "logo_url");
+      if (existing) {
+        await base44.entities.Configuracao.update(existing.id, { valor: file_url });
+      } else {
+        await base44.entities.Configuracao.create({ 
+          chave: "logo_url", 
+          valor: file_url, 
+          owner: currentUser?.email 
+        });
+      }
+      
+      // Recarregar página para atualizar logo
+      window.location.reload();
+    } catch (error) {
+      console.error("Erro ao fazer upload da logo:", error);
+    }
+  };
+
   // --- HELPERS (CÁLCULOS) ---
   const calcularDistancia = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
