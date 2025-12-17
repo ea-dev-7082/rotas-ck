@@ -1,10 +1,27 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Route, Users, Settings } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  const { data: configs } = useQuery({
+    queryKey: ["configuracoes-layout", currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Configuracao.filter({ owner: currentUser.email }) : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
+
+  const logoUrl = configs.find(c => c.chave === "logo_url")?.valor || 
+    "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/23059fc58_image.png";
 
   const navigationItems = [
     {
@@ -32,9 +49,9 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <img 
-                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/23059fc58_image.png" 
+                src={logoUrl} 
                 alt="Logo" 
-                className="w-10 h-10 rounded-xl shadow-lg object-contain"
+                className="w-12 h-12 rounded-xl shadow-lg object-contain"
               />
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
