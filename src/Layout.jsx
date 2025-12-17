@@ -1,12 +1,32 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Route, Users, Settings } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
-const LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/23059fc58_image.png";
+const DEFAULT_LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/23059fc58_image.png";
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
+  const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
+
+  useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const user = await base44.auth.me();
+        if (user) {
+          const configs = await base44.entities.Configuracao.filter({ owner: user.email });
+          const logoConfig = configs.find(c => c.chave === "logo_url");
+          if (logoConfig?.valor) {
+            setLogoUrl(logoConfig.valor);
+          }
+        }
+      } catch (error) {
+        // Usa logo padrão se houver erro
+      }
+    };
+    loadLogo();
+  }, []);
 
   const navigationItems = [
     {
