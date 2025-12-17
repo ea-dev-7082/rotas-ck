@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Printer, FileText } from "lucide-react";
 
-export default function PrintModal({ open, onClose, route, stats, pontoPartida, notasFiscais, responsavelExpedicao, veiculoData, motoristaData }) {
+export default function PrintModal({ open, onClose, route, stats, pontoPartida, notasFiscais, responsavelExpedicao, veiculoData, motoristaData, onSaveRelatorio }) {
   const [expedidor, setExpedidor] = useState(responsavelExpedicao || "");
   const printRef = useRef();
 
