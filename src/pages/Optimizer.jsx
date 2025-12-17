@@ -504,7 +504,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
 
             {/* Logo do Usuário - alinhado com o mapa */}
             <div className="flex justify-center">
-              <div className="w-44 h-24 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden shadow-lg">
+              <label className="relative w-52 h-28 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden shadow-lg cursor-pointer group">
                 {logoUrl ? (
                   <img 
                     src={logoUrl} 
@@ -516,7 +516,18 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
                     <p className="text-sm font-medium">SUA LOGO</p>
                   </div>
                 )}
-              </div>
+                {/* Overlay de edição */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                  <Edit className="w-6 h-6 text-white" />
+                  <span className="text-white text-xs font-medium">Alterar Logo</span>
+                </div>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleLogoUpload}
+                />
+              </label>
             </div>
           </div>
           <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${enderecoMatriz ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
