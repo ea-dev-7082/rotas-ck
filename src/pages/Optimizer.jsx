@@ -503,16 +503,16 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
             </div>
 
             {/* Logo do Usuário */}
-            <div className="w-40 h-24 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden">
+            <div className="w-48 h-28 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden shadow-lg">
               {logoUrl ? (
                 <img 
                   src={logoUrl} 
                   alt="Logo da Empresa" 
-                  className="w-full h-full object-contain p-2"
+                  className="w-full h-full object-contain p-3"
                 />
               ) : (
                 <div className="text-center text-gray-400 p-2">
-                  <p className="text-xs">SUA LOGO</p>
+                  <p className="text-sm font-medium">SUA LOGO</p>
                 </div>
               )}
             </div>
