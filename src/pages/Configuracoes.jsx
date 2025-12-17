@@ -121,9 +121,6 @@ export default function Configuracoes() {
       } else if (variables.chave === "endereco_matriz") {
         setMatrizSaved(true);
         setTimeout(() => setMatrizSaved(false), 3000);
-      } else if (variables.chave === "logo_url") {
-        setLogoSaved(true);
-        setTimeout(() => setLogoSaved(false), 3000);
       }
     },
   });
