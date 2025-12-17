@@ -29,6 +29,9 @@ import {
   Home,
   Car,
   Bike,
+  Image,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -38,6 +41,9 @@ export default function Configuracoes() {
   const [tokenSaved, setTokenSaved] = useState(false);
   const [enderecoMatriz, setEnderecoMatriz] = useState("");
   const [matrizSaved, setMatrizSaved] = useState(false);
+  const [logoUrl, setLogoUrl] = useState("");
+  const [logoSaved, setLogoSaved] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [showMotoristaDialog, setShowMotoristaDialog] = useState(false);
   const [editingMotorista, setEditingMotorista] = useState(null);
   const [motoristaForm, setMotoristaForm] = useState({
@@ -97,6 +103,10 @@ export default function Configuracoes() {
     if (matrizConfig) {
       setEnderecoMatriz(matrizConfig.valor);
     }
+    const logoConfig = configs.find((c) => c.chave === "logo_url");
+    if (logoConfig) {
+      setLogoUrl(logoConfig.valor);
+    }
   }, [configs]);
 
   // Mutations
@@ -116,9 +126,29 @@ export default function Configuracoes() {
       } else if (variables.chave === "endereco_matriz") {
         setMatrizSaved(true);
         setTimeout(() => setMatrizSaved(false), 3000);
+      } else if (variables.chave === "logo_url") {
+        setLogoSaved(true);
+        setTimeout(() => setLogoSaved(false), 3000);
       }
     },
   });
+
+  const handleLogoUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    setIsUploadingLogo(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setLogoUrl(file_url);
+      saveConfigMutation.mutate({ chave: "logo_url", valor: file_url });
+    } catch (error) {
+      console.error("Erro ao fazer upload do logo:", error);
+      alert("Erro ao fazer upload da imagem.");
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
 
   const createMotoristaMutation = useMutation({
     mutationFn: (data) => base44.entities.Motorista.create({ ...data, owner: currentUser?.email }),
@@ -327,6 +357,74 @@ export default function Configuracoes() {
                         mapbox.com
                       </a>
                     </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Logo da Empresa */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+          >
+            <Card className="bg-white shadow-xl">
+              <CardHeader className="border-b border-gray-100">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Image className="w-5 h-5 text-purple-600" />
+                  Logo da Empresa
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-6">
+                  {/* Preview do Logo */}
+                  <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50">
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                    ) : (
+                      <Image className="w-10 h-10 text-gray-300" />
+                    )}
+                  </div>
+                  
+                  {/* Botão de Upload */}
+                  <div className="flex-1 space-y-3">
+                    <p className="text-sm text-gray-600">
+                      Faça upload do logo da sua empresa. Será exibido no cabeçalho do sistema.
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                        id="logo-upload"
+                      />
+                      <label htmlFor="logo-upload">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="cursor-pointer"
+                          disabled={isUploadingLogo}
+                          asChild
+                        >
+                          <span>
+                            {isUploadingLogo ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Upload className="w-4 h-4 mr-2" />
+                            )}
+                            {isUploadingLogo ? "Enviando..." : "Enviar Logo"}
+                          </span>
+                        </Button>
+                      </label>
+                      {logoSaved && (
+                        <Badge className="bg-green-100 text-green-700 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Salvo!
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>

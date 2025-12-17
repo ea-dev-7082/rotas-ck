@@ -31,9 +31,11 @@ export default function Layout({ children, currentPageName }) {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Route className="w-5 h-5 text-white" />
-              </div>
+              <img 
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/23059fc58_image.png" 
+                alt="Logo" 
+                className="w-10 h-10 rounded-xl shadow-lg object-contain"
+              />
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
                   Sistema de Rotas
