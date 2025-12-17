@@ -101,10 +101,7 @@ export default function Configuracoes() {
     if (matrizConfig) {
       setEnderecoMatriz(matrizConfig.valor);
     }
-    const logoConfig = configs.find((c) => c.chave === "logo_url");
-    if (logoConfig) {
-      setLogoUrl(logoConfig.valor);
-    }
+
   }, [configs]);
 
   // Mutations
