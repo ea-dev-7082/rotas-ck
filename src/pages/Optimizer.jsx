@@ -497,7 +497,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
                 <img 
                   src={logoUrl} 
                   alt="Logo" 
-                  className="max-w-[200px] max-h-[80px] object-contain"
+                  className="w-[300px] h-[120px] object-contain"
                 />
               </div>
             )}
