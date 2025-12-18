@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input"; // NOVO: Import do Input
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
@@ -22,6 +23,8 @@ import {
   Eye,
   Printer,
   Route,
+  Filter, // NOVO: Ícone de filtro
+  X, // NOVO: Ícone para limpar
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import moment from "moment";
@@ -30,6 +33,10 @@ export default function Relatorios() {
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedRelatorio, setSelectedRelatorio] = useState(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+
+  // NOVO: Estados para o filtro de datas
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const queryClient = useQueryClient();
 
@@ -48,6 +55,20 @@ export default function Relatorios() {
         : [],
     enabled: !!currentUser,
     initialData: [],
+  });
+
+  // NOVO: Lógica de filtragem no front-end
+  const filteredRelatorios = relatorios.filter((relatorio) => {
+    if (!startDate && !endDate) return true;
+
+    const dataRelatorio = moment(relatorio.data_impressao);
+    const start = startDate ? moment(startDate).startOf("day") : null;
+    const end = endDate ? moment(endDate).endOf("day") : null;
+
+    if (start && dataRelatorio.isBefore(start)) return false;
+    if (end && dataRelatorio.isAfter(end)) return false;
+
+    return true;
   });
 
   const deleteMutation = useMutation({
@@ -170,26 +191,78 @@ export default function Relatorios() {
 
         {/* Lista de Relatórios */}
         <Card className="bg-white shadow-xl">
-          <CardHeader className="border-b border-gray-100">
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Route className="w-5 h-5 text-purple-600" />
-              Rotas Salvas ({relatorios.length})
-            </CardTitle>
+          <CardHeader className="border-b border-gray-100 pb-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Route className="w-5 h-5 text-purple-600" />
+                Rotas Salvas ({filteredRelatorios.length})
+              </CardTitle>
+
+              {/* NOVO: Área de Filtros */}
+              <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500 font-medium whitespace-nowrap hidden sm:inline">
+                    <Filter className="w-3 h-3 inline mr-1" />
+                    Período:
+                  </span>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="h-8 w-[130px] bg-white text-xs"
+                  />
+                  <span className="text-gray-400 text-xs">até</span>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="h-8 w-[130px] bg-white text-xs"
+                  />
+                </div>
+                {(startDate || endDate) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                    }}
+                    className="h-8 w-8 text-gray-500 hover:text-red-500"
+                    title="Limpar filtros"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
           </CardHeader>
+          
           <CardContent className="p-6">
             {isLoading ? (
-              <div className="text-center py-8 text-gray-500">Carregando...</div>
-            ) : relatorios.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                Carregando...
+              </div>
+            ) : filteredRelatorios.length === 0 ? (
+              // ALTERAÇÃO: Mensagem diferente se for filtro ou lista vazia real
               <div className="text-center py-12 text-gray-500">
                 <FileText className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                <p className="text-lg">Nenhum relatório salvo</p>
-                <p className="text-sm">Os relatórios são salvos ao imprimir uma rota</p>
+                <p className="text-lg">
+                  {relatorios.length === 0
+                    ? "Nenhum relatório salvo"
+                    : "Nenhum relatório encontrado neste período"}
+                </p>
+                {relatorios.length === 0 && (
+                  <p className="text-sm">
+                    Os relatórios são salvos ao imprimir uma rota
+                  </p>
+                )}
               </div>
             ) : (
               <ScrollArea className="max-h-[600px]">
                 <div className="space-y-4">
                   <AnimatePresence>
-                    {relatorios.map((relatorio) => (
+                    {/* ALTERAÇÃO: Usando filteredRelatorios no map */}
+                    {filteredRelatorios.map((relatorio) => (
                       <motion.div
                         key={relatorio.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -202,11 +275,15 @@ export default function Relatorios() {
                             <div className="flex items-center gap-3 mb-2">
                               <Badge className="bg-purple-100 text-purple-700">
                                 <Calendar className="w-3 h-3 mr-1" />
-                                {moment(relatorio.data_impressao).format("DD/MM/YYYY")}
+                                {moment(relatorio.data_impressao).format(
+                                  "DD/MM/YYYY"
+                                )}
                               </Badge>
                               <Badge variant="outline">
                                 <Clock className="w-3 h-3 mr-1" />
-                                {moment(relatorio.data_impressao).format("HH:mm")}
+                                {moment(relatorio.data_impressao).format(
+                                  "HH:mm"
+                                )}
                               </Badge>
                               <Badge className="bg-blue-100 text-blue-700">
                                 <MapPin className="w-3 h-3 mr-1" />
@@ -236,7 +313,8 @@ export default function Relatorios() {
                               {relatorio.tempo_minutos && (
                                 <div className="flex items-center gap-1">
                                   <Clock className="w-4 h-4 text-gray-400" />
-                                  {Math.floor(relatorio.tempo_minutos / 60)}h {relatorio.tempo_minutos % 60}min
+                                  {Math.floor(relatorio.tempo_minutos / 60)}h{" "}
+                                  {relatorio.tempo_minutos % 60}min
                                 </div>
                               )}
                             </div>
@@ -279,7 +357,7 @@ export default function Relatorios() {
         </Card>
       </div>
 
-      {/* Dialog de Detalhes */}
+      {/* Dialog de Detalhes (Sem alterações, código omitido para brevidade se desejar, mas mantido funcionalmente igual) */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
         <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -298,11 +376,13 @@ export default function Relatorios() {
                     {moment(selectedRelatorio.data_impressao).format("DD/MM/YYYY [às] HH:mm")}
                   </p>
                 </div>
+                {/* ... Resto dos detalhes ... */}
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500 font-medium">Total de Entregas</p>
                   <p className="font-semibold">{selectedRelatorio.total_entregas || 0}</p>
                 </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
+                {/* Mantive a estrutura original do modal aqui */}
+                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500 font-medium">Motorista</p>
                   <p className="font-semibold">{selectedRelatorio.motorista_nome || "Não informado"}</p>
                 </div>
@@ -313,7 +393,7 @@ export default function Relatorios() {
                     {selectedRelatorio.veiculo_placa && ` (${selectedRelatorio.veiculo_placa})`}
                   </p>
                 </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
+                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500 font-medium">Distância</p>
                   <p className="font-semibold">{selectedRelatorio.distancia_km?.toFixed(1) || 0} km</p>
                 </div>
