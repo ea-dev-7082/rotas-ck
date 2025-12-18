@@ -69,13 +69,16 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: #000; -webkit-print-color-adjust: exact; }
             
             .container { width: 100%; max-width: 100%; }
-            .header-box { border: 1px solid #000; padding: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-            .company-info h1 { font-size: 18px; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 1px; }
-            .company-info p { margin: 0; font-size: 10px; color: #333; }
+            
+            /* Header: align-items alterado para flex-start para subir o texto */
+            .header-box { border: 1px solid #000; padding: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; }
+            
+            .company-info h1 { font-size: 16px; text-transform: uppercase; margin: 0 0 3px 0; letter-spacing: 1px; line-height: 1; }
+            .company-info p { margin: 0; font-size: 10px; color: #333; text-transform: uppercase; line-height: 1.3; }
+            
             .doc-info { text-align: right; }
             .doc-title { font-size: 14px; font-weight: bold; border: 1px solid #000; padding: 5px 10px; display: inline-block; background: #eee; }
             
-            /* VOLTA PARA 4 COLUNAS */
             .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; border: 1px solid #000; padding: 10px; }
             .info-item { display: flex; flex-direction: column; }
             .label { font-size: 9px; text-transform: uppercase; color: #555; font-weight: bold; margin-bottom: 2px; }
@@ -91,7 +94,7 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
 
             .footer-stats { margin-bottom: 30px; border: 1px solid #000; background: #f9f9f9; padding: 10px; display: flex; justify-content: space-around; font-weight: bold; font-size: 12px; }
             
-            .signatures { display: flex; justify-content: space-between; margin-top: 50px; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 80px; }
             .sig-box { width: 40%; text-align: center; }
             .sig-line { border-top: 1px solid #000; padding-top: 5px; font-size: 10px; text-transform: uppercase; }
           </style>
@@ -102,7 +105,8 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
             <div class="header-box">
               <div class="company-info">
                 <h1>${nomeEmpresa || 'Nome da Empresa'}</h1>
-                <p style="font-size: 9px;">Controle de Operações Logísticas</p>
+                <p style="font-weight: bold; color: #000;">Logística & Distribuição</p>
+                <p>Controle de Operações Logísticas</p>
               </div>
               <div class="doc-info">
                 <div class="doc-title">ROMANEIO DE CARGA</div>
@@ -202,18 +206,21 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
           {/* Preview Visual na Tela */}
           <div className="border border-gray-300 bg-white p-6 shadow-sm min-h-[400px]" ref={printRef}>
             
-            <div className="flex justify-between border-b-2 border-black pb-4 mb-6">
-                <div>
-                    <h1 className="text-xl font-bold uppercase tracking-wider">Romaneio de Carga</h1>
-                    <p className="text-xs text-gray-500">{nomeEmpresa || 'Nome da Empresa'}</p>
+            {/* Header Preview - alterado items-center para items-start */}
+            <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
+                <div className="space-y-0.5">
+                    <h1 className="text-lg font-bold uppercase tracking-wider leading-none">{nomeEmpresa || 'NOME DA EMPRESA'}</h1>
+                    <p className="text-xs font-bold uppercase text-black leading-tight">Logística & Distribuição</p>
+                    <p className="text-[10px] text-gray-500 uppercase leading-tight">Controle de Operações Logísticas</p>
                 </div>
                 <div className="text-right">
+                    <div className="text-lg font-bold uppercase">ROMANEIO DE CARGA</div>
                     <div className="text-sm font-bold">{today}</div>
                     <div className="text-xs text-gray-500">Emissão Digital</div>
                 </div>
             </div>
 
-            {/* Grid Info Preview - 4 Colunas */}
+            {/* Grid Info Preview */}
             <div className="grid grid-cols-4 gap-4 mb-6 text-sm border p-4 bg-gray-50">
                 <div>
                     <span className="block text-xs font-bold text-gray-500 uppercase">Motorista</span>
@@ -268,7 +275,7 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                 )})}
             </div>
 
-            {/* Footer Preview Atualizado */}
+            {/* Footer Preview */}
             <div className="mt-8 p-4 border border-black bg-gray-50 flex justify-between text-xs font-bold items-center">
                  <div className="flex gap-4 items-center">
                     <span>Distância: {stats?.distance?.toFixed(1)} km</span>
