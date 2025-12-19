@@ -378,6 +378,9 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
 
         let currentTime = parseTime(startTime);
         
+        const TRAFFIC_BUFFER = 1.25; // +25% margem de segurança
+        const SERVICE_TIME = 15;    // 15 min por entrega
+
         const matrizInicio = {
           order: 1,
           client_name: PONTO_PARTIDA.nome,
@@ -389,12 +392,11 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
 
         let currentOrder = 2;
         const allDeliveries = [...beforePriority, ...ordenadosPorProximidade];
-        
+
         const deliveryItems = allDeliveries.map((item, idx) => {
-          if (legs[idx]) currentTime += legs[idx].duration / 60;
-          // Adiciona 20 minutos de margem ao horário exibido
-          const arrivalTime = formatTime(currentTime + 20);
-          currentTime += 15;
+          if (legs[idx]) currentTime += (legs[idx].duration / 60) * TRAFFIC_BUFFER;
+          const arrivalTime = formatTime(currentTime);
+          currentTime += SERVICE_TIME;
 
           // AQUI: Recupera a coordenada do Dicionário Mestre para o estado final
           const coords = getSafeCoords(item.client_name);
@@ -408,7 +410,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           };
         });
 
-        if (legs[legs.length - 1]) currentTime += legs[legs.length - 1].duration / 60;
+        if (legs[legs.length - 1]) currentTime += (legs[legs.length - 1].duration / 60) * TRAFFIC_BUFFER;
 
         const matrizFim = {
           order: currentOrder,
@@ -416,7 +418,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           address: PONTO_PARTIDA.endereco,
           latitude: matrizGeocodificada.latitude,
           longitude: matrizGeocodificada.longitude,
-          estimated_arrival: formatTime(currentTime + 20)
+          estimated_arrival: formatTime(currentTime)
         };
 
         finalRoute = [matrizInicio, ...deliveryItems, matrizFim];
@@ -478,7 +480,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       // Tenta achar coordenada no cache ou usa do item
       const geocoded = geocodedClients.find(g => g.nome?.trim() === item.client_name?.trim()) || item;
       
-      if (idx > 0) currentTime += 25; else currentTime += 10;
+      // Tempo médio entre entregas (incluindo deslocamento e parada)
+    if (idx > 0) currentTime += 20; else currentTime += 10;
 
       route.push({
         order: currentOrder++,

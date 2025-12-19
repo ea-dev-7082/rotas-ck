@@ -9,24 +9,7 @@ import { motion } from "framer-motion";
 export default function DraggableRouteList({ route, onReorder, onPrint, notasFiscais, onOpenNotaFiscal, onRefreshTimes }) {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
-  // --- NOVA FUNÇÃO AUXILIAR ---
-  const calcularHorarioComAdicional = (horarioString) => {
-    if (!horarioString) return "";
-    
-    // Divide "14:30" em horas e minutos
-    const [horas, minutos] = horarioString.split(':').map(Number);
-    
-    const data = new Date();
-    data.setHours(horas);
-    data.setMinutes(minutos + 20); // Adiciona os 20 minutos aqui
-    
-    // Retorna formatado como HH:MM
-    return data.toLocaleTimeString('pt-BR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
-  // -----------------------------
+
 
   if (!route || route.length === 0) return null;
 
@@ -88,8 +71,7 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
           {!isFirst && point.estimated_arrival && (
             <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
               <Clock className="w-4 h-4" />
-              {/* AQUI: Aplicando a função no Card da Matriz (Retorno) */}
-              <span>Chegada prevista: {calcularHorarioComAdicional(point.estimated_arrival)}</span>
+              <span>Chegada prevista: {point.estimated_arrival}</span>
             </div>
           )}
           
@@ -192,8 +174,7 @@ export default function DraggableRouteList({ route, onReorder, onPrint, notasFis
                                 {point.estimated_arrival && (
                                   <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
                                     <Clock className="w-4 h-4" />
-                                    {/* AQUI: Aplicando a função nos Cards de Entrega */}
-                                    <span>Chegada prevista: {calcularHorarioComAdicional(point.estimated_arrival)}</span>
+                                    <span>Chegada prevista: {point.estimated_arrival}</span>
                                   </div>
                                 )}
                                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
