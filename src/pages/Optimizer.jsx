@@ -515,46 +515,18 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
-                <Route className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Otimizador de Rotas
-                </h1>
-                <p className="text-gray-500">
-                  Selecione os clientes e planeje as entregas do dia
-                </p>
-              </div>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+              <Route className="w-6 h-6 text-white" />
             </div>
-
-            {/* Logo do Usuário - centralizado verticalmente */}
-            <label className="relative w-52 h-28 bg-gray-700 rounded-xl flex items-center justify-center overflow-hidden shadow-lg cursor-pointer group mt-6">
-                {logoUrl ? (
-                  <img 
-                    src={logoUrl} 
-                    alt="Logo da Empresa" 
-                    className="w-full h-full object-contain p-3"
-                  />
-                ) : (
-                  <div className="text-center text-gray-400 p-2">
-                    <p className="text-sm font-medium">SUA LOGO</p>
-                  </div>
-                )}
-                {/* Overlay de edição */}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
-                  <Edit className="w-6 h-6 text-white" />
-                  <span className="text-white text-xs font-medium">Alterar Logo</span>
-                </div>
-              <input 
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                onChange={handleLogoUpload}
-              />
-            </label>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Otimizador de Rotas
+              </h1>
+              <p className="text-gray-500">
+                Selecione os clientes e planeje as entregas do dia
+              </p>
+            </div>
           </div>
           <div className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${enderecoMatriz ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
             <Home className={`w-5 h-5 ${enderecoMatriz ? 'text-green-600' : 'text-yellow-600'}`} />
