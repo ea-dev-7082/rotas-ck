@@ -393,14 +393,11 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         const allDeliveries = [...beforePriority, ...ordenadosPorProximidade];
 
         const deliveryItems = allDeliveries.map((item, idx) => {
-          // Para a primeira entrega (idx=0), usa leg[0] (matriz -> primeira entrega)
-          // O array legs tem N-1 elementos onde N é o número de pontos
-          if (idx === 0 && legs[0]) {
-            // Tempo da matriz até primeira entrega
-            currentTime += Math.round((legs[0].duration * TRAFFIC_BUFFER) / 60);
-          } else if (idx > 0 && legs[idx]) {
-            // Tempo da entrega anterior até esta
-            currentTime += Math.round((legs[idx].duration * TRAFFIC_BUFFER) / 60);
+          // legs[idx] contém duração em segundos da API Mapbox
+          // Converte para minutos e aplica buffer de trânsito
+          if (legs[idx]) {
+            const legDurationMinutes = (legs[idx].duration || 0) / 60; // segundos -> minutos
+            currentTime += Math.round(legDurationMinutes * TRAFFIC_BUFFER);
           }
           
           const arrivalTime = formatTime(currentTime);
