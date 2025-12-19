@@ -415,9 +415,12 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
           };
         });
 
-        // Tempo de retorno à matriz (última leg)
-        const lastLegIdx = legs.length - 1;
-        if (legs[lastLegIdx]) currentTime += Math.round((legs[lastLegIdx].duration * TRAFFIC_BUFFER) / 60);
+        // Tempo de retorno à matriz (última leg) - já processado no loop acima para entregas
+        // A última leg do Mapbox é o retorno à matriz
+        if (legs.length > allDeliveries.length && legs[allDeliveries.length]) {
+          const returnDurationMinutes = (legs[allDeliveries.length].duration || 0) / 60;
+          currentTime += Math.round(returnDurationMinutes * TRAFFIC_BUFFER);
+        }
 
         const matrizFim = {
           order: currentOrder,
