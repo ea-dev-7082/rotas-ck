@@ -434,10 +434,14 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         finalRoute = [matrizInicio, ...deliveryItems, matrizFim];
 
         if (trip) {
+          // Calcula tempo total: tempo de direção com buffer + tempo de serviço por entrega
+          const totalDrivingTime = Math.round(((trip.duration || 0) * TRAFFIC_BUFFER) / 60);
+          const totalServiceTime = allDeliveries.length * SERVICE_TIME;
+          
           setStats(prev => ({
             ...prev,
             distance: (trip.distance || 0) / 1000,
-            time: Math.round((trip.duration || 0) / 60),
+            time: totalDrivingTime + totalServiceTime,
             routeGeometry: trip.geometry?.coordinates || []
           }));
         }
