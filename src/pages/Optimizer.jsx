@@ -16,7 +16,7 @@ import VehicleDriverSelector from "../components/optimizer/VehicleDriverSelector
 import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
 
 // --- SERVIÇOS (MAPBOX) ---
-import { geocodeMultiple, optimizeRoute, processOptimizationResult } from "../components/optimizer/mapboxService";
+import { geocodeMultiple, optimizeRoute, processOptimizationResult, TIME_CONFIG } from "../components/optimizer/mapboxService";
 
 const DEFAULT_MATRIZ = "Configure o endereço da matriz em Configurações";
 
@@ -378,8 +378,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
 
         let currentTime = parseTime(startTime);
         
-        const TRAFFIC_BUFFER = 1.25; // +25% margem de segurança
-        const SERVICE_TIME = 15;    // 15 min por entrega
+        const { TRAFFIC_BUFFER, SERVICE_TIME } = TIME_CONFIG;
 
         const matrizInicio = {
           order: 1,
@@ -481,7 +480,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       const geocoded = geocodedClients.find(g => g.nome?.trim() === item.client_name?.trim()) || item;
       
       // Tempo médio entre entregas (incluindo deslocamento e parada)
-    if (idx > 0) currentTime += 20; else currentTime += 10;
+    if (idx > 0) currentTime += TIME_CONFIG.SERVICE_TIME + 5; else currentTime += 10;
 
       route.push({
         order: currentOrder++,
