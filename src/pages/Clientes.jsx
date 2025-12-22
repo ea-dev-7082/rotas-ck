@@ -160,56 +160,81 @@ export default function Clientes() {
     return result;
   };
 
-  // Importação sequencial de clientes
+  // Função para processar arquivo XLSX
+  const parseXLSX = (data) => {
+    const workbook = XLSX.read(data, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+    
+    // Normaliza os nomes das colunas para lowercase
+    return jsonData.map(row => {
+      const normalized = {};
+      Object.keys(row).forEach(key => {
+        normalized[key.toLowerCase().trim()] = row[key];
+      });
+      return normalized;
+    });
+  };
+
+  // Importação sequencial de clientes (CSV ou XLSX)
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !currentUser) return;
 
     setIsImporting(true);
-    const reader = new FileReader();
 
-    reader.onload = async (e) => {
-      try {
-        const text = e.target.result;
-        const parsedData = parseCSV(text);
+    try {
+      let parsedData = [];
+      const fileExtension = file.name.split('.').pop().toLowerCase();
 
-        let importedCount = 0;
+      if (fileExtension === 'csv') {
+        // Leitura de CSV
+        const text = await file.text();
+        parsedData = parseCSV(text);
+      } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+        // Leitura de XLSX/XLS
+        const arrayBuffer = await file.arrayBuffer();
+        parsedData = parseXLSX(arrayBuffer);
+      } else {
+        throw new Error("Formato de arquivo não suportado");
+      }
 
-        for (const item of parsedData) {
-          if (!item.nome) continue;
+      let importedCount = 0;
 
-          try {
-            await base44.entities.Cliente.create({
-              nome: item.nome,
-              endereco: item.endereco || "",
-              telefone: item.telefone || "",
-              observacoes: item.observacoes || "",
-              endereco_entrega: item.endereco_entrega || "",
-              usar_endereco_entrega:
-                item.usar_endereco_entrega === "true" ||
-                item.usar_endereco_entrega === true,
-              owner: currentUser.email,
-            });
-            importedCount++;
-          } catch (err) {
-            console.error(`Erro ao importar ${item.nome}:`, err);
-          }
-        }
+      for (const item of parsedData) {
+        if (!item.nome) continue;
 
-        queryClient.invalidateQueries({ queryKey: ["clientes"] });
-        alert(`${importedCount} clientes importados com sucesso!`);
-      } catch (error) {
-        console.error("Erro ao importar CSV:", error);
-        alert("Erro ao processar o arquivo. Verifique o formato.");
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
+        try {
+          await base44.entities.Cliente.create({
+            nome: item.nome,
+            endereco: item.endereco || "",
+            telefone: item.telefone || "",
+            observacoes: item.observacoes || "",
+            endereco_entrega: item.endereco_entrega || "",
+            usar_endereco_entrega:
+              item.usar_endereco_entrega === "true" ||
+              item.usar_endereco_entrega === true ||
+              item.usar_endereco_entrega === "TRUE",
+            owner: currentUser.email,
+          });
+          importedCount++;
+        } catch (err) {
+          console.error(`Erro ao importar ${item.nome}:`, err);
         }
       }
-    };
 
-    reader.readAsText(file);
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      alert(`${importedCount} clientes importados com sucesso!`);
+    } catch (error) {
+      console.error("Erro ao importar arquivo:", error);
+      alert("Erro ao processar o arquivo. Verifique o formato.");
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   // Função para excluir todos os clientes do usuário atual
