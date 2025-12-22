@@ -229,7 +229,7 @@ export function processOptimizationResult(optimizationData, originalPoints, star
     route_geometry: routeGeometry,
     total_distance_km: (trip.distance || 0) / 1000,
     total_time_minutes: totalDrivingTime + totalServiceTime,
-    optimization_notes: `Rota otimizada com trânsito real (+25% margem). Inclui ${SERVICE_TIME} min de parada por entrega.`
+    optimization_notes: `Rota otimizada com trânsito real (+25% margem). Inclui 20 min de parada por entrega.`
   };
 }
 
