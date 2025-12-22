@@ -167,13 +167,23 @@ export default function Clientes() {
     const worksheet = workbook.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
     
-    // Normaliza os nomes das colunas para lowercase
+    // Normaliza os nomes das colunas para lowercase e mapeia colunas alternativas
     return jsonData.map(row => {
       const normalized = {};
       Object.keys(row).forEach(key => {
         normalized[key.toLowerCase().trim()] = row[key];
       });
-      return normalized;
+      
+      // Mapeia colunas alternativas (COD_CLI, CLIENTE, ENDERECO)
+      return {
+        nome: normalized.nome || normalized.cliente || "",
+        endereco: normalized.endereco || "",
+        telefone: normalized.telefone || "",
+        observacoes: normalized.observacoes || "",
+        endereco_entrega: normalized.endereco_entrega || "",
+        usar_endereco_entrega: normalized.usar_endereco_entrega || false,
+        cod_cli: normalized.cod_cli || "",
+      };
     });
   };
 
