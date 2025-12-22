@@ -1,14 +1,16 @@
-import Optimizer from './pages/Optimizer';
 import Clientes from './pages/Clientes';
 import Configuracoes from './pages/Configuracoes';
+import Home from './pages/Home';
+import Optimizer from './pages/Optimizer';
 import Relatorios from './pages/Relatorios';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "Optimizer": Optimizer,
     "Clientes": Clientes,
     "Configuracoes": Configuracoes,
+    "Home": Home,
+    "Optimizer": Optimizer,
     "Relatorios": Relatorios,
 }
 
