@@ -124,7 +124,7 @@ export async function getDirections(coordinates, mapboxToken) {
 // --- CONSTANTES DE TEMPO (CONSISTENTES EM TODO O APP) ---
 export const TIME_CONFIG = {
   TRAFFIC_BUFFER: 1.25,  // +25% tempo de segurança para trânsito
-  SERVICE_TIME: 15       // 15 min parado por entrega
+  SERVICE_TIME: 20       // 20 min parado por entrega
 };
 
 // --- PROCESSAMENTO FINAL (Com Buffers de Tempo) ---
