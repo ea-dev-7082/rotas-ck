@@ -213,15 +213,17 @@ export default function Clientes() {
       let importedCount = 0;
 
       for (const item of parsedData) {
-        if (!item.nome) continue;
+        // Aceita 'nome' ou 'cliente' como campo de nome
+        const clienteNome = item.nome || item.cliente;
+        if (!clienteNome) continue;
 
         try {
           await base44.entities.Cliente.create({
-            nome: item.nome,
-            endereco: item.endereco || "",
-            telefone: item.telefone || "",
-            observacoes: item.observacoes || "",
-            endereco_entrega: item.endereco_entrega || "",
+            nome: String(clienteNome).trim(),
+            endereco: String(item.endereco || "").trim(),
+            telefone: String(item.telefone || "").trim(),
+            observacoes: String(item.observacoes || "").trim(),
+            endereco_entrega: String(item.endereco_entrega || "").trim(),
             usar_endereco_entrega:
               item.usar_endereco_entrega === "true" ||
               item.usar_endereco_entrega === true ||
@@ -230,7 +232,7 @@ export default function Clientes() {
           });
           importedCount++;
         } catch (err) {
-          console.error(`Erro ao importar ${item.nome}:`, err);
+          console.error(`Erro ao importar ${clienteNome}:`, err);
         }
       }
 
