@@ -298,7 +298,7 @@ export default function Clientes() {
             <div className="flex flex-col md:flex-row items-stretch gap-3">
               <input
                 type="file"
-                accept=".csv"
+                accept=".csv,.xlsx,.xls"
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleFileUpload}
@@ -314,7 +314,7 @@ export default function Clientes() {
                 ) : (
                   <Upload className="w-5 h-5 mr-2" />
                 )}
-                {isImporting ? "Importando..." : "Importar CSV"}
+                {isImporting ? "Importando..." : "Importar CSV/XLSX"}
               </Button>
 
               <Button
