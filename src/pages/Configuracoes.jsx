@@ -295,6 +295,18 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
 
+          {/* Botão Sair */}
+          <div className="pt-6 border-t">
+            <Button 
+              variant="outline" 
+              className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+              onClick={() => base44.auth.logout()}
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sair da Conta
+            </Button>
+          </div>
+
         </div>
 
         {/* DIALOGS (Modais) */}
