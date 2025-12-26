@@ -8,15 +8,29 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Printer, FileText } from "lucide-react";
+import { Printer, FileText, CheckCircle2 } from "lucide-react";
 
-export default function PrintModal({ open, onClose, route, stats, pontoPartida, notasFiscais, responsavelExpedicao, veiculoData, motoristaData, onSaveRelatorio, nomeEmpresa }) {
+export default function PrintModal({ 
+  open, 
+  onClose, 
+  route, 
+  stats, 
+  pontoPartida, 
+  notasFiscais, 
+  responsavelExpedicao, 
+  veiculoData, 
+  motoristaData, 
+  onSaveRelatorio, 
+  nomeEmpresa 
+}) {
   const [expedidor, setExpedidor] = useState(responsavelExpedicao || "");
+  const [isSaved, setIsSaved] = useState(false); // Estado para feedback visual
   const printRef = useRef();
 
   React.useEffect(() => {
     setExpedidor(responsavelExpedicao || "");
-  }, [responsavelExpedicao]);
+    setIsSaved(false); // Reseta o status de salvo ao abrir/mudar dados
+  }, [responsavelExpedicao, open]);
 
   const calcularVolumeTotal = () => {
     if (!route || !notasFiscais) return 0;
@@ -36,7 +50,6 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     
-    // Gerar linhas da tabela
     const tableRows = route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
         const clientNotas = notasFiscais?.[point.client_name] || [];
         const notasString = clientNotas.map(n => n.numero).join('<br/>');
@@ -66,117 +79,60 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
           <title>Romaneio de Transporte</title>
           <style>
             @page { size: A4; margin: 10mm; }
-            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: #000; -webkit-print-color-adjust: exact; }
-            
-            .container { width: 100%; max-width: 100%; }
-            
-            /* Header: align-items alterado para flex-start para subir o texto */
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: #000; }
+            .container { width: 100%; }
             .header-box { border: 1px solid #000; padding: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-start; }
-            
-            .company-info h1 { font-size: 16px; text-transform: uppercase; margin: 0 0 3px 0; letter-spacing: 1px; line-height: 1; }
-            .company-info p { margin: 0; font-size: 10px; color: #333; text-transform: uppercase; line-height: 1.3; }
-            
-            .doc-info { text-align: right; }
-            .doc-title { font-size: 14px; font-weight: bold; border: 1px solid #000; padding: 5px 10px; display: inline-block; background: #eee; }
-            
+            .company-info h1 { font-size: 16px; text-transform: uppercase; margin: 0; }
+            .doc-title { font-size: 14px; font-weight: bold; border: 1px solid #000; padding: 5px 10px; background: #eee; }
             .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; border: 1px solid #000; padding: 10px; }
-            .info-item { display: flex; flex-direction: column; }
-            .label { font-size: 9px; text-transform: uppercase; color: #555; font-weight: bold; margin-bottom: 2px; }
-            .value { font-size: 11px; font-weight: normal; border-bottom: 1px dotted #ccc; padding-bottom: 2px; }
-
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; }
-            th { border: 1px solid #000; background-color: #eee; padding: 6px; text-align: center; text-transform: uppercase; font-size: 9px; }
-            th:nth-child(2) { text-align: left; } 
-            td { border: 1px solid #000; padding: 6px; vertical-align: middle; }
-            
-            .client-name { font-weight: bold; font-size: 11px; }
-            .client-address { font-size: 9px; color: #444; margin-top: 2px; }
-
-            .footer-stats { margin-bottom: 30px; border: 1px solid #000; background: #f9f9f9; padding: 10px; display: flex; justify-content: space-around; font-weight: bold; font-size: 12px; }
-            
-            .signatures { display: flex; justify-content: space-between; margin-top: 80px; }
-            .sig-box { width: 40%; text-align: center; }
-            .sig-line { border-top: 1px solid #000; padding-top: 5px; font-size: 10px; text-transform: uppercase; }
+            .label { font-size: 9px; font-weight: bold; text-transform: uppercase; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid #000; padding: 6px; }
+            th { background: #eee; }
+            .footer-stats { border: 1px solid #000; padding: 10px; display: flex; justify-content: space-around; font-weight: bold; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 60px; }
+            .sig-line { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
           </style>
         </head>
         <body>
           <div class="container">
-            
             <div class="header-box">
               <div class="company-info">
-                <h1>${nomeEmpresa || 'Nome da Empresa'}</h1>
-                <p style="font-weight: bold; color: #000;">Logística & Distribuição</p>
-                <p>Controle de Operações Logísticas</p>
+                <h1>${nomeEmpresa || 'Empresa'}</h1>
+                <p>Logística & Distribuição</p>
               </div>
               <div class="doc-info">
                 <div class="doc-title">ROMANEIO DE CARGA</div>
-                <p style="margin-top: 5px;">Emissão: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}</p>
+                <p>Emissão: ${new Date().toLocaleString('pt-BR')}</p>
               </div>
             </div>
-
             <div class="info-grid">
-              <div class="info-item">
-                <span class="label">Motorista</span>
-                <span class="value">${motoristaData?.nome || 'N/D'}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Veículo</span>
-                <span class="value">${veiculoData?.descricao || ''} ${veiculoData?.placa ? `(${veiculoData.placa})` : ''}</span>
-              </div>
-               <div class="info-item">
-                <span class="label">Responsável Expedição</span>
-                <span class="value">${expedidor || '____________'}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Saída Prevista</span>
-                <span class="value">${route?.[0]?.estimated_arrival || '-'}</span>
-              </div>
+               <div><span class="label">Motorista</span><br/>${motoristaData?.nome || '-'}</div>
+               <div><span class="label">Veículo</span><br/>${veiculoData?.descricao || '-'}</div>
+               <div><span class="label">Expedição</span><br/>${expedidor || '-'}</div>
+               <div><span class="label">Saída</span><br/>${route?.[0]?.estimated_arrival || '-'}</div>
             </div>
-
             <table>
               <thead>
-                <tr>
-                  <th style="width: 30px;">#</th>
-                  <th>Destinatário / Endereço</th>
-                  <th style="width: 60px;">Chegada</th>
-                  <th style="width: 40px;">Vol.</th>
-                  <th style="width: 80px;">Nº Nota Fiscal</th>
-                  <th style="width: 80px;">Data Nota</th>
-                </tr>
+                <tr><th>#</th><th>Destinatário</th><th>Chegada</th><th>Vol.</th><th>NF</th><th>Data NF</th></tr>
               </thead>
-              <tbody>
-                ${tableRows}
-              </tbody>
+              <tbody>${tableRows}</tbody>
             </table>
-
             <div class="footer-stats">
-               <span>Distância Total: ${stats?.distance?.toFixed(1) || 0} km</span>
-               <span>Tempo Est.: ${stats?.time ? `${Math.floor(stats.time / 60)}h ${stats.time % 60}min` : '-'}</span>
-               <span>Previsão Volta: ${previsaoVolta}</span>
-               <span style="border-left: 1px solid #ccc; padding-left: 15px;">TOTAL VOLUMES: ${totalVolumesGeral}</span>
+               <span>Distância: ${stats?.distance?.toFixed(1)} km</span>
+               <span>Volta: ${previsaoVolta}</span>
+               <span>TOTAL VOLUMES: ${totalVolumesGeral}</span>
             </div>
-
-            <div class="signatures">
-              <div class="sig-box">
-                <div class="sig-line">Assinatura Motorista</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line">Conferência Expedição</div>
-              </div>
-            </div>
-
           </div>
         </body>
       </html>
     `);
     
     printWindow.document.close();
-    printWindow.focus();
     setTimeout(() => {
       printWindow.print();
       printWindow.close();
     }, 250);
-
   };
 
   const today = new Date().toLocaleDateString('pt-BR');
@@ -204,95 +160,54 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
           </div>
 
           {/* Preview Visual na Tela */}
-          <div className="border border-gray-300 bg-white p-6 shadow-sm min-h-[400px]" ref={printRef}>
-            
-            {/* Header Preview - alterado items-center para items-start */}
+          <div className="border border-gray-300 bg-white p-6 shadow-sm min-h-[400px]">
             <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
-                <div className="space-y-0.5">
-                    <h1 className="text-lg font-bold uppercase tracking-wider leading-none">{nomeEmpresa || 'NOME DA EMPRESA'}</h1>
-                    <p className="text-xs font-bold uppercase text-black leading-tight">Logística & Distribuição</p>
-                    <p className="text-[10px] text-gray-500 uppercase leading-tight">Controle de Operações Logísticas</p>
+                <div>
+                    <h1 className="text-lg font-bold uppercase leading-none">{nomeEmpresa || 'NOME DA EMPRESA'}</h1>
+                    <p className="text-xs font-bold uppercase text-black">Logística & Distribuição</p>
                 </div>
                 <div className="text-right">
-                    <div className="text-lg font-bold uppercase">ROMANEIO DE CARGA</div>
+                    <div className="text-lg font-bold">ROMANEIO DE CARGA</div>
                     <div className="text-sm font-bold">{today}</div>
-                    <div className="text-xs text-gray-500">Emissão Digital</div>
                 </div>
             </div>
 
-            {/* Grid Info Preview */}
             <div className="grid grid-cols-4 gap-4 mb-6 text-sm border p-4 bg-gray-50">
-                <div>
-                    <span className="block text-xs font-bold text-gray-500 uppercase">Motorista</span>
-                    <span className="font-semibold truncate block">{motoristaData?.nome || '-'}</span>
-                </div>
-                <div>
-                    <span className="block text-xs font-bold text-gray-500 uppercase">Veículo</span>
-                    <span className="font-semibold truncate block">{veiculoData?.descricao || '-'}</span>
-                </div>
-                <div>
-                    <span className="block text-xs font-bold text-gray-500 uppercase">Vol. Total</span>
-                    <span className="font-bold text-lg">{totalVolumesGeral}</span>
-                </div>
-                <div>
-                    <span className="block text-xs font-bold text-gray-500 uppercase">Saída</span>
-                    <span className="font-semibold">{route?.[0]?.estimated_arrival || '-'}</span>
-                </div>
+                <div><span className="block text-xs font-bold text-gray-400">Motorista</span>{motoristaData?.nome || '-'}</div>
+                <div><span className="block text-xs font-bold text-gray-400">Veículo</span>{veiculoData?.descricao || '-'}</div>
+                <div><span className="block text-xs font-bold text-gray-400">Vol. Total</span><span className="font-bold">{totalVolumesGeral}</span></div>
+                <div><span className="block text-xs font-bold text-gray-400">Saída</span>{route?.[0]?.estimated_arrival || '-'}</div>
             </div>
 
-            {/* Tabela Preview */}
             <div className="border border-gray-300">
-                <div className="grid grid-cols-12 bg-gray-100 border-b border-gray-300 p-2 text-xs font-bold uppercase">
+                <div className="grid grid-cols-12 bg-gray-100 p-2 text-xs font-bold border-b">
                     <div className="col-span-1 text-center">#</div>
-                    <div className="col-span-5">Cliente</div>
+                    <div className="col-span-6">Cliente</div>
                     <div className="col-span-1 text-center">Vol.</div>
                     <div className="col-span-2 text-center">NF</div>
-                    <div className="col-span-2 text-center">Data NF</div>
-                    <div className="col-span-1 text-center">Chegada</div>
+                    <div className="col-span-2 text-center">Chegada</div>
                 </div>
                 {route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
                     const clientNotas = notasFiscais?.[point.client_name] || [];
                     const volCliente = clientNotas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
-                    
                     return (
-                    <div key={index} className="grid grid-cols-12 border-b border-gray-200 p-2 text-xs items-center hover:bg-gray-50">
+                    <div key={index} className="grid grid-cols-12 border-b p-2 text-xs items-center">
                         <div className="col-span-1 text-center font-bold">{index + 1}</div>
-                        <div className="col-span-5 pr-2">
-                            <div className="font-bold text-gray-800 truncate">{point.client_name}</div>
-                            <div className="text-gray-500 text-[10px] truncate">{point.address}</div>
+                        <div className="col-span-6">
+                            <div className="font-bold">{point.client_name}</div>
+                            <div className="text-gray-500 text-[10px]">{point.address}</div>
                         </div>
-                        <div className="col-span-1 text-center font-bold">
-                            {volCliente > 0 ? volCliente : '-'}
-                        </div>
-                        <div className="col-span-2 text-center text-[10px]">
-                             {clientNotas.map(n => n.numero).join(', ') || '-'}
-                        </div>
-                        <div className="col-span-2 text-center text-[10px]">
-                             {clientNotas.map(n => n.data ? new Date(n.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-').join(', ') || '-'}
-                        </div>
-                        <div className="col-span-1 text-center text-[10px]">{point.estimated_arrival}</div>
+                        <div className="col-span-1 text-center font-bold">{volCliente || '-'}</div>
+                        <div className="col-span-2 text-center text-[10px]">{clientNotas.map(n => n.numero).join(', ') || '-'}</div>
+                        <div className="col-span-2 text-center">{point.estimated_arrival}</div>
                     </div>
                 )})}
             </div>
-
-            {/* Footer Preview */}
-            <div className="mt-8 p-4 border border-black bg-gray-50 flex justify-between text-xs font-bold items-center">
-                 <div className="flex gap-4 items-center">
-                    <span>Distância: {stats?.distance?.toFixed(1)} km</span>
-                    <span className="text-gray-400">|</span>
-                    <span>Tempo: {stats?.time ? `${Math.floor(stats.time / 60)}h ${stats.time % 60}min` : '-'}</span>
-                    <span className="text-gray-400">|</span>
-                    <span className="text-blue-800">Volta: {previsaoVolta}</span>
-                 </div>
-                 <div className="text-sm border px-4 py-1 bg-white">TOTAL VOLUMES: {totalVolumesGeral}</div>
-            </div>
-
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={onClose}>
-              Fechar
-            </Button>
+            <Button variant="outline" onClick={onClose}>Fechar</Button>
+            
             <Button 
               variant="outline"
               onClick={() => {
@@ -300,25 +215,26 @@ export default function PrintModal({ open, onClose, route, stats, pontoPartida, 
                   onSaveRelatorio({
                     data_impressao: new Date().toISOString(),
                     motorista_nome: motoristaData?.nome || null,
-                    motorista_telefone: motoristaData?.telefone || null,
                     veiculo_descricao: veiculoData?.descricao || null,
                     veiculo_placa: veiculoData?.placa || null,
-                    endereco_matriz: pontoPartida?.endereco || null,
-                    total_entregas: route ? route.length - 2 : 0,
-                    distancia_km: stats?.distance || null,
-                    tempo_minutos: stats?.time || null,
                     rota: route || [],
                     notas_fiscais: notasFiscais || {},
                     responsavel_expedicao: expedidor || null,
                   });
+                  // Feedback visual
+                  setIsSaved(true);
+                  setTimeout(() => setIsSaved(false), 3000); 
                 }
-                onClose();
               }}
-              className="border-green-500 text-green-600 hover:bg-green-50"
+              className={`transition-all ${isSaved ? "bg-green-50 border-green-500 text-green-600" : "border-green-500 text-green-600 hover:bg-green-50"}`}
             >
-              <FileText className="w-4 h-4 mr-2" />
-              Salvar Relatório
+              {isSaved ? (
+                <><CheckCircle2 className="w-4 h-4 mr-2" /> Salvo!</>
+              ) : (
+                <><FileText className="w-4 h-4 mr-2" /> Salvar Relatório</>
+              )}
             </Button>
+
             <Button onClick={handlePrint} className="bg-black hover:bg-gray-800 text-white">
               <Printer className="w-4 h-4 mr-2" />
               Imprimir Romaneio
