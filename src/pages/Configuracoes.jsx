@@ -336,6 +336,10 @@ export default function Configuracoes() {
                   <Input value={veiculoForm.placa} onChange={e => setVeiculoForm({...veiculoForm, placa: e.target.value})} placeholder="ABC-1234" />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Capacidade</Label>
+                <Input value={veiculoForm.capacidade} onChange={e => setVeiculoForm({...veiculoForm, capacidade: e.target.value})} placeholder="Ex: 500kg ou 20 caixas" />
+              </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={handleCloseVeiculoDialog}>Cancelar</Button>
                 <Button type="submit">Salvar</Button>
