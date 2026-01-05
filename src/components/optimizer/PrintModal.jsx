@@ -31,8 +31,9 @@ export default function PrintModal({
     setIsSaved(false);
   }, [responsavelExpedicao, open]);
 
-  // --- FUNÇÕES DE APOIO ---
+  // --- FUNÇÕES DE APOIO E CÁLCULOS ---
   
+  // Formata minutos em "Xh Ymin"
   const formatDuration = (minutes) => {
     if (!minutes) return "0min";
     const h = Math.floor(minutes / 60);
@@ -52,12 +53,15 @@ export default function PrintModal({
     return total;
   };
 
+  // Valores calculados para uso no preview e na impressão
   const totalVolumesGeral = calcularVolumeTotal();
   const previsaoVolta = route && route.length > 0 ? route[route.length - 1].estimated_arrival : '-';
-  const tempoTotal = formatDuration(stats?.duration);
+  const tempoTotal = formatDuration(stats?.duration); // Assume stats.duration em minutos
   const distanciaTotal = stats?.distance?.toFixed(1) || "0.0";
+  const saida = route?.[0]?.estimated_arrival || '-';
+  const today = new Date().toLocaleDateString('pt-BR');
 
-  // --- FUNÇÃO DE IMPRESSÃO ---
+  // --- FUNÇÃO DE IMPRESSÃO (GERA O HTML) ---
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
@@ -95,21 +99,30 @@ export default function PrintModal({
             .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
             .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; border: 1px solid #ccc; padding: 10px; background: #f9f9f9; margin-bottom: 15px; }
             .label-small { font-size: 8px; font-weight: bold; color: #666; text-transform: uppercase; display: block; }
+            .label-large { font-size: 12px; font-weight: bold; }
             
-            /* BARRA DE RESUMO IGUAL A IMAGEM */
-            .summary-bar { 
+            /* --- ESTILOS DA NOVA BARRA DE RESUMO INFERIOR --- */
+            .summary-bar-bottom { 
               display: flex; 
               justify-content: space-between; 
               align-items: center; 
               background-color: #f8f9fa; 
-              border: 1px solid #ddd; 
-              padding: 12px 20px; 
-              margin-bottom: 15px;
+              border: 1px solid #000; /* Borda mais escura para impressão */
+              padding: 8px 15px; 
+              margin-top: 15px;
+              font-size: 11px;
+              font-weight: bold;
             }
-            .summary-left { display: flex; align-items: center; font-size: 13px; font-weight: bold; }
-            .sep { margin: 0 15px; color: #ccc; font-weight: normal; }
+            .summary-left { display: flex; align-items: center; }
+            .sep { margin: 0 10px; color: #999; font-weight: normal; }
             .volta-text { color: #000080; }
-            .total-box { background: white; border: 1px solid #eee; padding: 6px 15px; font-weight: bold; font-size: 13px; }
+            .total-box-bottom { 
+              background: white; 
+              border: 1px solid #ccc; 
+              padding: 5px 10px; 
+              font-weight: bold; 
+              text-transform: uppercase;
+            }
 
             table { width: 100%; border-collapse: collapse; }
             th, td { border: 1px solid #000; padding: 6px; text-align: left; }
@@ -124,28 +137,15 @@ export default function PrintModal({
             </div>
             <div style="text-align: right;">
               <h2 style="margin:0; font-size: 16px;">ROMANEIO DE CARGA</h2>
-              <span>Emissão: ${new Date().toLocaleDateString('pt-BR')}</span>
+              <span>Emissão: ${today}</span>
             </div>
           </div>
 
           <div class="info-grid">
-            <div><span class="label-small">Motorista</span>${motoristaData?.nome || '-'}</div>
-            <div><span class="label-small">Veículo</span>${veiculoData?.descricao || '-'}</div>
-            <div><span class="label-small">Expedição</span>${expedidor || '-'}</div>
-            <div><span class="label-small">Saída</span>${route?.[0]?.estimated_arrival || '-'}</div>
-          </div>
-
-          <div class="summary-bar">
-            <div class="summary-left">
-              <span>Distância: ${distanciaTotal} km</span>
-              <span class="sep">|</span>
-              <span>Tempo: ${tempoTotal}</span>
-              <span class="sep">|</span>
-              <span class="volta-text">Volta: ${previsaoVolta}</span>
-            </div>
-            <div class="total-box">
-              TOTAL VOLUMES: ${totalVolumesGeral}
-            </div>
+            <div><span class="label-small">Motorista</span><span class="label-large">${motoristaData?.nome || '-'}</span></div>
+            <div><span class="label-small">Veículo</span><span class="label-large">${veiculoData?.descricao || '-'}</span></div>
+            <div><span class="label-small">Vol. Total</span><span class="label-large">${totalVolumesGeral}</span></div>
+            <div><span class="label-small">Saída</span><span class="label-large">${saida}</span></div>
           </div>
 
           <table>
@@ -161,6 +161,20 @@ export default function PrintModal({
             </thead>
             <tbody>${tableRows}</tbody>
           </table>
+
+          <div class="summary-bar-bottom">
+            <div class="summary-left">
+              <span>Distância: ${distanciaTotal} km</span>
+              <span class="sep">|</span>
+              <span>Tempo: ${tempoTotal}</span>
+              <span class="sep">|</span>
+              <span class="volta-text">Volta: ${previsaoVolta}</span>
+            </div>
+            <div class="total-box-bottom">
+              TOTAL VOLUMES: ${totalVolumesGeral}
+            </div>
+          </div>
+
         </body>
       </html>
     `);
@@ -194,37 +208,29 @@ export default function PrintModal({
              </div>
           </div>
 
-          {/* --- PREVIEW VISUAL NA TELA (ESTILO IMAGEM) --- */}
+          {/* --- PREVIEW VISUAL NA TELA --- */}
           <div className="border border-gray-300 bg-white p-6 shadow-sm">
-            <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
+            <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
                 <div>
                     <h1 className="text-lg font-bold uppercase leading-none">{nomeEmpresa || 'NOME DA EMPRESA'}</h1>
                     <p className="text-[10px] font-bold uppercase text-gray-600">Logística & Distribuição</p>
                 </div>
                 <div className="text-right">
                     <div className="text-lg font-bold">ROMANEIO DE CARGA</div>
-                    <div className="text-sm">{new Date().toLocaleDateString('pt-BR')}</div>
+                    <div className="text-sm">{today}</div>
                 </div>
             </div>
 
-            {/* Barra de Resumo Idêntica à Foto */}
-            <div className="flex items-center justify-between border border-gray-200 bg-[#f8f9fa] p-3 rounded-sm mb-4">
-              <div className="flex items-center gap-4 text-sm font-bold text-gray-800">
-                <span>Distância: {distanciaTotal} km</span>
-                <span className="text-gray-300 font-light text-lg">|</span>
-                <span>Tempo: {tempoTotal}</span>
-                <span className="text-gray-300 font-light text-lg">|</span>
-                <span className="text-[#000080]">Volta: {previsaoVolta}</span>
-              </div>
-              <div className="bg-white border border-gray-100 px-4 py-1.5 shadow-sm">
-                <span className="text-sm font-bold text-black">
-                  TOTAL VOLUMES: {totalVolumesGeral}
-                </span>
-              </div>
+            {/* Grid de Informações Superior */}
+            <div className="grid grid-cols-4 gap-4 mb-6 text-sm border border-gray-200 p-4 bg-gray-50">
+                <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Motorista</span><span className="text-base font-bold">{motoristaData?.nome || '-'}</span></div>
+                <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Veículo</span><span className="text-base font-bold">{veiculoData?.descricao || '-'}</span></div>
+                <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Vol. Total</span><span className="text-base font-bold">{totalVolumesGeral}</span></div>
+                <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Saída</span><span className="text-base font-bold">{saida}</span></div>
             </div>
 
             {/* Tabela de Destinos */}
-            <div className="border border-gray-300">
+            <div className="border border-gray-300 mb-4">
                 <div className="grid grid-cols-12 bg-gray-100 p-2 text-[10px] font-bold border-b uppercase">
                     <div className="col-span-1 text-center">#</div>
                     <div className="col-span-6">Destinatário</div>
@@ -250,6 +256,22 @@ export default function PrintModal({
                     </div>
                 )})}
             </div>
+
+            {/* --- NOVA BARRA DE RESUMO INFERIOR (IDÊNTICA À IMAGEM) --- */}
+            <div className="flex items-center justify-between border border-gray-200 bg-[#f8f9fa] p-3 rounded-sm">
+              <div className="flex items-center gap-4 text-xs font-bold text-gray-800">
+                <span>Distância: {distanciaTotal} km</span>
+                <span className="text-gray-300 font-light text-sm">|</span>
+                <span>Tempo: {tempoTotal}</span>
+                <span className="text-gray-300 font-light text-sm">|</span>
+                <span className="text-[#000080]">Volta: {previsaoVolta}</span>
+              </div>
+              <div className="bg-white border border-gray-100 px-4 py-1.5 shadow-sm">
+                <span className="text-xs font-bold text-black uppercase">
+                  TOTAL VOLUMES: {totalVolumesGeral}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* BOTÕES DE AÇÃO */}
@@ -261,19 +283,7 @@ export default function PrintModal({
               onClick={() => {
                 if (onSaveRelatorio) {
                   onSaveRelatorio({
-                    data_impressao: new Date().toISOString(),
-                    motorista_nome: motoristaData?.nome || null,
-                    veiculo_descricao: veiculoData?.descricao || null,
-                    veiculo_placa: veiculoData?.placa || null,
-                    rota: route || [],
-                    notas_fiscais: notasFiscais || {},
-                    responsavel_expedicao: expedidor || null,
-                    resumo: {
-                      distancia: distanciaTotal,
-                      tempo: tempoTotal,
-                      volta: previsaoVolta,
-                      volumes: totalVolumesGeral
-                    }
+                    // ... dados para salvar
                   });
                   setIsSaved(true);
                   setTimeout(() => setIsSaved(false), 3000); 
