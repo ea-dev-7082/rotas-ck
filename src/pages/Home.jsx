@@ -1,13 +1,10 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+// Placeholder file, this should be overridden by the generated code
+
 
 export default function Home() {
-  const navigate = useNavigate();
 
-  useEffect(() => {
-    navigate(createPageUrl("Optimizer"));
-  }, [navigate]);
-
-  return null;
+  return (
+    <div>
+    </div>
+  );
 }
