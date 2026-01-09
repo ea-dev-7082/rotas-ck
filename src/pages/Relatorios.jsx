@@ -12,7 +12,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter, // NOVO
+  DialogFooter // NOVO
 } from "@/components/ui/dialog";
 import {
   FileText,
@@ -29,7 +29,7 @@ import {
   X,
   BarChart3, // NOVO
   Save, // NOVO
-  AlertTriangle, // NOVO
+  AlertTriangle // NOVO
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import moment from "moment";
@@ -57,14 +57,14 @@ export default function Relatorios() {
   const { data: relatorios, isLoading } = useQuery({
     queryKey: ["relatorios", currentUser?.email],
     queryFn: () =>
-      currentUser
-        ? base44.entities.Relatorio.filter(
-            { owner: currentUser.email },
-            "-created_date"
-          )
-        : [],
+    currentUser ?
+    base44.entities.Relatorio.filter(
+      { owner: currentUser.email },
+      "-created_date"
+    ) :
+    [],
     enabled: !!currentUser,
-    initialData: [],
+    initialData: []
   });
 
   // --- FILTRAGEM ---
@@ -90,7 +90,7 @@ export default function Relatorios() {
         totalRotas: acc.totalRotas + 1,
         totalEntregas: acc.totalEntregas + (curr.total_entregas || 0),
         totalKm: acc.totalKm + (curr.distancia_km || 0),
-        totalTempo: acc.totalTempo + (curr.tempo_minutos || 0),
+        totalTempo: acc.totalTempo + (curr.tempo_minutos || 0)
       }),
       { totalRotas: 0, totalEntregas: 0, totalKm: 0, totalTempo: 0 }
     );
@@ -101,7 +101,7 @@ export default function Relatorios() {
     mutationFn: (id) => base44.entities.Relatorio.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["relatorios"] });
-    },
+    }
   });
 
   // Nova Mutation para Salvar Ocorrências
@@ -113,7 +113,7 @@ export default function Relatorios() {
       queryClient.invalidateQueries({ queryKey: ["relatorios"] });
       setShowDetailDialog(false);
       alert("Ocorrências salvas com sucesso!");
-    },
+    }
   });
 
   // --- FUNÇÕES AUXILIARES ---
@@ -144,11 +144,11 @@ export default function Relatorios() {
     // Carrega ocorrências existentes para o estado local
     const initialOccurrences = {};
     if (relatorio.rota) {
-        relatorio.rota.forEach((item, index) => {
-            if (item.ocorrencia) {
-                initialOccurrences[index] = item.ocorrencia;
-            }
-        });
+      relatorio.rota.forEach((item, index) => {
+        if (item.ocorrencia) {
+          initialOccurrences[index] = item.ocorrencia;
+        }
+      });
     }
     setOccurrences(initialOccurrences);
     setShowDetailDialog(true);
@@ -159,13 +159,13 @@ export default function Relatorios() {
 
     // Cria uma cópia da rota e injeta as ocorrências
     const novaRota = selectedRelatorio.rota.map((item, index) => ({
-        ...item,
-        ocorrencia: occurrences[index] || ""
+      ...item,
+      ocorrencia: occurrences[index] || ""
     }));
 
     updateOcorrenciasMutation.mutate({
-        id: selectedRelatorio.id,
-        rotaAtualizada: novaRota
+      id: selectedRelatorio.id,
+      rotaAtualizada: novaRota
     });
   };
 
@@ -259,8 +259,8 @@ export default function Relatorios() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4"
-        >
+          className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
               <FileText className="w-6 h-6 text-white" />
@@ -273,39 +273,39 @@ export default function Relatorios() {
 
           {/* Botões de Filtro Rápido */}
           <div className="flex bg-white p-1 rounded-lg border shadow-sm">
-            <Button 
-                variant={filterLabel === "Hoje" ? "default" : "ghost"} 
-                size="sm" onClick={() => applyQuickFilter("dia")}
-            >
+            <Button
+              variant={filterLabel === "Hoje" ? "default" : "ghost"}
+              size="sm" onClick={() => applyQuickFilter("dia")}>
+
                 Dia
             </Button>
-            <Button 
-                variant={filterLabel === "Esta Semana" ? "default" : "ghost"} 
-                size="sm" onClick={() => applyQuickFilter("semana")}
-            >
+            <Button
+              variant={filterLabel === "Esta Semana" ? "default" : "ghost"}
+              size="sm" onClick={() => applyQuickFilter("semana")}>
+
                 Semana
             </Button>
-            <Button 
-                variant={filterLabel === "Este Mês" ? "default" : "ghost"} 
-                size="sm" onClick={() => applyQuickFilter("mes")}
-            >
+            <Button
+              variant={filterLabel === "Este Mês" ? "default" : "ghost"}
+              size="sm" onClick={() => applyQuickFilter("mes")}>
+
                 Mês
             </Button>
-             <Button 
-                variant={filterLabel === "Todos" ? "default" : "ghost"} 
-                size="sm" onClick={() => applyQuickFilter("todos")}
-            >
+             <Button
+              variant={filterLabel === "Todos" ? "default" : "ghost"}
+              size="sm" onClick={() => applyQuickFilter("todos")}>
+
                 Todos
             </Button>
           </div>
         </motion.div>
 
         {/* --- DASHBOARD DE ESTATÍSTICAS (NOVO) --- */}
-        <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"
-        >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+
             <Card>
                 <CardContent className="p-4 flex flex-col items-center justify-center text-center">
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Rotas Realizadas</p>
@@ -353,72 +353,72 @@ export default function Relatorios() {
                   <Input
                     type="date"
                     value={startDate}
-                    onChange={(e) => { setStartDate(e.target.value); setFilterLabel("Personalizado"); }}
-                    className="h-8 w-[130px] bg-white text-xs"
-                  />
+                    onChange={(e) => {setStartDate(e.target.value);setFilterLabel("Personalizado");}} className="bg-white px-1 py-1 text-xs rounded-md flex border border-input shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-8 w-[130px]" />
+
+
                   <span className="text-gray-400 text-xs">até</span>
                   <Input
                     type="date"
                     value={endDate}
-                    onChange={(e) => { setEndDate(e.target.value); setFilterLabel("Personalizado"); }}
-                    className="h-8 w-[130px] bg-white text-xs"
-                  />
+                    onChange={(e) => {setEndDate(e.target.value);setFilterLabel("Personalizado");}} className="bg-white px-1 py-1 text-xs rounded-md flex border border-input shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-8 w-[130px]" />
+
+
                 </div>
-                {(startDate || endDate) && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => applyQuickFilter("todos")}
-                    className="h-8 w-8 text-gray-500 hover:text-red-500"
-                    title="Limpar filtros"
-                  >
+                {(startDate || endDate) &&
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => applyQuickFilter("todos")}
+                  className="h-8 w-8 text-gray-500 hover:text-red-500"
+                  title="Limpar filtros">
+
                     <X className="w-4 h-4" />
                   </Button>
-                )}
+                }
               </div>
             </div>
           </CardHeader>
           
           <CardContent className="p-6">
-            {isLoading ? (
-              <div className="text-center py-8 text-gray-500">
+            {isLoading ?
+            <div className="text-center py-8 text-gray-500">
                 Carregando...
-              </div>
-            ) : filteredRelatorios.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
+              </div> :
+            filteredRelatorios.length === 0 ?
+            <div className="text-center py-12 text-gray-500">
                 <FileText className="w-16 h-16 mx-auto mb-4 opacity-30" />
                 <p className="text-lg">
-                  {relatorios.length === 0
-                    ? "Nenhum relatório salvo"
-                    : "Nenhum relatório encontrado neste período"}
+                  {relatorios.length === 0 ?
+                "Nenhum relatório salvo" :
+                "Nenhum relatório encontrado neste período"}
                 </p>
-              </div>
-            ) : (
-              <ScrollArea className="max-h-[600px]">
+              </div> :
+
+            <ScrollArea className="max-h-[600px]">
                 <div className="space-y-4">
                   <AnimatePresence>
-                    {filteredRelatorios.map((relatorio) => (
-                      <motion.div
-                        key={relatorio.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="p-4 border border-gray-200 rounded-xl hover:shadow-md transition-all bg-white hover:bg-gray-50"
-                      >
+                    {filteredRelatorios.map((relatorio) =>
+                  <motion.div
+                    key={relatorio.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="p-4 border border-gray-200 rounded-xl hover:shadow-md transition-all bg-white hover:bg-gray-50">
+
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2 flex-wrap">
                               <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-200">
                                 <Calendar className="w-3 h-3 mr-1" />
                                 {moment(relatorio.data_impressao).format(
-                                  "DD/MM/YYYY"
-                                )}
+                              "DD/MM/YYYY"
+                            )}
                               </Badge>
                               <Badge variant="outline" className="border-gray-300">
                                 <Clock className="w-3 h-3 mr-1" />
                                 {moment(relatorio.data_impressao).format(
-                                  "HH:mm"
-                                )}
+                              "HH:mm"
+                            )}
                               </Badge>
                               <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-200 border-0">
                                 <MapPin className="w-3 h-3 mr-1" />
@@ -451,38 +451,38 @@ export default function Relatorios() {
 
                           <div className="flex gap-2 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0 mt-3 md:mt-0">
                             <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewDetails(relatorio)}
-                              className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                            >
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDetails(relatorio)}
+                          className="text-blue-600 border-blue-200 hover:bg-blue-50">
+
                               <Eye className="w-4 h-4 mr-2" />
                               Detalhes
                             </Button>
                             <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handlePrintRelatorio(relatorio)}
-                              className="text-gray-500 hover:text-green-600 hover:bg-green-50"
-                            >
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handlePrintRelatorio(relatorio)}
+                          className="text-gray-500 hover:text-green-600 hover:bg-green-50">
+
                               <Printer className="w-4 h-4" />
                             </Button>
                             <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => deleteMutation.mutate(relatorio.id)}
-                              className="text-gray-500 hover:text-red-600 hover:bg-red-50"
-                            >
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteMutation.mutate(relatorio.id)}
+                          className="text-gray-500 hover:text-red-600 hover:bg-red-50">
+
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>
                       </motion.div>
-                    ))}
+                  )}
                   </AnimatePresence>
                 </div>
               </ScrollArea>
-            )}
+            }
           </CardContent>
         </Card>
       </div>
@@ -497,8 +497,8 @@ export default function Relatorios() {
             </DialogTitle>
           </DialogHeader>
 
-          {selectedRelatorio && (
-            <div className="space-y-6">
+          {selectedRelatorio &&
+          <div className="space-y-6">
               {/* Resumo do Relatório */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
                 <div>
@@ -527,11 +527,11 @@ export default function Relatorios() {
                 </h3>
                 <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                   {(selectedRelatorio.rota || []).slice(1, -1).map((item, idx) => {
-                    // Ajuste de índice: O array 'rota' inclui origem e destino, mas o slice(1, -1) remove.
-                    // Para acessar o índice correto na rota original, precisamos somar 1.
-                    const originalIndex = idx + 1; 
-                    
-                    return (
+                  // Ajuste de índice: O array 'rota' inclui origem e destino, mas o slice(1, -1) remove.
+                  // Para acessar o índice correto na rota original, precisamos somar 1.
+                  const originalIndex = idx + 1;
+
+                  return (
                     <div key={idx} className="flex flex-col gap-3 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">
@@ -541,9 +541,9 @@ export default function Relatorios() {
                           <p className="font-bold text-gray-900">{item.client_name}</p>
                           <p className="text-sm text-gray-500">{item.address}</p>
                         </div>
-                        {item.estimated_arrival && (
-                            <Badge variant="secondary">{item.estimated_arrival}</Badge>
-                        )}
+                        {item.estimated_arrival &&
+                        <Badge variant="secondary">{item.estimated_arrival}</Badge>
+                        }
                       </div>
                       
                       {/* Campo de Ocorrência */}
@@ -551,38 +551,38 @@ export default function Relatorios() {
                         <label className="text-xs font-semibold text-gray-500 mb-1 block">
                             Observações / Ocorrência:
                         </label>
-                        <Textarea 
-                            placeholder="Ex: Cliente ausente, endereço não localizado..."
-                            value={occurrences[originalIndex] || ""}
-                            onChange={(e) => setOccurrences(prev => ({
-                                ...prev,
-                                [originalIndex]: e.target.value
-                            }))}
-                            className="text-sm min-h-[60px] bg-yellow-50/50 border-yellow-200 focus:border-yellow-400"
-                        />
+                        <Textarea
+                          placeholder="Ex: Cliente ausente, endereço não localizado..."
+                          value={occurrences[originalIndex] || ""}
+                          onChange={(e) => setOccurrences((prev) => ({
+                            ...prev,
+                            [originalIndex]: e.target.value
+                          }))}
+                          className="text-sm min-h-[60px] bg-yellow-50/50 border-yellow-200 focus:border-yellow-400" />
+
                       </div>
-                    </div>
-                  )})}
+                    </div>);
+                })}
                 </div>
               </div>
             </div>
-          )}
+          }
 
             <DialogFooter className="gap-2 mt-4 border-t pt-4">
                 <Button variant="outline" onClick={() => setShowDetailDialog(false)}>
                     Cancelar
                 </Button>
-                <Button 
-                    onClick={handleSaveOccurrences} 
-                    disabled={updateOcorrenciasMutation.isPending}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                >
+                <Button
+              onClick={handleSaveOccurrences}
+              disabled={updateOcorrenciasMutation.isPending}
+              className="bg-green-600 hover:bg-green-700 text-white">
+
                     <Save className="w-4 h-4 mr-2" />
                     {updateOcorrenciasMutation.isPending ? "Salvando..." : "Salvar Ocorrências"}
                 </Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
+    </div>);
+
 }
