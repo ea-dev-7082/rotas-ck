@@ -55,7 +55,7 @@ export default function PrintModal({
 
   const totalVolumesGeral = calcularVolumeTotal();
   const previsaoVolta = route && route.length > 0 ? route[route.length - 1].estimated_arrival : '-';
-  const tempoTotal = formatDuration(stats?.duration); 
+  const tempoTotal = formatDuration(stats?.time); 
   const distanciaTotal = stats?.distance ? Number(stats.distance).toFixed(1) : "0.0";
   const saida = route?.[0]?.estimated_arrival || '-';
   const today = new Date().toLocaleDateString('pt-BR');
