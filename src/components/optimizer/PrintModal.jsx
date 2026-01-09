@@ -316,7 +316,7 @@ export default function PrintModal({
               variant="outline"
               onClick={() => {
                 if (onSaveRelatorio) {
-                  const durationValue = stats?.duration ? Number(stats.duration) : 0;
+                  const timeValue = stats?.time ? Number(stats.time) : 0;
                   const distanceValue = stats?.distance ? Number(stats.distance) : 0;
                   
                   const dadosCompletos = {
