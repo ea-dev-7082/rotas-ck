@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Printer, FileText, CheckCircle2 } from "lucide-react";
+import { Printer, FileText, CheckCircle2, CalendarClock } from "lucide-react";
 
 export default function PrintModal({ 
   open, 
@@ -20,15 +20,18 @@ export default function PrintModal({
   responsavelExpedicao, 
   veiculoData, 
   motoristaData, 
-  onSaveRelatorio, 
+  onSaveRelatorio,
+  onSaveAgendado,
   nomeEmpresa 
 }) {
   const [expedidor, setExpedidor] = useState(responsavelExpedicao || "");
   const [isSaved, setIsSaved] = useState(false);
+  const [isAgendado, setIsAgendado] = useState(false);
 
   useEffect(() => {
     setExpedidor(responsavelExpedicao || "");
     setIsSaved(false);
+    setIsAgendado(false);
   }, [responsavelExpedicao, open]);
 
   // --- FUNÇÕES DE APOIO E CÁLCULOS ---
@@ -309,9 +312,59 @@ export default function PrintModal({
             {/* REMOVIDO: Área de assinatura foi apagada daqui */}
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-4 flex-wrap">
             <Button variant="outline" onClick={onClose}>Fechar</Button>
             
+            {/* Botão Agendar Rota */}
+            <Button 
+              variant="outline"
+              onClick={() => {
+                if (onSaveAgendado) {
+                  const timeValue = stats?.time ? Number(stats.time) : 0;
+                  const distanceValue = stats?.distance ? Number(stats.distance) : 0;
+                  
+                  // Monta rota com notas fiscais incluídas
+                  const rotaComNotas = route?.map(item => {
+                    const notas = notasFiscais?.[item.client_name] || [];
+                    const volumeTotal = notas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
+                    return {
+                      ...item,
+                      notas_fiscais: notas,
+                      volume_total: volumeTotal
+                    };
+                  });
+
+                  const dadosAgendado = {
+                    data_agendamento: new Date().toISOString(),
+                    motorista_id: motoristaData?.id || "",
+                    motorista_nome: motoristaData?.nome || "Não informado",
+                    veiculo_id: veiculoData?.id || "",
+                    veiculo_descricao: veiculoData?.descricao || "Não informado",
+                    veiculo_placa: veiculoData?.placa || "", 
+                    total_entregas: route ? route.length - 2 : 0, 
+                    distancia_km: distanceValue,
+                    tempo_minutos: timeValue, 
+                    endereco_matriz: route?.[0]?.address || "Matriz",
+                    rota: rotaComNotas,
+                    total_volumes: totalVolumesGeral,
+                    status: "agendado"
+                  };
+
+                  onSaveAgendado(dadosAgendado);
+                  setIsAgendado(true);
+                  setTimeout(() => setIsAgendado(false), 3000); 
+                }
+              }}
+              className={`transition-all ${isAgendado ? "bg-cyan-50 border-cyan-500 text-cyan-600" : "border-cyan-500 text-cyan-600 hover:bg-cyan-50"}`}
+            >
+              {isAgendado ? (
+                <><CheckCircle2 className="w-4 h-4 mr-2" /> Agendado!</>
+              ) : (
+                <><CalendarClock className="w-4 h-4 mr-2" /> Agendar Rota</>
+              )}
+            </Button>
+
+            {/* Botão Salvar Relatório */}
             <Button 
               variant="outline"
               onClick={() => {
