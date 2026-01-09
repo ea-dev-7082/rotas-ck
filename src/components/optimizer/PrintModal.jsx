@@ -326,7 +326,7 @@ export default function PrintModal({
                     veiculo_placa: veiculoData?.placa || "", 
                     total_entregas: route ? route.length - 2 : 0, 
                     distancia_km: distanceValue,
-                    tempo_minutos: durationValue, 
+                    tempo_minutos: timeValue, 
                     responsavel_expedicao: expedidor,
                     endereco_matriz: route?.[0]?.address || "Matriz",
                     rota: route,
