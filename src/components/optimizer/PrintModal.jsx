@@ -35,8 +35,9 @@ export default function PrintModal({
   
   const formatDuration = (minutes) => {
     if (!minutes) return "0min";
-    const h = Math.floor(minutes / 60);
-    const m = Math.round(minutes % 60);
+    const val = Number(minutes);
+    const h = Math.floor(val / 60);
+    const m = Math.round(val % 60);
     return h > 0 ? `${h}h ${m}min` : `${m}min`;
   };
 
@@ -52,20 +53,18 @@ export default function PrintModal({
     return total;
   };
 
-  // Valores calculados
   const totalVolumesGeral = calcularVolumeTotal();
   const previsaoVolta = route && route.length > 0 ? route[route.length - 1].estimated_arrival : '-';
   const tempoTotal = formatDuration(stats?.duration); 
-  const distanciaTotal = stats?.distance?.toFixed(1) || "0.0";
+  const distanciaTotal = stats?.distance ? Number(stats.distance).toFixed(1) : "0.0";
   const saida = route?.[0]?.estimated_arrival || '-';
   const today = new Date().toLocaleDateString('pt-BR');
 
-  // --- FUNÇÃO DE IMPRESSÃO (GERA O HTML) ---
+  // --- FUNÇÃO DE IMPRESSÃO ---
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     
-    // Filtra para não mostrar origem e retorno na tabela de entregas
     const tableRows = route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
         const clientNotas = notasFiscais?.[point.client_name] || [];
         const notasString = clientNotas.map(n => n.numero).join('<br/>');
@@ -96,11 +95,28 @@ export default function PrintModal({
           <style>
             @page { size: A4; margin: 10mm; }
             body { font-family: sans-serif; font-size: 11px; color: #000; margin: 0; padding: 0; }
+            
+            /* Layout Principal */
             .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
             .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; border: 1px solid #ccc; padding: 10px; background: #f9f9f9; margin-bottom: 15px; }
+            
+            /* Fontes */
             .label-small { font-size: 8px; font-weight: bold; color: #666; text-transform: uppercase; display: block; }
             .label-large { font-size: 12px; font-weight: bold; }
             
+            /* Tabela e Conteúdo Central */
+            /* AQUI ESTÁ O TRUQUE: min-height 50vh (metade da página) */
+            .content-wrapper {
+                min-height: 50vh; 
+                display: flex;
+                flex-direction: column;
+            }
+            
+            table { width: 100%; border-collapse: collapse; flex-grow: 1; }
+            th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+            th { background: #f0f0f0; font-size: 10px; }
+            
+            /* Barra de Resumo */
             .summary-bar-bottom { 
               display: flex; 
               justify-content: space-between; 
@@ -123,30 +139,17 @@ export default function PrintModal({
               text-transform: uppercase;
             }
 
-            /* --- ESTILOS DE ASSINATURA (PARA O PAPEL) --- */
+            /* Assinaturas */
             .signatures-container {
                 display: flex;
                 justify-content: space-between;
-                margin-top: 40px;
+                margin-top: 50px; /* Mais espaço antes da assinatura */
                 padding: 0 20px;
+                break-inside: avoid; /* Evita quebra de página no meio da assinatura */
             }
-            .signature-box {
-                width: 40%;
-                text-align: center;
-            }
-            .signature-line {
-                border-top: 1px solid #000;
-                margin-bottom: 5px;
-            }
-            .signature-text {
-                font-size: 10px;
-                font-weight: bold;
-                text-transform: uppercase;
-            }
-
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #000; padding: 6px; text-align: left; }
-            th { background: #f0f0f0; font-size: 10px; }
+            .signature-box { width: 40%; text-align: center; }
+            .signature-line { border-top: 1px solid #000; margin-bottom: 5px; }
+            .signature-text { font-size: 10px; font-weight: bold; text-transform: uppercase; }
           </style>
         </head>
         <body>
@@ -168,19 +171,21 @@ export default function PrintModal({
             <div><span class="label-small">Saída</span><span class="label-large">${saida}</span></div>
           </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 30px;">#</th>
-                <th>Destinatário</th>
-                <th style="width: 60px; text-align: center;">Chegada</th>
-                <th style="width: 40px; text-align: center;">Vol.</th>
-                <th style="width: 80px; text-align: center;">NF</th>
-                <th style="width: 80px; text-align: center;">Data NF</th>
-              </tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-          </table>
+          <div class="content-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 30px;">#</th>
+                    <th>Destinatário</th>
+                    <th style="width: 60px; text-align: center;">Chegada</th>
+                    <th style="width: 40px; text-align: center;">Vol.</th>
+                    <th style="width: 80px; text-align: center;">NF</th>
+                    <th style="width: 80px; text-align: center;">Data NF</th>
+                  </tr>
+                </thead>
+                <tbody>${tableRows}</tbody>
+              </table>
+          </div>
 
           <div class="summary-bar-bottom">
             <div class="summary-left">
@@ -241,6 +246,7 @@ export default function PrintModal({
 
           {/* --- PREVIEW VISUAL NA TELA --- */}
           <div className="border border-gray-300 bg-white p-6 shadow-sm">
+            {/* ... Cabeçalho do Preview ... */}
             <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
                 <div>
                     <h1 className="text-lg font-bold uppercase leading-none">{nomeEmpresa || 'NOME DA EMPRESA'}</h1>
@@ -252,7 +258,6 @@ export default function PrintModal({
                 </div>
             </div>
 
-            {/* Grid de Informações Superior */}
             <div className="grid grid-cols-4 gap-4 mb-6 text-sm border border-gray-200 p-4 bg-gray-50">
                 <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Motorista</span><span className="text-base font-bold">{motoristaData?.nome || '-'}</span></div>
                 <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Veículo</span><span className="text-base font-bold">{veiculoData?.descricao || '-'}</span></div>
@@ -260,8 +265,8 @@ export default function PrintModal({
                 <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Saída</span><span className="text-base font-bold">{saida}</span></div>
             </div>
 
-            {/* Tabela de Destinos */}
-            <div className="border border-gray-300 mb-4">
+            {/* Container com altura mínima também no preview */}
+            <div className="border border-gray-300 mb-4 min-h-[300px] flex flex-col">
                 <div className="grid grid-cols-12 bg-gray-100 p-2 text-[10px] font-bold border-b uppercase">
                     <div className="col-span-1 text-center">#</div>
                     <div className="col-span-6">Destinatário</div>
@@ -288,7 +293,6 @@ export default function PrintModal({
                 )})}
             </div>
 
-            {/* Barra de Resumo Inferior */}
             <div className="flex items-center justify-between border border-gray-200 bg-[#f8f9fa] p-3 rounded-sm">
               <div className="flex items-center gap-4 text-xs font-bold text-gray-800">
                 <span>Distância: {distanciaTotal} km</span>
@@ -304,7 +308,6 @@ export default function PrintModal({
               </div>
             </div>
 
-            {/* --- CAMPOS DE ASSINATURA NA TELA --- */}
             <div className="flex justify-between mt-12 px-4 gap-8">
                 <div className="flex-1 flex flex-col items-center">
                     <div className="w-full border-t border-black mb-2"></div>
@@ -315,10 +318,8 @@ export default function PrintModal({
                     <span className="text-[10px] font-bold uppercase text-black">CONFERÊNCIA EXPEDIÇÃO</span>
                 </div>
             </div>
-
           </div>
 
-          {/* BOTÕES DE AÇÃO */}
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="outline" onClick={onClose}>Fechar</Button>
             
@@ -326,15 +327,17 @@ export default function PrintModal({
               variant="outline"
               onClick={() => {
                 if (onSaveRelatorio) {
-                  // CRIAÇÃO DO OBJETO COMPLETO PARA SALVAR NO BANCO
+                  const durationValue = stats?.duration ? Number(stats.duration) : 0;
+                  const distanceValue = stats?.distance ? Number(stats.distance) : 0;
+                  
                   const dadosCompletos = {
                     data_impressao: new Date().toISOString(),
                     motorista_nome: motoristaData?.nome || "Não informado",
                     veiculo_descricao: veiculoData?.descricao || "Não informado",
                     veiculo_placa: veiculoData?.placa || "", 
                     total_entregas: route ? route.length - 2 : 0, 
-                    distancia_km: stats?.distance || 0,
-                    tempo_minutos: stats?.duration || 0,
+                    distancia_km: distanceValue,
+                    tempo_minutos: durationValue, 
                     responsavel_expedicao: expedidor,
                     endereco_matriz: route?.[0]?.address || "Matriz",
                     rota: route,
@@ -342,7 +345,6 @@ export default function PrintModal({
                   };
 
                   onSaveRelatorio(dadosCompletos);
-                  
                   setIsSaved(true);
                   setTimeout(() => setIsSaved(false), 3000); 
                 }
