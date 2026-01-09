@@ -1,359 +1,375 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  // DialogFooter removido para evitar erros de importação
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Printer, FileText, CheckCircle2 } from "lucide-react";
+import {
+  FileText,
+  Calendar,
+  Clock,
+  MapPin,
+  Truck,
+  User,
+  Trash2,
+  Eye,
+  Printer,
+  Route,
+  Filter,
+  X,
+  BarChart3,
+  Save,
+  AlertTriangle,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import moment from "moment";
 
-export default function PrintModal({ 
-  open, 
-  onClose, 
-  route, 
-  stats, 
-  pontoPartida, 
-  notasFiscais, 
-  responsavelExpedicao, 
-  veiculoData, 
-  motoristaData, 
-  onSaveRelatorio, 
-  nomeEmpresa 
-}) {
-  const [expedidor, setExpedidor] = useState(responsavelExpedicao || "");
-  const [isSaved, setIsSaved] = useState(false);
+export default function Relatorios() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [selectedRelatorio, setSelectedRelatorio] = useState(null);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+
+  // Filtros
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [filterLabel, setFilterLabel] = useState("Todos");
+
+  // Ocorrências (Estado local)
+  const [occurrences, setOccurrences] = useState({});
+
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    setExpedidor(responsavelExpedicao || "");
-    setIsSaved(false);
-  }, [responsavelExpedicao, open]);
+    base44.auth.me().then(setCurrentUser);
+  }, []);
 
-  // --- FUNÇÕES DE APOIO E CÁLCULOS ---
-  
-  const formatDuration = (minutes) => {
-    if (!minutes) return "0min";
-    const val = Number(minutes);
-    const h = Math.floor(val / 60);
-    const m = Math.round(val % 60);
-    return h > 0 ? `${h}h ${m}min` : `${m}min`;
-  };
+  // --- QUERY DE DADOS ---
+  const { data: relatorios, isLoading } = useQuery({
+    queryKey: ["relatorios", currentUser?.email],
+    queryFn: () =>
+      currentUser
+        ? base44.entities.Relatorio.filter(
+            { owner: currentUser.email },
+            "-created_date"
+          )
+        : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
 
-  const calcularVolumeTotal = () => {
-    if (!route || !notasFiscais) return 0;
-    let total = 0;
-    route.forEach(point => {
-      const notas = notasFiscais[point.client_name] || [];
-      notas.forEach(nota => {
-        total += Number(nota.volume) || 0;
-      });
+  // --- FILTRAGEM ---
+  const filteredRelatorios = useMemo(() => {
+    return relatorios.filter((relatorio) => {
+      if (!startDate && !endDate) return true;
+
+      const dataRelatorio = moment(relatorio.data_impressao);
+      const start = startDate ? moment(startDate).startOf("day") : null;
+      const end = endDate ? moment(endDate).endOf("day") : null;
+
+      if (start && dataRelatorio.isBefore(start)) return false;
+      if (end && dataRelatorio.isAfter(end)) return false;
+
+      return true;
     });
-    return total;
+  }, [relatorios, startDate, endDate]);
+
+  // --- ESTATÍSTICAS ---
+  const stats = useMemo(() => {
+    return filteredRelatorios.reduce(
+      (acc, curr) => ({
+        totalRotas: acc.totalRotas + 1,
+        totalEntregas: acc.totalEntregas + (curr.total_entregas || 0),
+        totalKm: acc.totalKm + (curr.distancia_km || 0),
+        totalTempo: acc.totalTempo + (curr.tempo_minutos || 0),
+      }),
+      { totalRotas: 0, totalEntregas: 0, totalKm: 0, totalTempo: 0 }
+    );
+  }, [filteredRelatorios]);
+
+  // --- MUTAÇÕES ---
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Relatorio.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["relatorios"] });
+    },
+  });
+
+  const updateOcorrenciasMutation = useMutation({
+    mutationFn: async ({ id, rotaAtualizada }) => {
+      return base44.entities.Relatorio.update(id, { rota: rotaAtualizada });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["relatorios"] });
+      setShowDetailDialog(false);
+      // alert("Ocorrências salvas com sucesso!"); // Pode descomentar se quiser feedback visual
+    },
+  });
+
+  // --- FUNÇÕES AUXILIARES ---
+  const applyQuickFilter = (type) => {
+    const now = moment();
+    if (type === "dia") {
+      setStartDate(now.format("YYYY-MM-DD"));
+      setEndDate(now.format("YYYY-MM-DD"));
+      setFilterLabel("Hoje");
+    } else if (type === "semana") {
+      setStartDate(now.clone().startOf("week").format("YYYY-MM-DD"));
+      setEndDate(now.clone().endOf("week").format("YYYY-MM-DD"));
+      setFilterLabel("Esta Semana");
+    } else if (type === "mes") {
+      setStartDate(now.clone().startOf("month").format("YYYY-MM-DD"));
+      setEndDate(now.clone().endOf("month").format("YYYY-MM-DD"));
+      setFilterLabel("Este Mês");
+    } else {
+      setStartDate("");
+      setEndDate("");
+      setFilterLabel("Todos");
+    }
   };
 
-  const totalVolumesGeral = calcularVolumeTotal();
-  const previsaoVolta = route && route.length > 0 ? route[route.length - 1].estimated_arrival : '-';
-  const tempoTotal = formatDuration(stats?.duration); 
-  const distanciaTotal = stats?.distance ? Number(stats.distance).toFixed(1) : "0.0";
-  const saida = route?.[0]?.estimated_arrival || '-';
-  const today = new Date().toLocaleDateString('pt-BR');
+  const handleViewDetails = (relatorio) => {
+    setSelectedRelatorio(relatorio);
+    const initialOccurrences = {};
+    if (relatorio.rota) {
+        relatorio.rota.forEach((item, index) => {
+            if (item.ocorrencia) {
+                initialOccurrences[index] = item.ocorrencia;
+            }
+        });
+    }
+    setOccurrences(initialOccurrences);
+    setShowDetailDialog(true);
+  };
 
-  // --- FUNÇÃO DE IMPRESSÃO ---
-  // Mantém a assinatura AQUI para sair no papel/PDF
-  const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    
-    const tableRows = route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
-        const clientNotas = notasFiscais?.[point.client_name] || [];
-        const notasString = clientNotas.map(n => n.numero).join('<br/>');
-        const datasString = clientNotas.map(n => 
-            n.data ? new Date(n.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-'
-        ).join('<br/>');
-        const volCliente = clientNotas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
-        
-        return `
-          <tr>
-            <td style="text-align: center;">${index + 1}</td>
-            <td>
-                <div style="font-weight: bold;">${point.client_name}</div>
-                <div style="font-size: 9px; color: #444;">${point.address}</div>
-            </td>
-            <td style="text-align: center;">${point.estimated_arrival || '-'}</td>
-            <td style="text-align: center; font-weight: bold;">${volCliente > 0 ? volCliente : '-'}</td>
-            <td style="text-align: center;">${notasString || '-'}</td>
-            <td style="text-align: center;">${datasString || '-'}</td>
-          </tr>
-        `;
-    }).join('');
+  const handleSaveOccurrences = () => {
+    if (!selectedRelatorio) return;
 
-    printWindow.document.write(`
+    const novaRota = selectedRelatorio.rota.map((item, index) => ({
+        ...item,
+        ocorrencia: occurrences[index] || ""
+    }));
+
+    updateOcorrenciasMutation.mutate({
+        id: selectedRelatorio.id,
+        rotaAtualizada: novaRota
+    });
+  };
+
+  const handlePrintRelatorio = (relatorio) => {
+    const rota = relatorio.rota || [];
+    const entregas = rota.slice(1, -1);
+
+    const printContent = `
+      <!DOCTYPE html>
       <html>
-        <head>
-          <title>Romaneio de Carga</title>
-          <style>
-            @page { size: A4; margin: 10mm; }
-            body { font-family: sans-serif; font-size: 11px; color: #000; margin: 0; padding: 0; }
-            
-            /* Layout Principal */
-            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
-            .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; border: 1px solid #ccc; padding: 10px; background: #f9f9f9; margin-bottom: 15px; }
-            
-            /* Fontes */
-            .label-small { font-size: 8px; font-weight: bold; color: #666; text-transform: uppercase; display: block; }
-            .label-large { font-size: 12px; font-weight: bold; }
-            
-            /* Posicionamento apenas na impressão */
-            .content-wrapper {
-                min-height: 60vh; 
-                display: flex;
-                flex-direction: column;
-            }
-            
-            table { width: 100%; border-collapse: collapse; margin-bottom: auto; }
-            
-            th, td { border: 1px solid #000; padding: 6px; text-align: left; }
-            th { background: #f0f0f0; font-size: 10px; }
-            
-            /* Barra de Resumo */
-            .summary-bar-bottom { 
-              display: flex; 
-              justify-content: space-between; 
-              align-items: center; 
-              background-color: #f8f9fa; 
-              border: 1px solid #000;
-              padding: 8px 15px; 
-              margin-top: 15px;
-              font-size: 11px;
-              font-weight: bold;
-            }
-            .summary-left { display: flex; align-items: center; }
-            .sep { margin: 0 10px; color: #999; font-weight: normal; }
-            .volta-text { color: #000080; }
-            .total-box-bottom { 
-              background: white; 
-              border: 1px solid #ccc; 
-              padding: 5px 10px; 
-              font-weight: bold; 
-              text-transform: uppercase;
-            }
-
-            /* Assinaturas */
-            .signatures-container {
-                display: flex;
-                justify-content: space-between;
-                margin-top: 50px; 
-                padding: 0 20px;
-                break-inside: avoid;
-            }
-            .signature-box { width: 40%; text-align: center; }
-            .signature-line { border-top: 1px solid #000; margin-bottom: 5px; }
-            .signature-text { font-size: 10px; font-weight: bold; text-transform: uppercase; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <h1 style="margin:0; font-size: 18px;">${nomeEmpresa || 'EMPRESA'}</h1>
-              <span style="font-size: 10px; font-weight: bold;">LOGÍSTICA & DISTRIBUIÇÃO</span>
-            </div>
-            <div style="text-align: right;">
-              <h2 style="margin:0; font-size: 16px;">ROMANEIO DE CARGA</h2>
-              <span>Emissão: ${today}</span>
-            </div>
+      <head>
+        <title>Relatório de Rota</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+          .info-item { padding: 8px; background: #f5f5f5; border-radius: 4px; }
+          .info-label { font-weight: bold; font-size: 12px; color: #666; }
+          .info-value { font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+          th { background: #333; color: white; }
+          tr:nth-child(even) { background: #f9f9f9; }
+          .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Relatório de Rota</h1>
+          <p>Impresso em: ${moment(relatorio.data_impressao).format("DD/MM/YYYY [às] HH:mm")}</p>
+        </div>
+        
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">Motorista</div>
+            <div class="info-value">${relatorio.motorista_nome || "Não informado"}</div>
           </div>
-
-          <div class="info-grid">
-            <div><span class="label-small">Motorista</span><span class="label-large">${motoristaData?.nome || '-'}</span></div>
-            <div><span class="label-small">Veículo</span><span class="label-large">${veiculoData?.descricao || '-'}</span></div>
-            <div><span class="label-small">Vol. Total</span><span class="label-large">${totalVolumesGeral}</span></div>
-            <div><span class="label-small">Saída</span><span class="label-large">${saida}</span></div>
+          <div class="info-item">
+            <div class="info-label">Veículo</div>
+            <div class="info-value">${relatorio.veiculo_descricao || "Não informado"}</div>
           </div>
-
-          <div class="content-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width: 30px;">#</th>
-                    <th>Destinatário</th>
-                    <th style="width: 60px; text-align: center;">Chegada</th>
-                    <th style="width: 40px; text-align: center;">Vol.</th>
-                    <th style="width: 80px; text-align: center;">NF</th>
-                    <th style="width: 80px; text-align: center;">Data NF</th>
-                  </tr>
-                </thead>
-                <tbody>${tableRows}</tbody>
-              </table>
+          <div class="info-item">
+            <div class="info-label">Total de Entregas</div>
+            <div class="info-value">${relatorio.total_entregas || 0}</div>
           </div>
+        </div>
 
-          <div class="summary-bar-bottom">
-            <div class="summary-left">
-              <span>Distância: ${distanciaTotal} km</span>
-              <span class="sep">|</span>
-              <span>Tempo: ${tempoTotal}</span>
-              <span class="sep">|</span>
-              <span class="volta-text">Volta: ${previsaoVolta}</span>
-            </div>
-            <div class="total-box-bottom">
-              TOTAL VOLUMES: ${totalVolumesGeral}
-            </div>
-          </div>
-
-          <div class="signatures-container">
-            <div class="signature-box">
-                <div class="signature-line"></div>
-                <div class="signature-text">ASSINATURA MOTORISTA</div>
-            </div>
-            <div class="signature-box">
-                <div class="signature-line"></div>
-                <div class="signature-text">CONFERÊNCIA EXPEDIÇÃO</div>
-            </div>
-          </div>
-
-        </body>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cliente</th>
+              <th>Endereço</th>
+              <th>Ocorrência</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${entregas.map((item, idx) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${item.client_name}</td>
+                <td>${item.address}</td>
+                <td>${item.ocorrencia || "-"}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+        
+        <div class="footer">
+          <p>Responsável: ${relatorio.responsavel_expedicao || "Não informado"}</p>
+        </div>
+      </body>
       </html>
-    `);
-    
+    `;
+
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(printContent);
     printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
+    printWindow.print();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[850px] max-h-[90vh] overflow-y-auto z-[9999]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Visualizar Romaneio
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-             <div className="space-y-2">
-                <Label>Responsável pela Expedição</Label>
-                <Input
-                  value={expedidor}
-                  onChange={(e) => setExpedidor(e.target.value)}
-                  placeholder="Nome do responsável..."
-                />
-             </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-slate-100 p-6">
+      <div className="container mx-auto max-w-6xl">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+              <FileText className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Relatórios de Rotas</h1>
+              <p className="text-gray-600">Gestão de entregas e ocorrências</p>
+            </div>
           </div>
 
-          {/* --- PREVIEW VISUAL NA TELA (Sem assinaturas) --- */}
-          <div className="border border-gray-300 bg-white p-6 shadow-sm">
-            <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
-                <div>
-                    <h1 className="text-lg font-bold uppercase leading-none">{nomeEmpresa || 'NOME DA EMPRESA'}</h1>
-                    <p className="text-[10px] font-bold uppercase text-gray-600">Logística & Distribuição</p>
-                </div>
-                <div className="text-right">
-                    <div className="text-lg font-bold">ROMANEIO DE CARGA</div>
-                    <div className="text-sm">{today}</div>
-                </div>
-            </div>
+          <div className="flex bg-white p-1 rounded-lg border shadow-sm">
+            <Button variant={filterLabel === "Hoje" ? "default" : "ghost"} size="sm" onClick={() => applyQuickFilter("dia")}>Dia</Button>
+            <Button variant={filterLabel === "Esta Semana" ? "default" : "ghost"} size="sm" onClick={() => applyQuickFilter("semana")}>Semana</Button>
+            <Button variant={filterLabel === "Este Mês" ? "default" : "ghost"} size="sm" onClick={() => applyQuickFilter("mes")}>Mês</Button>
+            <Button variant={filterLabel === "Todos" ? "default" : "ghost"} size="sm" onClick={() => applyQuickFilter("todos")}>Todos</Button>
+          </div>
+        </motion.div>
 
-            <div className="grid grid-cols-4 gap-4 mb-6 text-sm border border-gray-200 p-4 bg-gray-50">
-                <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Motorista</span><span className="text-base font-bold">{motoristaData?.nome || '-'}</span></div>
-                <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Veículo</span><span className="text-base font-bold">{veiculoData?.descricao || '-'}</span></div>
-                <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Vol. Total</span><span className="text-base font-bold">{totalVolumesGeral}</span></div>
-                <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Saída</span><span className="text-base font-bold">{saida}</span></div>
-            </div>
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"
+        >
+            <Card><CardContent className="p-4 flex flex-col items-center justify-center text-center"><p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Rotas</p><p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalRotas}</p></CardContent></Card>
+            <Card><CardContent className="p-4 flex flex-col items-center justify-center text-center"><p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Entregas</p><p className="text-2xl font-bold text-purple-600 mt-1">{stats.totalEntregas}</p></CardContent></Card>
+            <Card><CardContent className="p-4 flex flex-col items-center justify-center text-center"><p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Km</p><p className="text-2xl font-bold text-blue-600 mt-1">{stats.totalKm.toFixed(1)} km</p></CardContent></Card>
+            <Card><CardContent className="p-4 flex flex-col items-center justify-center text-center"><p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Tempo</p><p className="text-2xl font-bold text-orange-600 mt-1">{Math.floor(stats.totalTempo / 60)}h {stats.totalTempo % 60}m</p></CardContent></Card>
+        </motion.div>
 
-            <div className="border border-gray-300 mb-4">
-                <div className="grid grid-cols-12 bg-gray-100 p-2 text-[10px] font-bold border-b uppercase">
-                    <div className="col-span-1 text-center">#</div>
-                    <div className="col-span-6">Destinatário</div>
-                    <div className="col-span-1 text-center">Vol.</div>
-                    <div className="col-span-2 text-center">NF</div>
-                    <div className="col-span-2 text-center">Chegada</div>
+        <Card className="bg-white shadow-xl border-0">
+          <CardHeader className="border-b border-gray-100 pb-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <BarChart3 className="w-5 h-5 text-gray-500" />
+                Histórico: <span className="text-purple-600">{filterLabel}</span>
+              </CardTitle>
+              <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                  <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setFilterLabel("Personalizado"); }} className="h-8 w-[130px] bg-white text-xs" />
+                  <span className="text-gray-400 text-xs">até</span>
+                  <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setFilterLabel("Personalizado"); }} className="h-8 w-[130px] bg-white text-xs" />
+              </div>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="p-6">
+            {isLoading ? <div className="text-center py-8 text-gray-500">Carregando...</div> : filteredRelatorios.length === 0 ? <div className="text-center py-12 text-gray-500">Nenhum relatório encontrado</div> : (
+              <ScrollArea className="max-h-[600px]">
+                <div className="space-y-4">
+                  <AnimatePresence>
+                    {filteredRelatorios.map((relatorio) => (
+                      <motion.div key={relatorio.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 border border-gray-200 rounded-xl bg-white hover:bg-gray-50">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Badge className="bg-gray-100 text-gray-700"><Calendar className="w-3 h-3 mr-1" />{moment(relatorio.data_impressao).format("DD/MM/YYYY")}</Badge>
+                              <Badge className="bg-purple-100 text-purple-700">{relatorio.total_entregas || 0} entregas</Badge>
+                            </div>
+                            <div className="flex gap-4 text-sm text-gray-600">
+                                <span>{relatorio.motorista_nome}</span>
+                                <span>{relatorio.veiculo_descricao}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(relatorio)} className="text-blue-600 border-blue-200"><Eye className="w-4 h-4 mr-2" /> Detalhes</Button>
+                            <Button variant="ghost" size="icon" onClick={() => handlePrintRelatorio(relatorio)}><Printer className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(relatorio.id)} className="text-red-500"><Trash2 className="w-4 h-4" /></Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
-                {route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
-                    const clientNotas = notasFiscais?.[point.client_name] || [];
-                    const volCliente = clientNotas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl"><FileText className="w-6 h-6 text-purple-600" /> Detalhes e Ocorrências</DialogTitle>
+          </DialogHeader>
+          {selectedRelatorio && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div><p className="text-xs text-gray-500 font-bold">Data</p><p>{moment(selectedRelatorio.data_impressao).format("DD/MM/YYYY")}</p></div>
+                <div><p className="text-xs text-gray-500 font-bold">Motorista</p><p>{selectedRelatorio.motorista_nome}</p></div>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-orange-500" /> Ocorrências</h3>
+                <div className="space-y-4">
+                  {(selectedRelatorio.rota || []).slice(1, -1).map((item, idx) => {
+                    const originalIndex = idx + 1; 
                     return (
-                    <div key={index} className="grid grid-cols-12 border-b p-2 text-xs items-center hover:bg-gray-50">
-                        <div className="col-span-1 text-center font-bold text-gray-400">{index + 1}</div>
-                        <div className="col-span-6">
-                            <div className="font-bold text-gray-900">{point.client_name}</div>
-                            <div className="text-gray-500 text-[9px] line-clamp-1">{point.address}</div>
-                        </div>
-                        <div className="col-span-1 text-center font-bold">{volCliente || '-'}</div>
-                        <div className="col-span-2 text-center text-[10px] text-gray-600">
-                          {clientNotas.map(n => n.numero).join(', ') || '-'}
-                        </div>
-                        <div className="col-span-2 text-center font-medium">{point.estimated_arrival}</div>
+                    <div key={idx} className="flex flex-col gap-2 p-3 border rounded-lg">
+                      <div className="flex justify-between font-bold"><span>{idx + 1}. {item.client_name}</span></div>
+                      {/* SUBTITUIÇÃO: Usando textarea HTML padrão em vez do componente Textarea */}
+                      <textarea
+                        placeholder="Observações..."
+                        value={occurrences[originalIndex] || ""}
+                        onChange={(e) => setOccurrences(prev => ({ ...prev, [originalIndex]: e.target.value }))}
+                        className="w-full p-2 border rounded-md text-sm bg-yellow-50 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                        rows={2}
+                      />
                     </div>
-                )})}
-            </div>
-
-            <div className="flex items-center justify-between border border-gray-200 bg-[#f8f9fa] p-3 rounded-sm">
-              <div className="flex items-center gap-4 text-xs font-bold text-gray-800">
-                <span>Distância: {distanciaTotal} km</span>
-                <span className="text-gray-300 font-light text-sm">|</span>
-                <span>Tempo: {tempoTotal}</span>
-                <span className="text-gray-300 font-light text-sm">|</span>
-                <span className="text-[#000080]">Volta: {previsaoVolta}</span>
-              </div>
-              <div className="bg-white border border-gray-100 px-4 py-1.5 shadow-sm">
-                <span className="text-xs font-bold text-black uppercase">
-                  TOTAL VOLUMES: {totalVolumesGeral}
-                </span>
+                  )})}
+                </div>
               </div>
             </div>
-            
-            {/* REMOVIDO: Área de assinatura foi apagada daqui */}
+          )}
+          {/* SUBSTITUIÇÃO: Usando div em vez de DialogFooter */}
+          <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
+                <Button variant="outline" onClick={() => setShowDetailDialog(false)}>Cancelar</Button>
+                <Button onClick={handleSaveOccurrences} disabled={updateOcorrenciasMutation.isPending} className="bg-green-600 text-white hover:bg-green-700">
+                    <Save className="w-4 h-4 mr-2" /> Salvar
+                </Button>
           </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={onClose}>Fechar</Button>
-            
-            <Button 
-              variant="outline"
-              onClick={() => {
-                if (onSaveRelatorio) {
-                  const durationValue = stats?.duration ? Number(stats.duration) : 0;
-                  const distanceValue = stats?.distance ? Number(stats.distance) : 0;
-                  
-                  const dadosCompletos = {
-                    data_impressao: new Date().toISOString(),
-                    motorista_nome: motoristaData?.nome || "Não informado",
-                    veiculo_descricao: veiculoData?.descricao || "Não informado",
-                    veiculo_placa: veiculoData?.placa || "", 
-                    total_entregas: route ? route.length - 2 : 0, 
-                    distancia_km: distanceValue,
-                    tempo_minutos: durationValue, 
-                    responsavel_expedicao: expedidor,
-                    endereco_matriz: route?.[0]?.address || "Matriz",
-                    rota: route,
-                    total_volumes: totalVolumesGeral
-                  };
-
-                  onSaveRelatorio(dadosCompletos);
-                  setIsSaved(true);
-                  setTimeout(() => setIsSaved(false), 3000); 
-                }
-              }}
-              className={`transition-all ${isSaved ? "bg-green-50 border-green-500 text-green-600" : "border-green-500 text-green-600 hover:bg-green-50"}`}
-            >
-              {isSaved ? (
-                <><CheckCircle2 className="w-4 h-4 mr-2" /> Salvo!</>
-              ) : (
-                <><FileText className="w-4 h-4 mr-2" /> Salvar Relatório</>
-              )}
-            </Button>
-
-            <Button onClick={handlePrint} className="bg-black hover:bg-gray-800 text-white">
-              <Printer className="w-4 h-4 mr-2" />
-              Imprimir Romaneio
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
