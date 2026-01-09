@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Printer, FileText, CheckCircle2 } from "lucide-react";
+import { Printer, FileText, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 
 export default function PrintModal({ 
   open, 
@@ -25,10 +25,14 @@ export default function PrintModal({
 }) {
   const [expedidor, setExpedidor] = useState(responsavelExpedicao || "");
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   useEffect(() => {
     setExpedidor(responsavelExpedicao || "");
     setIsSaved(false);
+    setIsSaving(false);
+    setSaveError(null);
   }, [responsavelExpedicao, open]);
 
   // --- FUNÇÕES DE APOIO E CÁLCULOS ---
@@ -325,8 +329,12 @@ export default function PrintModal({
             
             <Button 
               variant="outline"
-              onClick={() => {
+              disabled={isSaving}
+              onClick={async () => {
                 if (onSaveRelatorio) {
+                  setIsSaving(true);
+                  setSaveError(null);
+                  
                   const durationValue = stats?.duration ? Number(stats.duration) : 0;
                   const distanceValue = stats?.distance ? Number(stats.distance) : 0;
                   
@@ -344,14 +352,30 @@ export default function PrintModal({
                     total_volumes: totalVolumesGeral
                   };
 
-                  onSaveRelatorio(dadosCompletos);
-                  setIsSaved(true);
-                  setTimeout(() => setIsSaved(false), 3000); 
+                  try {
+                    await onSaveRelatorio(dadosCompletos);
+                    setIsSaved(true);
+                    setTimeout(() => setIsSaved(false), 3000);
+                  } catch (error) {
+                    console.error("Erro ao salvar relatório:", error);
+                    setSaveError("Falha ao salvar. Tente novamente.");
+                    setTimeout(() => setSaveError(null), 5000);
+                  } finally {
+                    setIsSaving(false);
+                  }
                 }
               }}
-              className={`transition-all ${isSaved ? "bg-green-50 border-green-500 text-green-600" : "border-green-500 text-green-600 hover:bg-green-50"}`}
+              className={`transition-all ${
+                saveError ? "bg-red-50 border-red-500 text-red-600" :
+                isSaved ? "bg-green-50 border-green-500 text-green-600" : 
+                "border-green-500 text-green-600 hover:bg-green-50"
+              }`}
             >
-              {isSaved ? (
+              {isSaving ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...</>
+              ) : saveError ? (
+                <><AlertCircle className="w-4 h-4 mr-2" /> {saveError}</>
+              ) : isSaved ? (
                 <><CheckCircle2 className="w-4 h-4 mr-2" /> Salvo!</>
               ) : (
                 <><FileText className="w-4 h-4 mr-2" /> Salvar Relatório</>
