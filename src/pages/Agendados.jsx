@@ -41,6 +41,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import moment from "moment";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
 
 import { geocodeMultiple, optimizeRoute, processOptimizationResult, TIME_CONFIG } from "../components/optimizer/mapboxService";
 import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
@@ -409,6 +411,16 @@ export default function Agendados() {
                               </div>
 
                               <div className="flex gap-2 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0 mt-3 md:mt-0">
+                                <Link to={createPageUrl("Optimizer") + `?rotaAgendadaId=${rota.id}`}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-cyan-600 border-cyan-200 hover:bg-cyan-50"
+                                  >
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Editar Rota
+                                  </Button>
+                                </Link>
                                 <Button
                                   variant="outline"
                                   size="sm"

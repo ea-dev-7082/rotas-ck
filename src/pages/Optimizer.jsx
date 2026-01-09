@@ -35,11 +35,71 @@ export default function Optimizer() {
   const [notasFiscais, setNotasFiscais] = useState({});
   const [showNotaFiscalDialog, setShowNotaFiscalDialog] = useState(false);
   const [currentClientForNota, setCurrentClientForNota] = useState("");
+  const [editingRotaAgendadaId, setEditingRotaAgendadaId] = useState(null);
 
   // --- CARREGAMENTO DE DADOS (QUERIES) ---
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
   }, []);
+
+  // Carrega rota agendada se vier da URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const rotaAgendadaId = urlParams.get('rotaAgendadaId');
+    
+    if (rotaAgendadaId && clientes.length > 0) {
+      loadRotaAgendada(rotaAgendadaId);
+    }
+  }, [clientes]);
+
+  const loadRotaAgendada = async (rotaId) => {
+    try {
+      const rotasAgendadas = await base44.entities.RotaAgendada.filter({ id: rotaId });
+      const rotaAgendada = rotasAgendadas[0];
+      
+      if (!rotaAgendada) return;
+
+      setEditingRotaAgendadaId(rotaId);
+
+      // Seleciona motorista e veículo
+      if (rotaAgendada.motorista_id) setSelectedMotorista(rotaAgendada.motorista_id);
+      if (rotaAgendada.veiculo_id) setSelectedVeiculo(rotaAgendada.veiculo_id);
+
+      // Extrai clientes da rota (exceto matriz)
+      const entregas = rotaAgendada.rota?.slice(1, -1) || [];
+      
+      // Encontra IDs dos clientes pelo nome
+      const clientIds = [];
+      const notasCarregadas = {};
+      
+      entregas.forEach(entrega => {
+        const cliente = clientes.find(c => c.nome === entrega.client_name);
+        if (cliente) {
+          clientIds.push(cliente.id);
+        }
+        // Carrega notas fiscais
+        if (entrega.notas_fiscais && entrega.notas_fiscais.length > 0) {
+          notasCarregadas[entrega.client_name] = entrega.notas_fiscais;
+        }
+      });
+
+      setSelectedClients(clientIds);
+      setNotasFiscais(notasCarregadas);
+
+      // Carrega a rota otimizada
+      setOptimizedRoute(rotaAgendada.rota);
+      setStats({
+        distance: rotaAgendada.distancia_km,
+        time: rotaAgendada.tempo_minutos
+      });
+
+      // Limpa URL
+      window.history.replaceState({}, '', window.location.pathname);
+      
+    } catch (error) {
+      console.error("Erro ao carregar rota agendada:", error);
+    }
+  };
 
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes', currentUser?.email],
@@ -160,6 +220,7 @@ export default function Optimizer() {
     setNearbyClients(null);
     setGeocodedClients([]);
     setNotasFiscais({});
+    setEditingRotaAgendadaId(null);
   };
 
   const handleOpenNotaFiscal = (clientName) => {
@@ -538,8 +599,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                Otimizador de Rotas
-              </h1>
+                                  {editingRotaAgendadaId ? "Editando Rota Agendada" : "Otimizador de Rotas"}
+                                </h1>
               <p className="text-gray-500">
                 Selecione os clientes e planeje as entregas do dia
               </p>
@@ -709,8 +770,15 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
               await base44.entities.Relatorio.create({ ...data, owner: currentUser?.email });
             }}
             onSaveAgendado={async (data) => {
-              await base44.entities.RotaAgendada.create({ ...data, owner: currentUser?.email });
-            }}
+                    if (editingRotaAgendadaId) {
+                      // Atualiza rota existente
+                      await base44.entities.RotaAgendada.update(editingRotaAgendadaId, data);
+                      setEditingRotaAgendadaId(null);
+                    } else {
+                      // Cria nova rota
+                      await base44.entities.RotaAgendada.create({ ...data, owner: currentUser?.email });
+                    }
+                  }}
             nomeEmpresa={nomeEmpresa}
           />
 
