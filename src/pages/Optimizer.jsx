@@ -696,20 +696,23 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       </div>
 
       <PrintModal
-        open={showPrintModal}
-        onClose={() => setShowPrintModal(false)}
-        route={optimizedRoute}
-        stats={stats}
-        pontoPartida={PONTO_PARTIDA}
-        notasFiscais={notasFiscais}
-        responsavelExpedicao={currentUser?.full_name}
-        veiculoData={selectedVeiculoData}
-        motoristaData={selectedMotoristaData}
-        onSaveRelatorio={async (data) => {
-          await base44.entities.Relatorio.create({ ...data, owner: currentUser?.email });
-        }}
-        nomeEmpresa={nomeEmpresa}
-      />
+            open={showPrintModal}
+            onClose={() => setShowPrintModal(false)}
+            route={optimizedRoute}
+            stats={stats}
+            pontoPartida={PONTO_PARTIDA}
+            notasFiscais={notasFiscais}
+            responsavelExpedicao={currentUser?.full_name}
+            veiculoData={selectedVeiculoData}
+            motoristaData={selectedMotoristaData}
+            onSaveRelatorio={async (data) => {
+              await base44.entities.Relatorio.create({ ...data, owner: currentUser?.email });
+            }}
+            onSaveAgendado={async (data) => {
+              await base44.entities.RotaAgendada.create({ ...data, owner: currentUser?.email });
+            }}
+            nomeEmpresa={nomeEmpresa}
+          />
 
       <NotaFiscalDialog
         open={showNotaFiscalDialog}
