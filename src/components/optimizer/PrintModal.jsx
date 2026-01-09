@@ -61,7 +61,7 @@ export default function PrintModal({
   const today = new Date().toLocaleDateString('pt-BR');
 
   // --- FUNÇÃO DE IMPRESSÃO ---
-
+  // Mantém a assinatura AQUI para sair no papel/PDF
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     
@@ -104,15 +104,13 @@ export default function PrintModal({
             .label-small { font-size: 8px; font-weight: bold; color: #666; text-transform: uppercase; display: block; }
             .label-large { font-size: 12px; font-weight: bold; }
             
-            /* --- LÓGICA DE POSICIONAMENTO APENAS NA IMPRESSÃO --- */
-            /* content-wrapper força uma altura mínima na página impressa */
+            /* Posicionamento apenas na impressão */
             .content-wrapper {
-                min-height: 60vh; /* Ocupa pelo menos 60% da altura da folha */
+                min-height: 60vh; 
                 display: flex;
                 flex-direction: column;
             }
             
-            /* table flex-grow faz a tabela empurrar o rodapé se ela for pequena, mas respeita o min-height */
             table { width: 100%; border-collapse: collapse; margin-bottom: auto; }
             
             th, td { border: 1px solid #000; padding: 6px; text-align: left; }
@@ -246,7 +244,7 @@ export default function PrintModal({
              </div>
           </div>
 
-          {/* --- PREVIEW VISUAL NA TELA (COMPACTO) --- */}
+          {/* --- PREVIEW VISUAL NA TELA (Sem assinaturas) --- */}
           <div className="border border-gray-300 bg-white p-6 shadow-sm">
             <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
                 <div>
@@ -266,7 +264,6 @@ export default function PrintModal({
                 <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Saída</span><span className="text-base font-bold">{saida}</span></div>
             </div>
 
-            {/* AQUI: Removi o min-h-[300px] para a tela ficar compacta */}
             <div className="border border-gray-300 mb-4">
                 <div className="grid grid-cols-12 bg-gray-100 p-2 text-[10px] font-bold border-b uppercase">
                     <div className="col-span-1 text-center">#</div>
@@ -308,17 +305,8 @@ export default function PrintModal({
                 </span>
               </div>
             </div>
-
-            <div className="flex justify-between mt-12 px-4 gap-8">
-                <div className="flex-1 flex flex-col items-center">
-                    <div className="w-full border-t border-black mb-2"></div>
-                    <span className="text-[10px] font-bold uppercase text-black">ASSINATURA MOTORISTA</span>
-                </div>
-                <div className="flex-1 flex flex-col items-center">
-                    <div className="w-full border-t border-black mb-2"></div>
-                    <span className="text-[10px] font-bold uppercase text-black">CONFERÊNCIA EXPEDIÇÃO</span>
-                </div>
-            </div>
+            
+            {/* REMOVIDO: Área de assinatura foi apagada daqui */}
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
