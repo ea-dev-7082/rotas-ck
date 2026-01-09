@@ -33,7 +33,6 @@ export default function PrintModal({
 
   // --- FUNÇÕES DE APOIO E CÁLCULOS ---
   
-  // Formata minutos em "Xh Ymin"
   const formatDuration = (minutes) => {
     if (!minutes) return "0min";
     const h = Math.floor(minutes / 60);
@@ -53,10 +52,10 @@ export default function PrintModal({
     return total;
   };
 
-  // Valores calculados para uso no preview e na impressão
+  // Valores calculados
   const totalVolumesGeral = calcularVolumeTotal();
   const previsaoVolta = route && route.length > 0 ? route[route.length - 1].estimated_arrival : '-';
-  const tempoTotal = formatDuration(stats?.duration); // Assume stats.duration em minutos
+  const tempoTotal = formatDuration(stats?.duration); 
   const distanciaTotal = stats?.distance?.toFixed(1) || "0.0";
   const saida = route?.[0]?.estimated_arrival || '-';
   const today = new Date().toLocaleDateString('pt-BR');
@@ -66,6 +65,7 @@ export default function PrintModal({
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     
+    // Filtra para não mostrar origem e retorno na tabela de entregas
     const tableRows = route?.filter((_, index) => index !== 0 && index !== route.length - 1).map((point, index) => {
         const clientNotas = notasFiscais?.[point.client_name] || [];
         const notasString = clientNotas.map(n => n.numero).join('<br/>');
@@ -101,13 +101,12 @@ export default function PrintModal({
             .label-small { font-size: 8px; font-weight: bold; color: #666; text-transform: uppercase; display: block; }
             .label-large { font-size: 12px; font-weight: bold; }
             
-            /* --- ESTILOS DA NOVA BARRA DE RESUMO INFERIOR --- */
             .summary-bar-bottom { 
               display: flex; 
               justify-content: space-between; 
               align-items: center; 
               background-color: #f8f9fa; 
-              border: 1px solid #000; /* Borda mais escura para impressão */
+              border: 1px solid #000;
               padding: 8px 15px; 
               margin-top: 15px;
               font-size: 11px;
@@ -122,6 +121,27 @@ export default function PrintModal({
               padding: 5px 10px; 
               font-weight: bold; 
               text-transform: uppercase;
+            }
+
+            /* --- ESTILOS DE ASSINATURA (PARA O PAPEL) --- */
+            .signatures-container {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 40px;
+                padding: 0 20px;
+            }
+            .signature-box {
+                width: 40%;
+                text-align: center;
+            }
+            .signature-line {
+                border-top: 1px solid #000;
+                margin-bottom: 5px;
+            }
+            .signature-text {
+                font-size: 10px;
+                font-weight: bold;
+                text-transform: uppercase;
             }
 
             table { width: 100%; border-collapse: collapse; }
@@ -172,6 +192,17 @@ export default function PrintModal({
             </div>
             <div class="total-box-bottom">
               TOTAL VOLUMES: ${totalVolumesGeral}
+            </div>
+          </div>
+
+          <div class="signatures-container">
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-text">ASSINATURA MOTORISTA</div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-text">CONFERÊNCIA EXPEDIÇÃO</div>
             </div>
           </div>
 
@@ -257,7 +288,7 @@ export default function PrintModal({
                 )})}
             </div>
 
-            {/* --- NOVA BARRA DE RESUMO INFERIOR (IDÊNTICA À IMAGEM) --- */}
+            {/* Barra de Resumo Inferior */}
             <div className="flex items-center justify-between border border-gray-200 bg-[#f8f9fa] p-3 rounded-sm">
               <div className="flex items-center gap-4 text-xs font-bold text-gray-800">
                 <span>Distância: {distanciaTotal} km</span>
@@ -272,6 +303,19 @@ export default function PrintModal({
                 </span>
               </div>
             </div>
+
+            {/* --- CAMPOS DE ASSINATURA NA TELA --- */}
+            <div className="flex justify-between mt-12 px-4 gap-8">
+                <div className="flex-1 flex flex-col items-center">
+                    <div className="w-full border-t border-black mb-2"></div>
+                    <span className="text-[10px] font-bold uppercase text-black">ASSINATURA MOTORISTA</span>
+                </div>
+                <div className="flex-1 flex flex-col items-center">
+                    <div className="w-full border-t border-black mb-2"></div>
+                    <span className="text-[10px] font-bold uppercase text-black">CONFERÊNCIA EXPEDIÇÃO</span>
+                </div>
+            </div>
+
           </div>
 
           {/* BOTÕES DE AÇÃO */}
@@ -282,9 +326,23 @@ export default function PrintModal({
               variant="outline"
               onClick={() => {
                 if (onSaveRelatorio) {
-                  onSaveRelatorio({
-                    // ... dados para salvar
-                  });
+                  // CRIAÇÃO DO OBJETO COMPLETO PARA SALVAR NO BANCO
+                  const dadosCompletos = {
+                    data_impressao: new Date().toISOString(),
+                    motorista_nome: motoristaData?.nome || "Não informado",
+                    veiculo_descricao: veiculoData?.descricao || "Não informado",
+                    veiculo_placa: veiculoData?.placa || "", 
+                    total_entregas: route ? route.length - 2 : 0, 
+                    distancia_km: stats?.distance || 0,
+                    tempo_minutos: stats?.duration || 0,
+                    responsavel_expedicao: expedidor,
+                    endereco_matriz: route?.[0]?.address || "Matriz",
+                    rota: route,
+                    total_volumes: totalVolumesGeral
+                  };
+
+                  onSaveRelatorio(dadosCompletos);
+                  
                   setIsSaved(true);
                   setTimeout(() => setIsSaved(false), 3000); 
                 }
