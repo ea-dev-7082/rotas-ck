@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Printer, FileText, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { Printer, FileText, CheckCircle2 } from "lucide-react";
 
 export default function PrintModal({ 
   open, 
@@ -25,14 +25,10 @@ export default function PrintModal({
 }) {
   const [expedidor, setExpedidor] = useState(responsavelExpedicao || "");
   const [isSaved, setIsSaved] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState(null);
 
   useEffect(() => {
     setExpedidor(responsavelExpedicao || "");
     setIsSaved(false);
-    setIsSaving(false);
-    setSaveError(null);
   }, [responsavelExpedicao, open]);
 
   // --- FUNÇÕES DE APOIO E CÁLCULOS ---
@@ -108,15 +104,17 @@ export default function PrintModal({
             .label-small { font-size: 8px; font-weight: bold; color: #666; text-transform: uppercase; display: block; }
             .label-large { font-size: 12px; font-weight: bold; }
             
-            /* Tabela e Conteúdo Central */
-            /* AQUI ESTÁ O TRUQUE: min-height 50vh (metade da página) */
+            /* --- LÓGICA DE POSICIONAMENTO APENAS NA IMPRESSÃO --- */
+            /* content-wrapper força uma altura mínima na página impressa */
             .content-wrapper {
-                min-height: 50vh; 
+                min-height: 60vh; /* Ocupa pelo menos 60% da altura da folha */
                 display: flex;
                 flex-direction: column;
             }
             
-            table { width: 100%; border-collapse: collapse; flex-grow: 1; }
+            /* table flex-grow faz a tabela empurrar o rodapé se ela for pequena, mas respeita o min-height */
+            table { width: 100%; border-collapse: collapse; margin-bottom: auto; }
+            
             th, td { border: 1px solid #000; padding: 6px; text-align: left; }
             th { background: #f0f0f0; font-size: 10px; }
             
@@ -147,9 +145,9 @@ export default function PrintModal({
             .signatures-container {
                 display: flex;
                 justify-content: space-between;
-                margin-top: 50px; /* Mais espaço antes da assinatura */
+                margin-top: 50px; 
                 padding: 0 20px;
-                break-inside: avoid; /* Evita quebra de página no meio da assinatura */
+                break-inside: avoid;
             }
             .signature-box { width: 40%; text-align: center; }
             .signature-line { border-top: 1px solid #000; margin-bottom: 5px; }
@@ -248,9 +246,8 @@ export default function PrintModal({
              </div>
           </div>
 
-          {/* --- PREVIEW VISUAL NA TELA --- */}
+          {/* --- PREVIEW VISUAL NA TELA (COMPACTO) --- */}
           <div className="border border-gray-300 bg-white p-6 shadow-sm">
-            {/* ... Cabeçalho do Preview ... */}
             <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
                 <div>
                     <h1 className="text-lg font-bold uppercase leading-none">{nomeEmpresa || 'NOME DA EMPRESA'}</h1>
@@ -269,8 +266,8 @@ export default function PrintModal({
                 <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Saída</span><span className="text-base font-bold">{saida}</span></div>
             </div>
 
-            {/* Container com altura mínima também no preview */}
-            <div className="border border-gray-300 mb-4 min-h-[300px] flex flex-col">
+            {/* AQUI: Removi o min-h-[300px] para a tela ficar compacta */}
+            <div className="border border-gray-300 mb-4">
                 <div className="grid grid-cols-12 bg-gray-100 p-2 text-[10px] font-bold border-b uppercase">
                     <div className="col-span-1 text-center">#</div>
                     <div className="col-span-6">Destinatário</div>
@@ -329,12 +326,8 @@ export default function PrintModal({
             
             <Button 
               variant="outline"
-              disabled={isSaving}
-              onClick={async () => {
+              onClick={() => {
                 if (onSaveRelatorio) {
-                  setIsSaving(true);
-                  setSaveError(null);
-                  
                   const durationValue = stats?.duration ? Number(stats.duration) : 0;
                   const distanceValue = stats?.distance ? Number(stats.distance) : 0;
                   
@@ -352,30 +345,14 @@ export default function PrintModal({
                     total_volumes: totalVolumesGeral
                   };
 
-                  try {
-                    await onSaveRelatorio(dadosCompletos);
-                    setIsSaved(true);
-                    setTimeout(() => setIsSaved(false), 3000);
-                  } catch (error) {
-                    console.error("Erro ao salvar relatório:", error);
-                    setSaveError("Falha ao salvar. Tente novamente.");
-                    setTimeout(() => setSaveError(null), 5000);
-                  } finally {
-                    setIsSaving(false);
-                  }
+                  onSaveRelatorio(dadosCompletos);
+                  setIsSaved(true);
+                  setTimeout(() => setIsSaved(false), 3000); 
                 }
               }}
-              className={`transition-all ${
-                saveError ? "bg-red-50 border-red-500 text-red-600" :
-                isSaved ? "bg-green-50 border-green-500 text-green-600" : 
-                "border-green-500 text-green-600 hover:bg-green-50"
-              }`}
+              className={`transition-all ${isSaved ? "bg-green-50 border-green-500 text-green-600" : "border-green-500 text-green-600 hover:bg-green-50"}`}
             >
-              {isSaving ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...</>
-              ) : saveError ? (
-                <><AlertCircle className="w-4 h-4 mr-2" /> {saveError}</>
-              ) : isSaved ? (
+              {isSaved ? (
                 <><CheckCircle2 className="w-4 h-4 mr-2" /> Salvo!</>
               ) : (
                 <><FileText className="w-4 h-4 mr-2" /> Salvar Relatório</>
