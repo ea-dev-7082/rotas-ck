@@ -42,6 +42,48 @@ export default function Optimizer() {
     base44.auth.me().then(setCurrentUser);
   }, []);
 
+  const { data: clientes, isLoading } = useQuery({
+    queryKey: ['clientes', currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Cliente.filter({ owner: currentUser.email }, 'nome') : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
+
+  const { data: configs } = useQuery({
+    queryKey: ['configuracoes', currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Configuracao.filter({ owner: currentUser.email }) : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
+
+  const { data: veiculos } = useQuery({
+    queryKey: ['veiculos', currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Veiculo.filter({ owner: currentUser.email, ativo: true }, 'descricao') : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
+
+  const { data: motoristas } = useQuery({
+    queryKey: ['motoristas', currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Motorista.filter({ owner: currentUser.email, ativo: true }, 'nome') : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
+
+  // Configurações
+  const enderecoMatriz = configs.find(c => c.chave === "endereco_matriz")?.valor || "";
+  const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || "";
+  const logoUrl = configs.find(c => c.chave === "logo_url")?.valor || "";
+  const nomeEmpresa = configs.find(c => c.chave === "nome_empresa")?.valor || "";
+
+  const PONTO_PARTIDA = {
+    nome: "Matriz - Ponto de Partida",
+    endereco: enderecoMatriz || DEFAULT_MATRIZ
+  };
+
+  const selectedVeiculoData = veiculos.find(v => v.id === selectedVeiculo);
+  const selectedMotoristaData = motoristas.find(m => m.id === selectedMotorista);
+
   // Carrega rota agendada se vier da URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -100,48 +142,6 @@ export default function Optimizer() {
       console.error("Erro ao carregar rota agendada:", error);
     }
   };
-
-  const { data: clientes, isLoading } = useQuery({
-    queryKey: ['clientes', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Cliente.filter({ owner: currentUser.email }, 'nome') : [],
-    enabled: !!currentUser,
-    initialData: [],
-  });
-
-  const { data: configs } = useQuery({
-    queryKey: ['configuracoes', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Configuracao.filter({ owner: currentUser.email }) : [],
-    enabled: !!currentUser,
-    initialData: [],
-  });
-
-  const { data: veiculos } = useQuery({
-    queryKey: ['veiculos', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Veiculo.filter({ owner: currentUser.email, ativo: true }, 'descricao') : [],
-    enabled: !!currentUser,
-    initialData: [],
-  });
-
-  const { data: motoristas } = useQuery({
-    queryKey: ['motoristas', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Motorista.filter({ owner: currentUser.email, ativo: true }, 'nome') : [],
-    enabled: !!currentUser,
-    initialData: [],
-  });
-
-  // Configurações
-  const enderecoMatriz = configs.find(c => c.chave === "endereco_matriz")?.valor || "";
-  const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || "";
-  const logoUrl = configs.find(c => c.chave === "logo_url")?.valor || "";
-  const nomeEmpresa = configs.find(c => c.chave === "nome_empresa")?.valor || "";
-
-  const PONTO_PARTIDA = {
-    nome: "Matriz - Ponto de Partida",
-    endereco: enderecoMatriz || DEFAULT_MATRIZ
-  };
-
-  const selectedVeiculoData = veiculos.find(v => v.id === selectedVeiculo);
-  const selectedMotoristaData = motoristas.find(m => m.id === selectedMotorista);
 
   // Upload de Logo
   const handleLogoUpload = async (e) => {
