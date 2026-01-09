@@ -59,7 +59,7 @@ export default function PrintModal({
 
   const totalVolumesGeral = calcularVolumeTotal();
   const previsaoVolta = route && route.length > 0 ? route[route.length - 1].estimated_arrival : '-';
-  const tempoTotal = formatDuration(stats?.duration); 
+  const tempoTotal = formatDuration(stats?.time);
   const distanciaTotal = stats?.distance ? Number(stats.distance).toFixed(1) : "0.0";
   const saida = route?.[0]?.estimated_arrival || '-';
   const today = new Date().toLocaleDateString('pt-BR');
@@ -99,58 +99,24 @@ export default function PrintModal({
           <style>
             @page { size: A4; margin: 10mm; }
             body { font-family: sans-serif; font-size: 11px; color: #000; margin: 0; padding: 0; }
-            
-            /* Layout Principal */
             .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
             .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; border: 1px solid #ccc; padding: 10px; background: #f9f9f9; margin-bottom: 15px; }
-            
-            /* Fontes */
             .label-small { font-size: 8px; font-weight: bold; color: #666; text-transform: uppercase; display: block; }
             .label-large { font-size: 12px; font-weight: bold; }
-            
-            /* Tabela e Conteúdo Central */
-            /* AQUI ESTÁ O TRUQUE: min-height 50vh (metade da página) */
-            .content-wrapper {
-                min-height: 50vh; 
-                display: flex;
-                flex-direction: column;
-            }
-            
+            .content-wrapper { min-height: 50vh; display: flex; flex-direction: column; }
             table { width: 100%; border-collapse: collapse; flex-grow: 1; }
             th, td { border: 1px solid #000; padding: 6px; text-align: left; }
             th { background: #f0f0f0; font-size: 10px; }
-            
-            /* Barra de Resumo */
             .summary-bar-bottom { 
-              display: flex; 
-              justify-content: space-between; 
-              align-items: center; 
-              background-color: #f8f9fa; 
-              border: 1px solid #000;
-              padding: 8px 15px; 
-              margin-top: 15px;
-              font-size: 11px;
-              font-weight: bold;
+              display: flex; justify-content: space-between; align-items: center; 
+              background-color: #f8f9fa; border: 1px solid #000; padding: 8px 15px; 
+              margin-top: 15px; font-size: 11px; font-weight: bold;
             }
             .summary-left { display: flex; align-items: center; }
             .sep { margin: 0 10px; color: #999; font-weight: normal; }
             .volta-text { color: #000080; }
-            .total-box-bottom { 
-              background: white; 
-              border: 1px solid #ccc; 
-              padding: 5px 10px; 
-              font-weight: bold; 
-              text-transform: uppercase;
-            }
-
-            /* Assinaturas */
-            .signatures-container {
-                display: flex;
-                justify-content: space-between;
-                margin-top: 50px; /* Mais espaço antes da assinatura */
-                padding: 0 20px;
-                break-inside: avoid; /* Evita quebra de página no meio da assinatura */
-            }
+            .total-box-bottom { background: white; border: 1px solid #ccc; padding: 5px 10px; font-weight: bold; text-transform: uppercase; }
+            .signatures-container { display: flex; justify-content: space-between; margin-top: 50px; padding: 0 20px; break-inside: avoid; }
             .signature-box { width: 40%; text-align: center; }
             .signature-line { border-top: 1px solid #000; margin-bottom: 5px; }
             .signature-text { font-size: 10px; font-weight: bold; text-transform: uppercase; }
@@ -199,9 +165,7 @@ export default function PrintModal({
               <span class="sep">|</span>
               <span class="volta-text">Volta: ${previsaoVolta}</span>
             </div>
-            <div class="total-box-bottom">
-              TOTAL VOLUMES: ${totalVolumesGeral}
-            </div>
+            <div class="total-box-bottom">TOTAL VOLUMES: ${totalVolumesGeral}</div>
           </div>
 
           <div class="signatures-container">
@@ -214,7 +178,6 @@ export default function PrintModal({
                 <div class="signature-text">CONFERÊNCIA EXPEDIÇÃO</div>
             </div>
           </div>
-
         </body>
       </html>
     `);
@@ -250,7 +213,6 @@ export default function PrintModal({
 
           {/* --- PREVIEW VISUAL NA TELA --- */}
           <div className="border border-gray-300 bg-white p-6 shadow-sm">
-            {/* ... Cabeçalho do Preview ... */}
             <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
                 <div>
                     <h1 className="text-lg font-bold uppercase leading-none">{nomeEmpresa || 'NOME DA EMPRESA'}</h1>
@@ -269,7 +231,6 @@ export default function PrintModal({
                 <div><span className="block text-[10px] font-bold text-gray-500 uppercase">Saída</span><span className="text-base font-bold">{saida}</span></div>
             </div>
 
-            {/* Container com altura mínima também no preview */}
             <div className="border border-gray-300 mb-4 min-h-[300px] flex flex-col">
                 <div className="grid grid-cols-12 bg-gray-100 p-2 text-[10px] font-bold border-b uppercase">
                     <div className="col-span-1 text-center">#</div>
@@ -335,20 +296,22 @@ export default function PrintModal({
                   setIsSaving(true);
                   setSaveError(null);
                   
-                  const durationValue = stats?.duration ? Number(stats.duration) : 0;
+                  const timeValue = stats?.time ? Number(stats.time) : 0;
                   const distanceValue = stats?.distance ? Number(stats.distance) : 0;
                   
                   const dadosCompletos = {
                     data_impressao: new Date().toISOString(),
                     motorista_nome: motoristaData?.nome || "Não informado",
+                    motorista_telefone: motoristaData?.telefone || "",
                     veiculo_descricao: veiculoData?.descricao || "Não informado",
                     veiculo_placa: veiculoData?.placa || "", 
                     total_entregas: route ? route.length - 2 : 0, 
                     distancia_km: distanceValue,
-                    tempo_minutos: durationValue, 
+                    tempo_minutos: timeValue, 
                     responsavel_expedicao: expedidor,
-                    endereco_matriz: route?.[0]?.address || "Matriz",
+                    endereco_matriz: route?.[0]?.address || pontoPartida?.endereco || "Matriz",
                     rota: route,
+                    notas_fiscais: notasFiscais || {},
                     total_volumes: totalVolumesGeral
                   };
 
