@@ -45,6 +45,9 @@ export default function Relatorios() {
   const [filterLabel, setFilterLabel] = useState("Todos");
   const [searchMotorista, setSearchMotorista] = useState("");
   const [searchNotaFiscal, setSearchNotaFiscal] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [showTimeDialog, setShowTimeDialog] = useState(false);
 
   // Ocorrências (Estado local para edição no modal)
   const [occurrences, setOccurrences] = useState({});
@@ -76,8 +79,27 @@ export default function Relatorios() {
       
       // Filtro de data
       if (startDate || endDate) {
-        const start = startDate ? moment(startDate).startOf("day") : null;
-        const end = endDate ? moment(endDate).endOf("day") : null;
+        let start = startDate ? moment(startDate) : null;
+        let end = endDate ? moment(endDate) : null;
+        
+        // Aplica horário se definido
+        if (start) {
+          if (startTime) {
+            const [h, m] = startTime.split(':');
+            start = start.clone().hour(parseInt(h)).minute(parseInt(m));
+          } else {
+            start = start.startOf("day");
+          }
+        }
+        if (end) {
+          if (endTime) {
+            const [h, m] = endTime.split(':');
+            end = end.clone().hour(parseInt(h)).minute(parseInt(m));
+          } else {
+            end = end.endOf("day");
+          }
+        }
+        
         if (start && dataRelatorio.isBefore(start)) return false;
         if (end && dataRelatorio.isAfter(end)) return false;
       }
@@ -104,7 +126,7 @@ export default function Relatorios() {
 
       return true;
     });
-  }, [relatorios, startDate, endDate, searchMotorista, searchNotaFiscal]);
+  }, [relatorios, startDate, endDate, startTime, endTime, searchMotorista, searchNotaFiscal]);
 
   // --- ESTATÍSTICAS (RESUMO DETALHADO) ---
   const stats = useMemo(() => {
@@ -146,6 +168,7 @@ export default function Relatorios() {
     if (type === "dia") {
       setStartDate(now.format("YYYY-MM-DD"));
       setEndDate(now.format("YYYY-MM-DD"));
+      setShowTimeDialog(true);
       setFilterLabel("Hoje");
     } else if (type === "semana") {
       setStartDate(now.clone().startOf("week").format("YYYY-MM-DD"));
@@ -165,6 +188,8 @@ export default function Relatorios() {
   const clearAllFilters = () => {
     setStartDate("");
     setEndDate("");
+    setStartTime("");
+    setEndTime("");
     setSearchMotorista("");
     setSearchNotaFiscal("");
     setFilterLabel("Todos");
@@ -637,6 +662,61 @@ export default function Relatorios() {
                     {updateOcorrenciasMutation.isPending ? "Salvando..." : "Salvar Ocorrências"}
                 </Button>
             </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- DIALOG DE SELEÇÃO DE HORÁRIO --- */}
+      <Dialog open={showTimeDialog} onOpenChange={setShowTimeDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-blue-600" />
+              Filtrar por Horário
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-gray-500">
+              Selecione o intervalo de horário para filtrar os relatórios de hoje.
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">De:</label>
+                <Input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">Até:</label>
+                <Input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setStartTime("");
+                setEndTime("");
+                setShowTimeDialog(false);
+              }}
+            >
+              Dia Inteiro
+            </Button>
+            <Button onClick={() => setShowTimeDialog(false)}>
+              Aplicar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>);
