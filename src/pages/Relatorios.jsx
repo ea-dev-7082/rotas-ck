@@ -43,6 +43,8 @@ export default function Relatorios() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [filterLabel, setFilterLabel] = useState("Todos");
+  const [searchMotorista, setSearchMotorista] = useState("");
+  const [searchNotaFiscal, setSearchNotaFiscal] = useState("");
 
   // Ocorrências (Estado local para edição no modal)
   const [occurrences, setOccurrences] = useState({});
@@ -70,18 +72,39 @@ export default function Relatorios() {
   // --- FILTRAGEM ---
   const filteredRelatorios = useMemo(() => {
     return relatorios.filter((relatorio) => {
-      if (!startDate && !endDate) return true;
-
       const dataRelatorio = moment(relatorio.data_impressao);
-      const start = startDate ? moment(startDate).startOf("day") : null;
-      const end = endDate ? moment(endDate).endOf("day") : null;
+      
+      // Filtro de data
+      if (startDate || endDate) {
+        const start = startDate ? moment(startDate).startOf("day") : null;
+        const end = endDate ? moment(endDate).endOf("day") : null;
+        if (start && dataRelatorio.isBefore(start)) return false;
+        if (end && dataRelatorio.isAfter(end)) return false;
+      }
 
-      if (start && dataRelatorio.isBefore(start)) return false;
-      if (end && dataRelatorio.isAfter(end)) return false;
+      // Filtro de motorista
+      if (searchMotorista) {
+        const motoristaNome = (relatorio.motorista_nome || "").toLowerCase();
+        if (!motoristaNome.includes(searchMotorista.toLowerCase())) return false;
+      }
+
+      // Filtro de nota fiscal
+      if (searchNotaFiscal) {
+        const rota = relatorio.rota || [];
+        const notasEncontradas = rota.some(item => {
+          const notas = item.notas_fiscais || [];
+          return notas.some(n => (n.numero || "").toLowerCase().includes(searchNotaFiscal.toLowerCase()));
+        });
+        const notasAntigo = relatorio.notas_fiscais || {};
+        const notasAntigoFound = Object.values(notasAntigo).flat().some(n => 
+          (n.numero || "").toLowerCase().includes(searchNotaFiscal.toLowerCase())
+        );
+        if (!notasEncontradas && !notasAntigoFound) return false;
+      }
 
       return true;
     });
-  }, [relatorios, startDate, endDate]);
+  }, [relatorios, startDate, endDate, searchMotorista, searchNotaFiscal]);
 
   // --- ESTATÍSTICAS (RESUMO DETALHADO) ---
   const stats = useMemo(() => {
@@ -137,6 +160,14 @@ export default function Relatorios() {
       setEndDate("");
       setFilterLabel("Todos");
     }
+  };
+
+  const clearAllFilters = () => {
+    setStartDate("");
+    setEndDate("");
+    setSearchMotorista("");
+    setSearchNotaFiscal("");
+    setFilterLabel("Todos");
   };
 
   const handleViewDetails = (relatorio) => {
@@ -364,17 +395,38 @@ export default function Relatorios() {
 
 
                 </div>
-                {(startDate || endDate) &&
+                {(startDate || endDate || searchMotorista || searchNotaFiscal) &&
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => applyQuickFilter("todos")}
+                  onClick={clearAllFilters}
                   className="h-8 w-8 text-gray-500 hover:text-red-500"
                   title="Limpar filtros">
-
                     <X className="w-4 h-4" />
                   </Button>
                 }
+              </div>
+            </div>
+            
+            {/* Filtros de busca */}
+            <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar motorista..."
+                  value={searchMotorista}
+                  onChange={(e) => setSearchMotorista(e.target.value)}
+                  className="h-9 w-[180px] text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar nota fiscal..."
+                  value={searchNotaFiscal}
+                  onChange={(e) => setSearchNotaFiscal(e.target.value)}
+                  className="h-9 w-[180px] text-sm"
+                />
               </div>
             </div>
           </CardHeader>
