@@ -43,6 +43,11 @@ export default function Relatorios() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [filterLabel, setFilterLabel] = useState("Todos");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [showTimeDialog, setShowTimeDialog] = useState(false);
+  const [searchMotorista, setSearchMotorista] = useState("");
+  const [searchNotaFiscal, setSearchNotaFiscal] = useState("");
 
   // Ocorrências (Estado local para edição no modal)
   const [occurrences, setOccurrences] = useState({});
@@ -70,18 +75,59 @@ export default function Relatorios() {
   // --- FILTRAGEM ---
   const filteredRelatorios = useMemo(() => {
     return relatorios.filter((relatorio) => {
-      if (!startDate && !endDate) return true;
-
       const dataRelatorio = moment(relatorio.data_impressao);
-      const start = startDate ? moment(startDate).startOf("day") : null;
-      const end = endDate ? moment(endDate).endOf("day") : null;
+      
+      // Filtro de data
+      if (startDate || endDate) {
+        let start = startDate ? moment(startDate) : null;
+        let end = endDate ? moment(endDate) : null;
+        
+        // Aplica horário se definido
+        if (start) {
+          if (startTime) {
+            const [h, m] = startTime.split(':');
+            start = start.clone().hour(parseInt(h)).minute(parseInt(m));
+          } else {
+            start = start.startOf("day");
+          }
+        }
+        if (end) {
+          if (endTime) {
+            const [h, m] = endTime.split(':');
+            end = end.clone().hour(parseInt(h)).minute(parseInt(m));
+          } else {
+            end = end.endOf("day");
+          }
+        }
 
-      if (start && dataRelatorio.isBefore(start)) return false;
-      if (end && dataRelatorio.isAfter(end)) return false;
+        if (start && dataRelatorio.isBefore(start)) return false;
+        if (end && dataRelatorio.isAfter(end)) return false;
+      }
+
+      // Filtro de motorista
+      if (searchMotorista) {
+        const motoristaNome = (relatorio.motorista_nome || "").toLowerCase();
+        if (!motoristaNome.includes(searchMotorista.toLowerCase())) return false;
+      }
+
+      // Filtro de nota fiscal
+      if (searchNotaFiscal) {
+        const rota = relatorio.rota || [];
+        const notasEncontradas = rota.some(item => {
+          const notas = item.notas_fiscais || [];
+          return notas.some(n => (n.numero || "").toLowerCase().includes(searchNotaFiscal.toLowerCase()));
+        });
+        // Também verifica no campo notas_fiscais do relatório (formato antigo)
+        const notasAntigo = relatorio.notas_fiscais || {};
+        const notasAntigoFound = Object.values(notasAntigo).flat().some(n => 
+          (n.numero || "").toLowerCase().includes(searchNotaFiscal.toLowerCase())
+        );
+        if (!notasEncontradas && !notasAntigoFound) return false;
+      }
 
       return true;
     });
-  }, [relatorios, startDate, endDate]);
+  }, [relatorios, startDate, endDate, startTime, endTime, searchMotorista, searchNotaFiscal]);
 
   // --- ESTATÍSTICAS (RESUMO DETALHADO) ---
   const stats = useMemo(() => {
@@ -123,20 +169,37 @@ export default function Relatorios() {
     if (type === "dia") {
       setStartDate(now.format("YYYY-MM-DD"));
       setEndDate(now.format("YYYY-MM-DD"));
+      setShowTimeDialog(true);
       setFilterLabel("Hoje");
     } else if (type === "semana") {
       setStartDate(now.clone().startOf("week").format("YYYY-MM-DD"));
       setEndDate(now.clone().endOf("week").format("YYYY-MM-DD"));
+      setStartTime("");
+      setEndTime("");
       setFilterLabel("Esta Semana");
     } else if (type === "mes") {
       setStartDate(now.clone().startOf("month").format("YYYY-MM-DD"));
       setEndDate(now.clone().endOf("month").format("YYYY-MM-DD"));
+      setStartTime("");
+      setEndTime("");
       setFilterLabel("Este Mês");
     } else {
       setStartDate("");
       setEndDate("");
+      setStartTime("");
+      setEndTime("");
       setFilterLabel("Todos");
     }
+  };
+
+  const clearAllFilters = () => {
+    setStartDate("");
+    setEndDate("");
+    setStartTime("");
+    setEndTime("");
+    setSearchMotorista("");
+    setSearchNotaFiscal("");
+    setFilterLabel("Todos");
   };
 
   const handleViewDetails = (relatorio) => {
@@ -348,34 +411,59 @@ export default function Relatorios() {
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500 font-medium whitespace-nowrap hidden sm:inline">
                     <Filter className="w-3 h-3 inline mr-1" />
-                    Personalizado:
+                    Período:
                   </span>
                   <Input
                     type="date"
                     value={startDate}
-                    onChange={(e) => {setStartDate(e.target.value);setFilterLabel("Personalizado");}} className="bg-white px-1 py-1 text-xs rounded-md flex border border-input shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-8 w-[130px]" />
-
-
+                    onChange={(e) => {setStartDate(e.target.value);setFilterLabel("Personalizado");}} 
+                    className="bg-white h-8 w-[130px] text-sm" />
                   <span className="text-gray-400 text-xs">até</span>
                   <Input
                     type="date"
                     value={endDate}
-                    onChange={(e) => {setEndDate(e.target.value);setFilterLabel("Personalizado");}} className="bg-white px-1 py-1 text-xs rounded-md flex border border-input shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-8 w-[130px]" />
-
-
+                    onChange={(e) => {setEndDate(e.target.value);setFilterLabel("Personalizado");}} 
+                    className="bg-white h-8 w-[130px] text-sm" />
                 </div>
-                {(startDate || endDate) &&
+                {(startDate || endDate || searchMotorista || searchNotaFiscal) &&
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => applyQuickFilter("todos")}
+                  onClick={clearAllFilters}
                   className="h-8 w-8 text-gray-500 hover:text-red-500"
                   title="Limpar filtros">
-
                     <X className="w-4 h-4" />
                   </Button>
                 }
               </div>
+            </div>
+            
+            {/* Filtros de busca */}
+            <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar motorista..."
+                  value={searchMotorista}
+                  onChange={(e) => setSearchMotorista(e.target.value)}
+                  className="h-9 w-[180px] text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar nota fiscal..."
+                  value={searchNotaFiscal}
+                  onChange={(e) => setSearchNotaFiscal(e.target.value)}
+                  className="h-9 w-[180px] text-sm"
+                />
+              </div>
+              {(startTime || endTime) && (
+                <Badge variant="secondary" className="h-9 px-3 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {startTime || "00:00"} - {endTime || "23:59"}
+                </Badge>
+              )}
             </div>
           </CardHeader>
           
@@ -581,6 +669,60 @@ export default function Relatorios() {
                     {updateOcorrenciasMutation.isPending ? "Salvando..." : "Salvar Ocorrências"}
                 </Button>
             </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* --- DIALOG DE SELEÇÃO DE HORÁRIO --- */}
+      <Dialog open={showTimeDialog} onOpenChange={setShowTimeDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-blue-600" />
+              Filtrar por Horário
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-gray-500">
+              Selecione o intervalo de horário para filtrar os relatórios de hoje.
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">De:</label>
+                <Input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">Até:</label>
+                <Input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setStartTime("");
+                setEndTime("");
+                setShowTimeDialog(false);
+              }}
+            >
+              Dia Inteiro
+            </Button>
+            <Button onClick={() => setShowTimeDialog(false)}>
+              Aplicar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>);
