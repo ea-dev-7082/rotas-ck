@@ -412,12 +412,16 @@ export default function Relatorios() {
             <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-gray-100">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar motorista..."
+                <select
                   value={searchMotorista}
                   onChange={(e) => setSearchMotorista(e.target.value)}
-                  className="h-9 w-[180px] text-sm"
-                />
+                  className="h-9 w-[180px] text-sm border border-gray-200 rounded-md px-3 bg-white focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">Todos os motoristas</option>
+                  {[...new Set(relatorios.map(r => r.motorista_nome).filter(Boolean))].sort().map((motorista) => (
+                    <option key={motorista} value={motorista}>{motorista}</option>
+                  ))}
+                </select>
               </div>
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-gray-400" />
