@@ -610,34 +610,61 @@ export default function Relatorios() {
               {/* Lista de Entregas com Campo de Ocorrência */}
               <div>
                 <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-orange-500" />
-                    Registro de Ocorrências
+                    <MapPin className="w-5 h-5 text-blue-500" />
+                    Entregas ({(selectedRelatorio.rota || []).length - 2})
                 </h3>
                 <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                   {(selectedRelatorio.rota || []).slice(1, -1).map((item, idx) => {
-                  // Ajuste de índice: O array 'rota' inclui origem e destino, mas o slice(1, -1) remove.
-                  // Para acessar o índice correto na rota original, precisamos somar 1.
                   const originalIndex = idx + 1;
+                  
+                  // Busca notas fiscais (novo formato na rota ou formato antigo)
+                  const notasNovo = item.notas_fiscais || [];
+                  const notasAntigo = selectedRelatorio.notas_fiscais?.[item.client_name] || [];
+                  const notas = notasNovo.length > 0 ? notasNovo : notasAntigo;
+                  const volumeTotal = item.volume_total || notas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
 
                   return (
                     <div key={idx} className="flex flex-col gap-3 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
                       <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">
+                        <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">
                           {idx + 1}
                         </div>
                         <div className="flex-1">
                           <p className="font-bold text-gray-900">{item.client_name}</p>
                           <p className="text-sm text-gray-500">{item.address}</p>
+                          
+                          {/* Notas Fiscais e Volume */}
+                          {notas.length > 0 && (
+                            <div className="mt-2 p-2 bg-gray-50 rounded-lg border">
+                              <div className="flex flex-wrap gap-2 items-center">
+                                <span className="text-xs font-semibold text-gray-500">NF:</span>
+                                {notas.map((nota, nIdx) => (
+                                  <Badge key={nIdx} variant="outline" className="text-xs">
+                                    {nota.numero}
+                                    {nota.volume && <span className="ml-1 text-blue-600">({nota.volume} vol)</span>}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        {item.estimated_arrival &&
-                        <Badge variant="secondary">{item.estimated_arrival}</Badge>
-                        }
+                        <div className="text-right shrink-0">
+                          {item.estimated_arrival && (
+                            <Badge variant="secondary" className="mb-1">{item.estimated_arrival}</Badge>
+                          )}
+                          {volumeTotal > 0 && (
+                            <div className="text-xs font-bold text-blue-600 mt-1">
+                              {volumeTotal} vol
+                            </div>
+                          )}
+                        </div>
                       </div>
                       
                       {/* Campo de Ocorrência */}
                       <div className="ml-11">
-                        <label className="text-xs font-semibold text-gray-500 mb-1 block">
-                            Observações / Ocorrência:
+                        <label className="text-xs font-semibold text-gray-500 mb-1 block flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-orange-500" />
+                            Ocorrência:
                         </label>
                         <Textarea
                           placeholder="Ex: Cliente ausente, endereço não localizado..."
@@ -647,12 +674,22 @@ export default function Relatorios() {
                             [originalIndex]: e.target.value
                           }))}
                           className="text-sm min-h-[60px] bg-yellow-50/50 border-yellow-200 focus:border-yellow-400" />
-
                       </div>
                     </div>);
                 })}
                 </div>
               </div>
+              
+              {/* Total de Volumes */}
+              {selectedRelatorio.total_volumes > 0 && (
+                <div className="flex justify-end">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+                    <span className="text-sm font-bold text-blue-800">
+                      TOTAL VOLUMES: {selectedRelatorio.total_volumes}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           }
 
