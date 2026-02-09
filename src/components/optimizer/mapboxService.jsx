@@ -121,14 +121,16 @@ export async function getDirections(coordinates, mapboxToken) {
   return data;
 }
 
-// --- CONSTANTES DE TEMPO (CONSISTENTES EM TODO O APP) ---
+// --- CONSTANTES DE TEMPO (VALORES PADRÃO - USADOS COMO FALLBACK) ---
 export const TIME_CONFIG = {
-  TRAFFIC_BUFFER: 1.10,  // +10% tempo de segurança para trânsito
-  SERVICE_TIME: 15       // 15 min parado por entrega
+  TRAFFIC_BUFFER: 1.10,  // +10% tempo de segurança para trânsito (padrão)
+  SERVICE_TIME: 20       // 20 min parado por entrega (padrão)
 };
 
-// --- PROCESSAMENTO FINAL (Com Buffers de Tempo) ---
-export function processOptimizationResult(optimizationData, originalPoints, startTime) {
+// --- PROCESSAMENTO FINAL (Com Buffers de Tempo Parametrizáveis) ---
+// serviceTime = tempo de parada por entrega (minutos)
+// trafficBuffer = margem de trânsito (percentual, ex: 10 para 10%)
+export function processOptimizationResult(optimizationData, originalPoints, startTime, serviceTime = TIME_CONFIG.SERVICE_TIME, trafficBuffer = 10) {
   if (!optimizationData.trips || optimizationData.trips.length === 0) {
       console.warn("Mapbox não otimizou. Retornando ordem original.");
       return { 
@@ -144,7 +146,9 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   const waypoints = optimizationData.waypoints;
   const legs = trip.legs || [];
   
-  const { TRAFFIC_BUFFER, SERVICE_TIME } = TIME_CONFIG;
+  // Converte margem de % para multiplicador (ex: 10% -> 1.10)
+  const TRAFFIC_BUFFER = 1 + (trafficBuffer / 100);
+  const SERVICE_TIME = serviceTime;
 
   const validOriginalPoints = originalPoints.filter(p => p.latitude && p.longitude);
 
@@ -229,7 +233,7 @@ export function processOptimizationResult(optimizationData, originalPoints, star
     route_geometry: routeGeometry,
     total_distance_km: (trip.distance || 0) / 1000,
     total_time_minutes: totalDrivingTime + totalServiceTime,
-    optimization_notes: `Rota otimizada com trânsito real (+25% margem). Inclui 20 min de parada por entrega.`
+    optimization_notes: `Rota otimizada com trânsito real (+${trafficBuffer}% margem). Inclui ${SERVICE_TIME} min de parada por entrega.`
   };
 }
 

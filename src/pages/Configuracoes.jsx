@@ -43,6 +43,8 @@ export default function Configuracoes() {
   const [empresaSaved, setEmpresaSaved] = useState(false);
   const [tempoParadaEntrega, setTempoParadaEntrega] = useState("20");
   const [tempoParadaSaved, setTempoParadaSaved] = useState(false);
+  const [margemTransito, setMargemTransito] = useState("10");
+  const [margemTransitoSaved, setMargemTransitoSaved] = useState(false);
 
   const [showMotoristaDialog, setShowMotoristaDialog] = useState(false);
   const [editingMotorista, setEditingMotorista] = useState(null);
@@ -99,6 +101,7 @@ export default function Configuracoes() {
       setEnderecoMatriz(configs.find(c => c.chave === "endereco_matriz")?.valor || "");
       setNomeEmpresa(configs.find(c => c.chave === "nome_empresa")?.valor || "");
       setTempoParadaEntrega(configs.find(c => c.chave === "tempo_parada_entrega")?.valor || "20");
+      setMargemTransito(configs.find(c => c.chave === "margem_transito")?.valor || "10");
     }
   }, [configs]);
 
@@ -117,6 +120,7 @@ export default function Configuracoes() {
       if (variables.chave === "endereco_matriz") { setMatrizSaved(true); setTimeout(() => setMatrizSaved(false), 3000); }
       if (variables.chave === "nome_empresa") { setEmpresaSaved(true); setTimeout(() => setEmpresaSaved(false), 3000); }
       if (variables.chave === "tempo_parada_entrega") { setTempoParadaSaved(true); setTimeout(() => setTempoParadaSaved(false), 3000); }
+      if (variables.chave === "margem_transito") { setMargemTransitoSaved(true); setTimeout(() => setMargemTransitoSaved(false), 3000); }
     },
   });
 
@@ -256,6 +260,31 @@ export default function Configuracoes() {
                 </Button>
               </div>
               <p className="text-xs text-orange-600 bg-orange-50 p-2 rounded">Tempo médio que o motorista leva em cada parada para estacionar e fazer a entrega. Usado no cálculo das rotas.</p>
+            </CardContent>
+          </Card>
+
+          {/* Margem de Trânsito */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-lg flex items-center gap-2"><Settings className="w-4 h-4 text-red-600" /> Margem de Trânsito</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-3">
+              <div className="flex gap-2 items-center">
+                <Input 
+                  type="number" 
+                  min="0" 
+                  max="100"
+                  value={margemTransito} 
+                  onChange={(e) => setMargemTransito(e.target.value)} 
+                  placeholder="10"
+                  className="w-24"
+                />
+                <span className="text-gray-600">%</span>
+                <Button onClick={() => saveConfigMutation.mutate({ chave: "margem_transito", valor: margemTransito })} className="bg-red-600 hover:bg-red-700 ml-auto">
+                  {margemTransitoSaved ? "Salvo" : "Salvar"}
+                </Button>
+              </div>
+              <p className="text-xs text-red-600 bg-red-50 p-2 rounded">Percentual de segurança adicionado ao tempo de viagem para compensar imprevistos no trânsito. Ex: 10% = tempo Mapbox + 10%.</p>
             </CardContent>
           </Card>
 

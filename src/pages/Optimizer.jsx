@@ -76,6 +76,7 @@ export default function Optimizer() {
   const logoUrl = configs.find(c => c.chave === "logo_url")?.valor || "";
   const nomeEmpresa = configs.find(c => c.chave === "nome_empresa")?.valor || "";
   const tempoParadaEntrega = parseInt(configs.find(c => c.chave === "tempo_parada_entrega")?.valor) || 20;
+  const margemTransito = parseInt(configs.find(c => c.chave === "margem_transito")?.valor) || 10;
 
   const PONTO_PARTIDA = {
     nome: "Matriz - Ponto de Partida",
@@ -292,7 +293,7 @@ export default function Optimizer() {
       }
 
       const optimizationData = await optimizeRoute(pontosParaOtimizar, mapboxToken);
-      const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime, tempoParadaEntrega);
+      const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime, tempoParadaEntrega, margemTransito);
 
       setOptimizedRoute(result.optimized_route);
       setStats({
