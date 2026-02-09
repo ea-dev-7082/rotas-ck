@@ -441,7 +441,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
 
         let currentTime = parseTime(startTime);
         
-        const { TRAFFIC_BUFFER } = TIME_CONFIG;
+        const TRAFFIC_BUFFER = 1 + (margemTransito / 100);
         const SERVICE_TIME = tempoParadaEntrega;
 
         const matrizInicio = {
