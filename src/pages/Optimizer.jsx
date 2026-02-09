@@ -75,6 +75,7 @@ export default function Optimizer() {
   const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || "";
   const logoUrl = configs.find(c => c.chave === "logo_url")?.valor || "";
   const nomeEmpresa = configs.find(c => c.chave === "nome_empresa")?.valor || "";
+  const tempoParadaEntrega = parseInt(configs.find(c => c.chave === "tempo_parada_entrega")?.valor) || 20;
 
   const PONTO_PARTIDA = {
     nome: "Matriz - Ponto de Partida",
@@ -291,7 +292,7 @@ export default function Optimizer() {
       }
 
       const optimizationData = await optimizeRoute(pontosParaOtimizar, mapboxToken);
-      const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime);
+      const result = processOptimizationResult(optimizationData, pontosParaOtimizar, startTime, tempoParadaEntrega);
 
       setOptimizedRoute(result.optimized_route);
       setStats({
@@ -439,7 +440,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
 
         let currentTime = parseTime(startTime);
         
-        const { TRAFFIC_BUFFER, SERVICE_TIME } = TIME_CONFIG;
+        const { TRAFFIC_BUFFER } = TIME_CONFIG;
+        const SERVICE_TIME = tempoParadaEntrega;
 
         const matrizInicio = {
           order: 1,
@@ -556,7 +558,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       const geocoded = geocodedClients.find(g => g.nome?.trim() === item.client_name?.trim()) || item;
       
       // Tempo médio entre entregas (incluindo deslocamento e parada)
-    if (idx > 0) currentTime += TIME_CONFIG.SERVICE_TIME + 5; else currentTime += 10;
+    if (idx > 0) currentTime += tempoParadaEntrega + 5; else currentTime += 10;
 
       route.push({
         order: currentOrder++,

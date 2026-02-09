@@ -41,6 +41,8 @@ export default function Configuracoes() {
   const [matrizSaved, setMatrizSaved] = useState(false);
   const [nomeEmpresa, setNomeEmpresa] = useState("");
   const [empresaSaved, setEmpresaSaved] = useState(false);
+  const [tempoParadaEntrega, setTempoParadaEntrega] = useState("20");
+  const [tempoParadaSaved, setTempoParadaSaved] = useState(false);
 
   const [showMotoristaDialog, setShowMotoristaDialog] = useState(false);
   const [editingMotorista, setEditingMotorista] = useState(null);
@@ -96,6 +98,7 @@ export default function Configuracoes() {
       setMapboxToken(configs.find(c => c.chave === "mapbox_token")?.valor || "");
       setEnderecoMatriz(configs.find(c => c.chave === "endereco_matriz")?.valor || "");
       setNomeEmpresa(configs.find(c => c.chave === "nome_empresa")?.valor || "");
+      setTempoParadaEntrega(configs.find(c => c.chave === "tempo_parada_entrega")?.valor || "20");
     }
   }, [configs]);
 
@@ -113,6 +116,7 @@ export default function Configuracoes() {
       if (variables.chave === "mapbox_token") { setTokenSaved(true); setTimeout(() => setTokenSaved(false), 3000); }
       if (variables.chave === "endereco_matriz") { setMatrizSaved(true); setTimeout(() => setMatrizSaved(false), 3000); }
       if (variables.chave === "nome_empresa") { setEmpresaSaved(true); setTimeout(() => setEmpresaSaved(false), 3000); }
+      if (variables.chave === "tempo_parada_entrega") { setTempoParadaSaved(true); setTimeout(() => setTempoParadaSaved(false), 3000); }
     },
   });
 
@@ -227,6 +231,31 @@ export default function Configuracoes() {
                   {matrizSaved ? "Salvo" : "Salvar"}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Tempo de Parada por Entrega */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-lg flex items-center gap-2"><Settings className="w-4 h-4 text-orange-600" /> Tempo de Parada por Entrega</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-3">
+              <div className="flex gap-2 items-center">
+                <Input 
+                  type="number" 
+                  min="1" 
+                  max="120"
+                  value={tempoParadaEntrega} 
+                  onChange={(e) => setTempoParadaEntrega(e.target.value)} 
+                  placeholder="20"
+                  className="w-24"
+                />
+                <span className="text-gray-600">minutos</span>
+                <Button onClick={() => saveConfigMutation.mutate({ chave: "tempo_parada_entrega", valor: tempoParadaEntrega })} className="bg-orange-600 hover:bg-orange-700 ml-auto">
+                  {tempoParadaSaved ? "Salvo" : "Salvar"}
+                </Button>
+              </div>
+              <p className="text-xs text-orange-600 bg-orange-50 p-2 rounded">Tempo médio que o motorista leva em cada parada para estacionar e fazer a entrega. Usado no cálculo das rotas.</p>
             </CardContent>
           </Card>
 
