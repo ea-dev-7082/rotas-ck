@@ -20,19 +20,6 @@ export default function DriverDashboard() {
   // Busca rotas do motorista para hoje
   const today = format(new Date(), "yyyy-MM-dd");
 
-  // Primeiro busca o motorista vinculado ao email do usuário
-  const { data: motorista } = useQuery({
-    queryKey: ["motorista-usuario", currentUser?.email],
-    queryFn: async () => {
-      if (!currentUser) return null;
-      const motoristas = await base44.entities.Motorista.filter({
-        email: currentUser.email,
-      });
-      return motoristas[0] || null;
-    },
-    enabled: !!currentUser,
-  });
-
   const { data: rotasHoje, isLoading } = useQuery({
     queryKey: ["rotas-motorista-hoje", currentUser?.email, today],
     queryFn: async () => {
