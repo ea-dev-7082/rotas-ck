@@ -338,6 +338,7 @@ export default function PrintModal({
                     data_agendamento: new Date().toISOString(),
                     motorista_id: motoristaData?.id || "",
                     motorista_nome: motoristaData?.nome || "Não informado",
+                    motorista_email: motoristaData?.email || "",
                     veiculo_id: veiculoData?.id || "",
                     veiculo_descricao: veiculoData?.descricao || "Não informado",
                     veiculo_placa: veiculoData?.placa || "", 
