@@ -20,21 +20,33 @@ export default function DriverDashboard() {
   // Busca rotas do motorista para hoje
   const today = format(new Date(), "yyyy-MM-dd");
 
-  const { data: rotasHoje, isLoading } = useQuery({
-    queryKey: ["rotas-motorista-hoje", currentUser?.email, today],
+  // Primeiro busca o motorista vinculado ao email do usuário
+  const { data: motorista } = useQuery({
+    queryKey: ["motorista-usuario", currentUser?.email],
     queryFn: async () => {
-      if (!currentUser) return [];
-      // Busca rotas onde o motorista_nome contém o nome do usuário atual
-      const todasRotas = await base44.entities.RotaAgendada.filter({
-        owner: currentUser.email,
-      }, "-data_prevista");
-      
-      // Filtra rotas de hoje ou em andamento
-      return todasRotas.filter(r => 
-        r.data_prevista === today || r.status === "em_andamento"
-      );
+      if (!currentUser) return null;
+      const motoristas = await base44.entities.Motorista.filter({
+        email: currentUser.email,
+      });
+      return motoristas[0] || null;
     },
     enabled: !!currentUser,
+  });
+
+  const { data: rotasHoje, isLoading } = useQuery({
+    queryKey: ["rotas-motorista-hoje", motorista?.id, today],
+    queryFn: async () => {
+      if (!motorista) return [];
+      // Busca todas as rotas e filtra pelo motorista_id
+      const todasRotas = await base44.entities.RotaAgendada.list("-data_prevista");
+      
+      // Filtra rotas deste motorista (hoje ou em andamento)
+      return todasRotas.filter(r => 
+        r.motorista_id === motorista.id && 
+        (r.data_prevista === today || r.status === "em_andamento")
+      );
+    },
+    enabled: !!motorista,
     initialData: [],
   });
 
