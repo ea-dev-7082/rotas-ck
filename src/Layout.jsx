@@ -1,12 +1,34 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { base44 } from "@/api/base44Client";
 import { Route, Users, Settings, FileText, CalendarClock, Truck } from "lucide-react";
 
 const LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/250c13318_image.png";
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
+  const [userRole, setUserRole] = React.useState(null);
+
+  React.useEffect(() => {
+    base44.auth.me().then(user => setUserRole(user?.role || "user"));
+  }, []);
+
+  // Páginas do motorista - não mostram header principal
+  const driverPages = ["DriverDashboard", "DriverRouteView", "DriverHistory", "DriverVehicle"];
+  const isDriverPage = driverPages.includes(currentPageName);
+
+  // Se for motorista, redireciona para área do motorista
+  React.useEffect(() => {
+    if (userRole === "motorista" && !isDriverPage) {
+      window.location.href = createPageUrl("DriverDashboard");
+    }
+  }, [userRole, isDriverPage]);
+
+  // Se é página de motorista, não mostra o layout principal
+  if (isDriverPage) {
+    return <>{children}</>;
+  }
 
   const navigationItems = [
     {
