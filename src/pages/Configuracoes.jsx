@@ -30,7 +30,12 @@ import {
   Car,
   Bike,
   LogOut,
+  Mail,
+  Send,
+  Loader2,
+  UserCheck,
 } from "lucide-react";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Configuracoes() {
@@ -50,10 +55,12 @@ export default function Configuracoes() {
   const [editingMotorista, setEditingMotorista] = useState(null);
   const [motoristaForm, setMotoristaForm] = useState({
     nome: "",
+    email: "",
     telefone: "",
     cnh: "",
     ativo: true,
   });
+  const [sendingInvite, setSendingInvite] = useState(null);
 
   const [showVeiculoDialog, setShowVeiculoDialog] = useState(false);
   const [editingVeiculo, setEditingVeiculo] = useState(null);
@@ -164,7 +171,24 @@ export default function Configuracoes() {
   const handleCloseMotoristaDialog = () => {
     setShowMotoristaDialog(false);
     setEditingMotorista(null);
-    setMotoristaForm({ nome: "", telefone: "", cnh: "", ativo: true });
+    setMotoristaForm({ nome: "", email: "", telefone: "", cnh: "", ativo: true });
+  };
+
+  const handleSendInvite = async (motorista) => {
+    if (!motorista.email) {
+      toast.error("Motorista não possui email cadastrado");
+      return;
+    }
+    setSendingInvite(motorista.id);
+    try {
+      await base44.users.inviteUser(motorista.email, "motorista");
+      await base44.entities.Motorista.update(motorista.id, { convite_enviado: true });
+      queryClient.invalidateQueries({ queryKey: ["motoristas"] });
+      toast.success(`Convite enviado para ${motorista.email}`);
+    } catch (error) {
+      toast.error("Erro ao enviar convite: " + (error.message || "Tente novamente"));
+    }
+    setSendingInvite(null);
   };
 
   return (
@@ -332,17 +356,38 @@ export default function Configuracoes() {
                 <div className="space-y-3 pr-4">
                   <AnimatePresence>
                     {motoristas.map((motorista) => (
-                      <motion.div key={motorista.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-4 bg-white border rounded-lg shadow-sm flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold">{motorista.nome}</span>
-                            <Badge variant={motorista.ativo ? "outline" : "secondary"} className={motorista.ativo ? "text-emerald-600 border-emerald-200 bg-emerald-50" : ""}>{motorista.ativo ? "Ativo" : "Inativo"}</Badge>
+                      <motion.div key={motorista.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-4 bg-white border rounded-lg shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold">{motorista.nome}</span>
+                              <Badge variant={motorista.ativo ? "outline" : "secondary"} className={motorista.ativo ? "text-emerald-600 border-emerald-200 bg-emerald-50" : ""}>{motorista.ativo ? "Ativo" : "Inativo"}</Badge>
+                              {motorista.convite_enviado && (
+                                <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
+                                  <UserCheck size={12} className="mr-1" /> Convidado
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {motorista.email && <><Mail size={12} className="inline mr-1" />{motorista.email} | </>}
+                              📱 {motorista.telefone || "N/A"} | CNH: {motorista.cnh || "N/A"}
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">📱 {motorista.telefone || "N/A"} | CNH: {motorista.cnh || "N/A"}</p>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => { setEditingMotorista(motorista); setMotoristaForm(motorista); setShowMotoristaDialog(true); }}><Edit size={14} /></Button>
-                          <Button variant="ghost" size="icon" className="text-red-500" onClick={() => deleteMotoristaMutation.mutate(motorista.id)}><Trash2 size={14} /></Button>
+                          <div className="flex gap-1 ml-2">
+                            {motorista.email && !motorista.convite_enviado && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-blue-600"
+                                onClick={() => handleSendInvite(motorista)}
+                                disabled={sendingInvite === motorista.id}
+                              >
+                                {sendingInvite === motorista.id ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" onClick={() => { setEditingMotorista(motorista); setMotoristaForm(motorista); setShowMotoristaDialog(true); }}><Edit size={14} /></Button>
+                            <Button variant="ghost" size="icon" className="text-red-500" onClick={() => deleteMotoristaMutation.mutate(motorista.id)}><Trash2 size={14} /></Button>
+                          </div>
                         </div>
                       </motion.div>
                     ))}
@@ -417,6 +462,16 @@ export default function Configuracoes() {
               <div className="space-y-2">
                 <Label>Nome Completo *</Label>
                 <Input required value={motoristaForm.nome} onChange={e => setMotoristaForm({...motoristaForm, nome: e.target.value})} placeholder="Nome do motorista..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Email (para acesso ao app)</Label>
+                <Input 
+                  type="email" 
+                  value={motoristaForm.email || ""} 
+                  onChange={e => setMotoristaForm({...motoristaForm, email: e.target.value})} 
+                  placeholder="motorista@email.com" 
+                />
+                <p className="text-xs text-slate-500">Informe o email para enviar convite de acesso ao app do motorista.</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
