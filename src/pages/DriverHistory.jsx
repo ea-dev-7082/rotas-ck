@@ -17,27 +17,15 @@ export default function DriverHistory() {
     base44.auth.me().then(setCurrentUser);
   }, []);
 
-  // Primeiro busca o motorista vinculado ao email do usuário
-  const { data: motorista } = useQuery({
-    queryKey: ["motorista-usuario", currentUser?.email],
+  const { data: rotas, isLoading } = useQuery({
+    queryKey: ["rotas-historico", currentUser?.email],
     queryFn: async () => {
-      if (!currentUser) return null;
-      const motoristas = await base44.entities.Motorista.filter({
-        email: currentUser.email,
-      });
-      return motoristas[0] || null;
+      if (!currentUser) return [];
+      // Com RLS atualizado, busca rotas pelo email do motorista
+      const todasRotas = await base44.entities.RotaAgendada.list("-data_prevista", 50);
+      return todasRotas.filter(r => r.motorista_email === currentUser.email);
     },
     enabled: !!currentUser,
-  });
-
-  const { data: rotas, isLoading } = useQuery({
-    queryKey: ["rotas-historico", motorista?.id],
-    queryFn: async () => {
-      if (!motorista) return [];
-      const todasRotas = await base44.entities.RotaAgendada.list("-data_prevista", 50);
-      return todasRotas.filter(r => r.motorista_id === motorista.id);
-    },
-    enabled: !!motorista,
     initialData: [],
   });
 
