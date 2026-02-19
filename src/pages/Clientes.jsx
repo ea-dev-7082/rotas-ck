@@ -159,31 +159,33 @@ export default function Clientes() {
     return result;
   };
 
-  // Função para processar arquivo XLSX
-  const parseXLSX = (data) => {
-    const workbook = XLSX.read(data, { type: "array" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+  // Função para processar arquivo XLSX usando ExtractDataFromUploadedFile
+  const parseXLSX = async (file) => {
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
     
-    // Normaliza os nomes das colunas para lowercase e mapeia colunas alternativas
-    return jsonData.map(row => {
-      const normalized = {};
-      Object.keys(row).forEach(key => {
-        normalized[key.toLowerCase().trim()] = row[key];
-      });
-      
-      // Mapeia colunas alternativas (COD_CLI, CLIENTE, ENDERECO)
-      return {
-        nome: normalized.nome || normalized.cliente || "",
-        endereco: normalized.endereco || "",
-        telefone: normalized.telefone || "",
-        observacoes: normalized.observacoes || "",
-        endereco_entrega: normalized.endereco_entrega || "",
-        usar_endereco_entrega: normalized.usar_endereco_entrega || false,
-        cod_cli: normalized.cod_cli || "",
-      };
+    const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
+      file_url,
+      json_schema: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            nome: { type: "string" },
+            endereco: { type: "string" },
+            telefone: { type: "string" },
+            observacoes: { type: "string" },
+            endereco_entrega: { type: "string" },
+            usar_endereco_entrega: { type: "boolean" }
+          }
+        }
+      }
     });
+    
+    if (result.status === "error") {
+      throw new Error(result.details || "Erro ao extrair dados do arquivo");
+    }
+    
+    return result.output || [];
   };
 
   // Importação sequencial de clientes (CSV ou XLSX)
