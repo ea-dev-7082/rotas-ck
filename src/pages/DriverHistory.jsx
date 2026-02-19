@@ -17,13 +17,27 @@ export default function DriverHistory() {
     base44.auth.me().then(setCurrentUser);
   }, []);
 
-  const { data: rotas, isLoading } = useQuery({
-    queryKey: ["rotas-historico", currentUser?.email],
-    queryFn: () => 
-      currentUser 
-        ? base44.entities.RotaAgendada.filter({ owner: currentUser.email }, "-data_prevista", 50) 
-        : [],
+  // Primeiro busca o motorista vinculado ao email do usuário
+  const { data: motorista } = useQuery({
+    queryKey: ["motorista-usuario", currentUser?.email],
+    queryFn: async () => {
+      if (!currentUser) return null;
+      const motoristas = await base44.entities.Motorista.filter({
+        email: currentUser.email,
+      });
+      return motoristas[0] || null;
+    },
     enabled: !!currentUser,
+  });
+
+  const { data: rotas, isLoading } = useQuery({
+    queryKey: ["rotas-historico", motorista?.id],
+    queryFn: async () => {
+      if (!motorista) return [];
+      const todasRotas = await base44.entities.RotaAgendada.list("-data_prevista", 50);
+      return todasRotas.filter(r => r.motorista_id === motorista.id);
+    },
+    enabled: !!motorista,
     initialData: [],
   });
 
