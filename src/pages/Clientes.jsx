@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import * as XLSX from "xlsx";
 
 import { base44 } from "@/api/base44Client";
 
