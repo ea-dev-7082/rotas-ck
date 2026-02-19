@@ -179,6 +179,10 @@ export default function Configuracoes() {
       toast.error("Motorista não possui email cadastrado");
       return;
     }
+    if (currentUser?.role !== "admin") {
+      toast.error("Apenas administradores podem enviar convites. Use o painel Base44 para convidar usuários.");
+      return;
+    }
     setSendingInvite(motorista.id);
     try {
       await base44.users.inviteUser(motorista.email, "motorista");
