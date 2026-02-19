@@ -181,8 +181,8 @@ export default function Configuracoes() {
     }
     setSendingInvite(motorista.id);
     try {
-      console.log("Enviando convite para:", motorista.email, "com role: motorista");
-      const result = await base44.users.inviteUser(motorista.email, "motorista");
+      console.log("Enviando convite para:", motorista.email, "com role: user");
+      const result = await base44.users.inviteUser(motorista.email, "user");
       console.log("Resultado do convite:", result);
       await base44.entities.Motorista.update(motorista.id, { convite_enviado: true });
       queryClient.invalidateQueries({ queryKey: ["motoristas"] });
