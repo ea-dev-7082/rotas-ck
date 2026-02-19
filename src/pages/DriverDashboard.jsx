@@ -26,13 +26,21 @@ export default function DriverDashboard() {
       if (!currentUser) return [];
       // Busca rotas onde motorista_email = email do usuário logado
       // Com RLS atualizado, o motorista consegue ver rotas onde seu email está cadastrado
-      const todasRotas = await base44.entities.RotaAgendada.list("-data_prevista");
+      const todasRotas = await base44.entities.RotaAgendada.list("-created_date");
       
-      // Filtra rotas deste motorista (hoje ou em andamento)
-      return todasRotas.filter(r => 
+      console.log("DEBUG - Email do usuário:", currentUser.email);
+      console.log("DEBUG - Total rotas retornadas:", todasRotas.length);
+      console.log("DEBUG - Rotas:", todasRotas.map(r => ({ id: r.id, motorista_email: r.motorista_email, status: r.status })));
+      
+      // Filtra rotas deste motorista (hoje ou em andamento ou sem data_prevista)
+      const rotasFiltradas = todasRotas.filter(r => 
         r.motorista_email === currentUser.email && 
         (r.data_prevista === today || r.status === "em_andamento" || !r.data_prevista)
       );
+      
+      console.log("DEBUG - Rotas filtradas:", rotasFiltradas.length);
+      
+      return rotasFiltradas;
     },
     enabled: !!currentUser,
     initialData: [],
