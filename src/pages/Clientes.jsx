@@ -204,9 +204,8 @@ export default function Clientes() {
         const text = await file.text();
         parsedData = parseCSV(text);
       } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-        // Leitura de XLSX/XLS
-        const arrayBuffer = await file.arrayBuffer();
-        parsedData = parseXLSX(arrayBuffer);
+        // Leitura de XLSX/XLS usando API
+        parsedData = await parseXLSX(file);
       } else {
         throw new Error("Formato de arquivo não suportado");
       }
