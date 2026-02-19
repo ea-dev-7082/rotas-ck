@@ -34,19 +34,20 @@ export default function DriverDashboard() {
   });
 
   const { data: rotasHoje, isLoading } = useQuery({
-    queryKey: ["rotas-motorista-hoje", motorista?.id, today],
+    queryKey: ["rotas-motorista-hoje", currentUser?.email, today],
     queryFn: async () => {
-      if (!motorista) return [];
-      // Busca todas as rotas e filtra pelo motorista_id
+      if (!currentUser) return [];
+      // Busca rotas onde motorista_email = email do usuário logado
+      // Com RLS atualizado, o motorista consegue ver rotas onde seu email está cadastrado
       const todasRotas = await base44.entities.RotaAgendada.list("-data_prevista");
       
       // Filtra rotas deste motorista (hoje ou em andamento)
       return todasRotas.filter(r => 
-        r.motorista_id === motorista.id && 
-        (r.data_prevista === today || r.status === "em_andamento")
+        r.motorista_email === currentUser.email && 
+        (r.data_prevista === today || r.status === "em_andamento" || !r.data_prevista)
       );
     },
-    enabled: !!motorista,
+    enabled: !!currentUser,
     initialData: [],
   });
 
