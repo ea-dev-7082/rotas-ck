@@ -53,6 +53,10 @@ import Configuracoes from './pages/Configuracoes';
 import Home from './pages/Home';
 import Optimizer from './pages/Optimizer';
 import Relatorios from './pages/Relatorios';
+import DriverDashboard from './pages/DriverDashboard';
+import DriverRouteView from './pages/DriverRouteView';
+import DriverHistory from './pages/DriverHistory';
+import DriverVehicle from './pages/DriverVehicle';
 import __Layout from './Layout.jsx';
 
 
@@ -63,6 +67,10 @@ export const PAGES = {
     "Home": Home,
     "Optimizer": Optimizer,
     "Relatorios": Relatorios,
+    "DriverDashboard": DriverDashboard,
+    "DriverRouteView": DriverRouteView,
+    "DriverHistory": DriverHistory,
+    "DriverVehicle": DriverVehicle,
 }
 
 export const pagesConfig = {
