@@ -179,18 +179,17 @@ export default function Configuracoes() {
       toast.error("Motorista não possui email cadastrado");
       return;
     }
-    if (currentUser?.role !== "admin") {
-      toast.error("Apenas administradores podem enviar convites. Use o painel Base44 para convidar usuários.");
-      return;
-    }
     setSendingInvite(motorista.id);
     try {
-      await base44.users.inviteUser(motorista.email, "motorista");
+      console.log("Enviando convite para:", motorista.email, "com role: motorista");
+      const result = await base44.users.inviteUser(motorista.email, "motorista");
+      console.log("Resultado do convite:", result);
       await base44.entities.Motorista.update(motorista.id, { convite_enviado: true });
       queryClient.invalidateQueries({ queryKey: ["motoristas"] });
       toast.success(`Convite enviado para ${motorista.email}`);
     } catch (error) {
-      toast.error("Erro ao enviar convite: " + (error.message || "Tente novamente"));
+      console.error("Erro ao enviar convite:", error);
+      toast.error("Erro ao enviar convite: " + (error.message || JSON.stringify(error)));
     }
     setSendingInvite(null);
   };
