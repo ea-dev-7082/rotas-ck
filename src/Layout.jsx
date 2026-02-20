@@ -15,7 +15,7 @@ export default function Layout({ children, currentPageName }) {
   }, []);
 
   // Páginas do motorista - não mostram header principal
-  const driverPages = ["DriverDashboard", "DriverRouteView", "DriverHistory", "DriverVehicle"];
+  const driverPages = ["DriverDashboard", "DriverRouteView", "DriverHistory", "DriverVehicle", "DriverProfile"];
   const isDriverPage = driverPages.includes(currentPageName);
 
   // Se for motorista, redireciona para área do motorista

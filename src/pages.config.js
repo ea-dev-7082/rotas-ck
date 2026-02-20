@@ -54,11 +54,12 @@ import DriverDashboard from './pages/DriverDashboard';
 import DriverHistory from './pages/DriverHistory';
 import DriverRouteView from './pages/DriverRouteView';
 import DriverVehicle from './pages/DriverVehicle';
+import EmRota from './pages/EmRota';
 import Home from './pages/Home';
 import Optimizer from './pages/Optimizer';
 import Relatorios from './pages/Relatorios';
-import EmRota from './pages/EmRota';
 import RotasEmAndamento from './pages/RotasEmAndamento';
+import DriverProfile from './pages/DriverProfile';
 import __Layout from './Layout.jsx';
 
 
@@ -70,11 +71,12 @@ export const PAGES = {
     "DriverHistory": DriverHistory,
     "DriverRouteView": DriverRouteView,
     "DriverVehicle": DriverVehicle,
+    "EmRota": EmRota,
     "Home": Home,
     "Optimizer": Optimizer,
     "Relatorios": Relatorios,
-    "EmRota": EmRota,
     "RotasEmAndamento": RotasEmAndamento,
+    "DriverProfile": DriverProfile,
 }
 
 export const pagesConfig = {
