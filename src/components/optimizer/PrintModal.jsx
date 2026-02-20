@@ -8,9 +8,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Printer, FileText, CheckCircle2, CalendarClock, Eye } from "lucide-react";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { Printer, FileText, CheckCircle2, CalendarClock } from "lucide-react";
+
 
 export default function PrintModal({ 
   open, 
