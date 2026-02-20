@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Truck, FileText, Car } from "lucide-react";
+import { Truck, FileText, Car, User } from "lucide-react";
 
 export default function BottomNav() {
   const location = useLocation();
@@ -15,6 +15,7 @@ export default function BottomNav() {
     { pageName: "DriverDashboard", icon: Truck, label: "Principal" },
     { pageName: "DriverHistory", icon: FileText, label: "Histórico" },
     { pageName: "DriverVehicle", icon: Car, label: "Veículo" },
+    { pageName: "DriverProfile", icon: User, label: "Perfil" },
   ];
 
   return (
