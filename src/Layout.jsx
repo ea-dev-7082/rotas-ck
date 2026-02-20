@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
-import { Route, Users, Settings, FileText, CalendarClock, Truck } from "lucide-react";
+import { Route, Users, Settings, FileText, CalendarClock, Navigation } from "lucide-react";
 
 const LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/250c13318_image.png";
 
@@ -52,9 +52,9 @@ export default function Layout({ children, currentPageName }) {
       icon: FileText,
     },
     {
-      title: "Motorista",
-      url: createPageUrl("DriverDashboard"),
-      icon: Truck,
+      title: "Em Rota",
+      url: createPageUrl("RotasEmAndamento"),
+      icon: Navigation,
     },
     {
       title: "Configurações",
