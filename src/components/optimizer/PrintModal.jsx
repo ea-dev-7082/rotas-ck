@@ -8,7 +8,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Printer, FileText, CheckCircle2, CalendarClock } from "lucide-react";
+import { Printer, FileText, CheckCircle2, CalendarClock, Eye } from "lucide-react";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
 
 export default function PrintModal({ 
   open, 
@@ -315,6 +317,20 @@ export default function PrintModal({
           <div className="flex justify-end gap-3 pt-4 flex-wrap">
             <Button variant="outline" onClick={onClose}>Fechar</Button>
             
+            {/* Botão Ver em Tempo Real - só aparece se já foi agendado */}
+            {isAgendado && (
+              <Button 
+                variant="outline"
+                asChild
+                className="border-purple-500 text-purple-600 hover:bg-purple-50"
+              >
+                <Link to={`${createPageUrl("EmRota")}?rotaId=${window._lastAgendadoId || ''}`}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  Ver em Tempo Real
+                </Link>
+              </Button>
+            )}
+            
             {/* Botão Agendar Rota */}
             <Button 
               variant="outline"
@@ -351,9 +367,12 @@ export default function PrintModal({
                     status: "agendado"
                   };
 
-                  onSaveAgendado(dadosAgendado);
-                  setIsAgendado(true);
-                  setTimeout(() => setIsAgendado(false), 3000); 
+                  onSaveAgendado(dadosAgendado).then((result) => {
+                    if (result?.id) {
+                      window._lastAgendadoId = result.id;
+                    }
+                  });
+                  setIsAgendado(true); 
                 }
               }}
               className={`transition-all ${isAgendado ? "bg-cyan-50 border-cyan-500 text-cyan-600" : "border-cyan-500 text-cyan-600 hover:bg-cyan-50"}`}
