@@ -317,20 +317,6 @@ export default function PrintModal({
           <div className="flex justify-end gap-3 pt-4 flex-wrap">
             <Button variant="outline" onClick={onClose}>Fechar</Button>
             
-            {/* Botão Ver em Tempo Real - só aparece se já foi agendado */}
-            {isAgendado && (
-              <Button 
-                variant="outline"
-                asChild
-                className="border-purple-500 text-purple-600 hover:bg-purple-50"
-              >
-                <Link to={`${createPageUrl("EmRota")}?rotaId=${window._lastAgendadoId || ''}`}>
-                  <Eye className="w-4 h-4 mr-2" />
-                  Ver em Tempo Real
-                </Link>
-              </Button>
-            )}
-            
             {/* Botão Agendar Rota */}
             <Button 
               variant="outline"
