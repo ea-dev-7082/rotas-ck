@@ -57,6 +57,7 @@ import DriverVehicle from './pages/DriverVehicle';
 import Home from './pages/Home';
 import Optimizer from './pages/Optimizer';
 import Relatorios from './pages/Relatorios';
+import EmRota from './pages/EmRota';
 import __Layout from './Layout.jsx';
 
 
@@ -71,6 +72,7 @@ export const PAGES = {
     "Home": Home,
     "Optimizer": Optimizer,
     "Relatorios": Relatorios,
+    "EmRota": EmRota,
 }
 
 export const pagesConfig = {
