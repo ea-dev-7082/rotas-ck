@@ -93,7 +93,21 @@ export default function EmRota() {
   const entregasRealizadas = entregas.filter(e => e.status === "delivered").length;
   const entregasComProblema = entregas.filter(e => e.status === "problem").length;
   const entregasPendentes = entregas.filter(e => !e.status || e.status === "pending").length;
+  const entregasEmProgresso = entregas.filter(e => e.status === "in_progress").length;
   const progress = entregas.length > 0 ? (entregasRealizadas / entregas.length) * 100 : 0;
+
+  // Calcula tempo médio por entrega
+  const entregasComTempo = entregas.filter(e => e.deliveredAt);
+  const tempoMedioEntrega = entregasComTempo.length > 0 
+    ? Math.round(entregasComTempo.reduce((acc, e) => {
+        const idx = entregas.indexOf(e);
+        if (idx > 0 && entregas[idx - 1]?.deliveredAt) {
+          const diff = new Date(e.deliveredAt) - new Date(entregas[idx - 1].deliveredAt);
+          return acc + (diff / 1000 / 60);
+        }
+        return acc;
+      }, 0) / (entregasComTempo.length - 1 || 1))
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -145,7 +159,7 @@ export default function EmRota() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
               <div className="text-center p-4 bg-gray-50 rounded-lg">
                 <div className="text-2xl font-bold text-gray-900">{entregas.length}</div>
                 <div className="text-sm text-gray-500">Total</div>
@@ -153,6 +167,10 @@ export default function EmRota() {
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <div className="text-2xl font-bold text-green-600">{entregasRealizadas}</div>
                 <div className="text-sm text-gray-500">Entregues</div>
+              </div>
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">{entregasEmProgresso}</div>
+                <div className="text-sm text-gray-500">Em Progresso</div>
               </div>
               <div className="text-center p-4 bg-yellow-50 rounded-lg">
                 <div className="text-2xl font-bold text-yellow-600">{entregasPendentes}</div>
@@ -162,6 +180,36 @@ export default function EmRota() {
                 <div className="text-2xl font-bold text-red-600">{entregasComProblema}</div>
                 <div className="text-sm text-gray-500">Problemas</div>
               </div>
+            </div>
+
+            {/* Info adicional da rota */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 pt-4 border-t">
+              {rota.hora_saida && (
+                <div className="text-center p-3 bg-indigo-50 rounded-lg">
+                  <div className="text-lg font-bold text-indigo-600">
+                    {format(new Date(rota.hora_saida), "HH:mm")}
+                  </div>
+                  <div className="text-xs text-gray-500">Saída</div>
+                </div>
+              )}
+              {rota.km_inicial && (
+                <div className="text-center p-3 bg-purple-50 rounded-lg">
+                  <div className="text-lg font-bold text-purple-600">{rota.km_inicial} km</div>
+                  <div className="text-xs text-gray-500">KM Inicial</div>
+                </div>
+              )}
+              {tempoMedioEntrega && (
+                <div className="text-center p-3 bg-orange-50 rounded-lg">
+                  <div className="text-lg font-bold text-orange-600">{tempoMedioEntrega} min</div>
+                  <div className="text-xs text-gray-500">Tempo Médio/Entrega</div>
+                </div>
+              )}
+              {rota.total_volumes > 0 && (
+                <div className="text-center p-3 bg-teal-50 rounded-lg">
+                  <div className="text-lg font-bold text-teal-600">{rota.total_volumes}</div>
+                  <div className="text-xs text-gray-500">Volumes</div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -219,22 +267,47 @@ export default function EmRota() {
                       )}
 
                       {entrega.status === "delivered" && (
-                        <div className="mt-2 text-sm text-green-700">
-                          <div>✓ Entregue às {entrega.deliveredAt ? format(new Date(entrega.deliveredAt), "HH:mm") : "--:--"}</div>
-                          {entrega.receivedBy && <div>Recebido por: {entrega.receivedBy}</div>}
+                        <div className="mt-2 p-2 bg-green-100 rounded text-sm text-green-700 space-y-1">
+                          <div className="font-medium">✓ Entregue às {entrega.deliveredAt ? format(new Date(entrega.deliveredAt), "HH:mm") : "--:--"}</div>
+                          {entrega.receivedBy && <div>👤 Recebido por: <strong>{entrega.receivedBy}</strong></div>}
+                          {entrega.photoUrl && (
+                            <div className="mt-2">
+                              <a href={entrega.photoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">
+                                📷 Ver comprovante
+                              </a>
+                            </div>
+                          )}
                         </div>
                       )}
 
                       {entrega.status === "problem" && (
-                        <div className="mt-2 text-sm text-red-700">
-                          <div>⚠️ {entrega.occurrenceType}</div>
-                          {entrega.occurrenceDescription && <div>{entrega.occurrenceDescription}</div>}
+                        <div className="mt-2 p-2 bg-red-100 rounded text-sm text-red-700 space-y-1">
+                          <div className="font-medium">⚠️ {entrega.occurrenceType || "Problema registrado"}</div>
+                          {entrega.occurrenceDescription && <div className="text-red-600">{entrega.occurrenceDescription}</div>}
+                          {entrega.deliveredAt && (
+                            <div className="text-xs text-red-500">Registrado às {format(new Date(entrega.deliveredAt), "HH:mm")}</div>
+                          )}
+                          {entrega.photoUrl && (
+                            <div className="mt-1">
+                              <a href={entrega.photoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">
+                                📷 Ver foto da ocorrência
+                              </a>
+                            </div>
+                          )}
                         </div>
                       )}
 
                       {entrega.notes && (
                         <div className="mt-2 text-sm text-gray-600 italic">
                           📝 {entrega.notes}
+                        </div>
+                      )}
+
+                      {/* Notas fiscais */}
+                      {entrega.notas_fiscais && entrega.notas_fiscais.length > 0 && (
+                        <div className="mt-2 text-xs text-gray-500">
+                          📄 NF: {entrega.notas_fiscais.map(n => n.numero).join(", ")}
+                          {entrega.volume_total > 0 && <span className="ml-2">• {entrega.volume_total} vol.</span>}
                         </div>
                       )}
                     </div>
