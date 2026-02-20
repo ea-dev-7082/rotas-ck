@@ -392,17 +392,30 @@ export default function PrintModal({
                   const timeValue = stats?.time ? Number(stats.time) : 0;
                   const distanceValue = stats?.distance ? Number(stats.distance) : 0;
                   
+                  // Monta rota com notas fiscais incluídas para o relatório
+                  const rotaComNotas = route?.map(item => {
+                    const notas = notasFiscais?.[item.client_name] || [];
+                    const volumeTotal = notas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
+                    return {
+                      ...item,
+                      notas_fiscais: notas,
+                      volume_total: volumeTotal
+                    };
+                  });
+
                   const dadosCompletos = {
                     data_impressao: new Date().toISOString(),
-                    motorista_nome: motoristaData?.nome || "Não informado",
-                    veiculo_descricao: veiculoData?.descricao || "Não informado",
+                    motorista_nome: motoristaData?.nome || "",
+                    motorista_telefone: motoristaData?.telefone || "",
+                    veiculo_descricao: veiculoData?.descricao || "",
                     veiculo_placa: veiculoData?.placa || "", 
                     total_entregas: route ? route.length - 2 : 0, 
                     distancia_km: distanceValue,
                     tempo_minutos: timeValue, 
                     responsavel_expedicao: expedidor,
                     endereco_matriz: route?.[0]?.address || "Matriz",
-                    rota: route,
+                    rota: rotaComNotas,
+                    notas_fiscais: notasFiscais,
                     total_volumes: totalVolumesGeral
                   };
 
