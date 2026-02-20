@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { User, AlertCircle, Truck, Calendar } from "lucide-react";
@@ -12,6 +12,7 @@ import RouteCard from "../components/driver/RouteCard";
 
 export default function DriverDashboard() {
   const [currentUser, setCurrentUser] = useState(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
@@ -25,26 +26,27 @@ export default function DriverDashboard() {
     queryFn: async () => {
       if (!currentUser) return [];
       // Busca rotas onde motorista_email = email do usuário logado
-      // Com RLS atualizado, o motorista consegue ver rotas onde seu email está cadastrado
       const todasRotas = await base44.entities.RotaAgendada.list("-created_date");
       
-      console.log("DEBUG - Email do usuário:", currentUser.email);
-      console.log("DEBUG - Total rotas retornadas:", todasRotas.length);
-      console.log("DEBUG - Rotas:", todasRotas.map(r => ({ id: r.id, motorista_email: r.motorista_email, status: r.status })));
-      
       // Filtra rotas deste motorista (hoje ou em andamento ou sem data_prevista)
-      const rotasFiltradas = todasRotas.filter(r => 
+      return todasRotas.filter(r => 
         r.motorista_email === currentUser.email && 
         (r.data_prevista === today || r.status === "em_andamento" || !r.data_prevista)
       );
-      
-      console.log("DEBUG - Rotas filtradas:", rotasFiltradas.length);
-      
-      return rotasFiltradas;
     },
     enabled: !!currentUser,
     initialData: [],
   });
+
+  // Atualização em tempo real quando motorista atualiza entregas
+  useEffect(() => {
+    const unsubscribe = base44.entities.RotaAgendada.subscribe((event) => {
+      // Atualiza a lista quando houver mudanças
+      queryClient.invalidateQueries({ queryKey: ["rotas-motorista-hoje"] });
+    });
+    
+    return unsubscribe;
+  }, [queryClient]);
 
   // Encontra rota atual (em andamento) ou próxima agendada
   const rotaAtual = rotasHoje.find(r => r.status === "em_andamento") || 
