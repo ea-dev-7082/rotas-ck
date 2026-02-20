@@ -777,9 +777,11 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
                       // Atualiza rota existente
                       await base44.entities.RotaAgendada.update(editingRotaAgendadaId, data);
                       setEditingRotaAgendadaId(null);
+                      return { id: editingRotaAgendadaId };
                     } else {
                       // Cria nova rota
-                      await base44.entities.RotaAgendada.create({ ...data, owner: currentUser?.email });
+                      const result = await base44.entities.RotaAgendada.create({ ...data, owner: currentUser?.email });
+                      return result;
                     }
                   }}
             nomeEmpresa={nomeEmpresa}
