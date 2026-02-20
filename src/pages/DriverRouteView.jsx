@@ -97,10 +97,34 @@ export default function DriverRouteView() {
       (e) => e.status === "delivered" || e.status === "problem"
     );
 
+    const novoStatus = todasConcluidas ? "concluido" : "em_andamento";
+
     await updateRotaMutation.mutateAsync({
       rota: updatedRota,
-      status: todasConcluidas ? "concluido" : "em_andamento",
+      status: novoStatus,
     });
+
+    // Cria relatório automaticamente quando a rota é concluída
+    if (todasConcluidas) {
+      try {
+        await base44.entities.Relatorio.create({
+          data_impressao: new Date().toISOString(),
+          motorista_nome: rota.motorista_nome || "",
+          motorista_telefone: "",
+          veiculo_descricao: rota.veiculo_descricao || "",
+          veiculo_placa: rota.veiculo_placa || "",
+          total_entregas: entregasAtualizadas.length,
+          distancia_km: rota.distancia_km || 0,
+          tempo_minutos: rota.tempo_minutos || 0,
+          endereco_matriz: rota.endereco_matriz || "",
+          rota: updatedRota,
+          total_volumes: rota.total_volumes || 0,
+          owner: rota.owner || rota.created_by,
+        });
+      } catch (err) {
+        console.error("Erro ao criar relatório:", err);
+      }
+    }
 
     setMarkDeliveredOpen(false);
     setSelectedDelivery(null);
