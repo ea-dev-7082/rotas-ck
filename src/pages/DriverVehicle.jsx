@@ -26,7 +26,7 @@ export default function DriverVehicle() {
   // Busca veículos cadastrados
   const { data: veiculos = [] } = useQuery({
     queryKey: ["veiculos-driver"],
-    queryFn: () => base44.entities.Veiculo.filter({ ativo: true }),
+    queryFn: () => base44.entities.Veiculo.list(),
     initialData: [],
   });
 
