@@ -140,9 +140,19 @@ export default function DriverVehicle() {
     });
 
     toast.success("Abastecimento adicionado!");
-    setAbastecimento({ litros: "", valor: "", posto: "", observacoes: "" });
+    setAbastecimento({ litros: "", valor: "", posto: "", observacoes: "", foto_comprovante: "" });
     refetchRegistro();
     setIsSaving(false);
+  };
+
+  const handleUploadFoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFoto(true);
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    setAbastecimento(prev => ({ ...prev, foto_comprovante: file_url }));
+    setUploadingFoto(false);
+    toast.success("Foto anexada!");
   };
 
   return (

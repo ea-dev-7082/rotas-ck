@@ -107,8 +107,18 @@ export default function Veiculos() {
         observacoes: "",
       });
     }
-    setNovoAbastecimento({ litros: "", valor: "", posto: "", observacoes: "" });
+    setNovoAbastecimento({ litros: "", valor: "", posto: "", observacoes: "", foto_comprovante: "" });
     setRegistroDialogOpen(true);
+  };
+
+  const handleUploadFoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFoto(true);
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    setNovoAbastecimento(prev => ({ ...prev, foto_comprovante: file_url }));
+    setUploadingFoto(false);
+    toast.success("Foto anexada!");
   };
 
   const handleSaveRegistro = () => {
