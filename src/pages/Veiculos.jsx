@@ -267,69 +267,112 @@ export default function Veiculos() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {veiculos.map((veiculo) => (
-            <Card key={veiculo.id} className={`${!veiculo.ativo ? "opacity-60" : ""}`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      veiculo.tipo === "moto" ? "bg-orange-100" : "bg-blue-100"
+          {veiculos.map((veiculo) => {
+            const registro = getRegistroDia(veiculo.id);
+            return (
+              <Card key={veiculo.id} className={`${!veiculo.ativo ? "opacity-60" : ""}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        veiculo.tipo === "moto" ? "bg-orange-100" : "bg-blue-100"
+                      }`}>
+                        {veiculo.tipo === "moto" ? (
+                          <Bike className="w-5 h-5 text-orange-600" />
+                        ) : (
+                          <Car className="w-5 h-5 text-blue-600" />
+                        )}
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">{veiculo.descricao}</CardTitle>
+                        <p className="text-sm text-gray-500">{veiculo.placa || "Sem placa"}</p>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      veiculo.ativo !== false
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-500"
                     }`}>
-                      {veiculo.tipo === "moto" ? (
-                        <Bike className="w-5 h-5 text-orange-600" />
-                      ) : (
-                        <Car className="w-5 h-5 text-blue-600" />
+                      {veiculo.ativo !== false ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Tipo:</span>
+                      <span className="font-medium">{veiculo.tipo === "moto" ? "Moto" : "Carro"}</span>
+                    </div>
+                    {veiculo.capacidade && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Capacidade:</span>
+                        <span className="font-medium">{veiculo.capacidade}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Status do dia */}
+                  {registro && (
+                    <div className={`mt-3 p-2 rounded-lg text-xs ${
+                      registro.status === "fechado" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"
+                    }`}>
+                      <div className="flex items-center gap-1">
+                        <Gauge className="w-3 h-3" />
+                        <span>Km: {registro.km_inicial}{registro.km_final ? ` → ${registro.km_final}` : ""}</span>
+                      </div>
+                      {registro.motorista_nome && (
+                        <p className="mt-1">Motorista: {registro.motorista_nome}</p>
+                      )}
+                      {registro.abastecimento?.litros && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Fuel className="w-3 h-3" />
+                          <span>{registro.abastecimento.litros}L</span>
+                        </div>
                       )}
                     </div>
-                    <div>
-                      <CardTitle className="text-base">{veiculo.descricao}</CardTitle>
-                      <p className="text-sm text-gray-500">{veiculo.placa || "Sem placa"}</p>
-                    </div>
-                  </div>
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    veiculo.ativo !== false
-                      ? "bg-green-100 text-green-700"
-                      : "bg-gray-100 text-gray-500"
-                  }`}>
-                    {veiculo.ativo !== false ? "Ativo" : "Inativo"}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Tipo:</span>
-                    <span className="font-medium">{veiculo.tipo === "moto" ? "Moto" : "Carro"}</span>
-                  </div>
-                  {veiculo.capacidade && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Capacidade:</span>
-                      <span className="font-medium">{veiculo.capacidade}</span>
-                    </div>
                   )}
-                </div>
-                <div className="flex gap-2 mt-4 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => openDialog(veiculo)}
-                  >
-                    <Pencil className="w-3 h-3 mr-1" />
-                    Editar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-red-600 hover:bg-red-50"
-                    onClick={() => handleDelete(veiculo)}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                  <div className="flex gap-2 mt-4 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openRegistroDialog(veiculo)}
+                    >
+                      <Gauge className="w-3 h-3 mr-1" />
+                      {registro ? "Atualizar Km" : "Registrar Km"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openHistoricoDialog(veiculo)}
+                    >
+                      <History className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openDialog(veiculo)}
+                    >
+                      <Pencil className="w-3 h-3 mr-1" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 hover:bg-red-50"
+                      onClick={() => handleDelete(veiculo)}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
