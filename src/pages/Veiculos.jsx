@@ -374,6 +374,11 @@ export default function Veiculos() {
                           {ab.posto && <span className="text-gray-500 ml-2">({ab.posto})</span>}
                           <span className="text-gray-400 ml-2 text-xs">{ab.hora}</span>
                         </div>
+                        {ab.foto_comprovante && (
+                          <a href={ab.foto_comprovante} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 text-xs">
+                            <Image className="w-3 h-3" /> Foto
+                          </a>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -536,9 +541,14 @@ export default function Veiculos() {
                         {reg.abastecimentos.length} Abastecimento(s)
                       </p>
                       {reg.abastecimentos.map((ab, idx) => (
-                        <p key={idx} className="text-amber-600 text-xs ml-4">
-                          {ab.litros}L - R$ {ab.valor} {ab.posto && `(${ab.posto})`} às {ab.hora}
-                        </p>
+                        <div key={idx} className="text-amber-600 text-xs ml-4 flex items-center gap-2">
+                          <span>{ab.litros}L - R$ {ab.valor} {ab.posto && `(${ab.posto})`} às {ab.hora}</span>
+                          {ab.foto_comprovante && (
+                            <a href={ab.foto_comprovante} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5">
+                              <Image className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}

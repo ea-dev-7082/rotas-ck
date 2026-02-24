@@ -321,6 +321,11 @@ export default function DriverVehicle() {
                               <span className="text-amber-600 text-xs">{ab.hora}</span>
                             </div>
                             {ab.posto && <p className="text-amber-600 text-xs mt-1">Posto: {ab.posto}</p>}
+                            {ab.foto_comprovante && (
+                              <a href={ab.foto_comprovante} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs mt-1 hover:underline flex items-center gap-1">
+                                <Image className="w-3 h-3" /> Ver Comprovante
+                              </a>
+                            )}
                           </div>
                         ))}
                         <div className="text-sm text-amber-700 font-medium pt-2 border-t border-amber-200">
@@ -502,6 +507,11 @@ export default function DriverVehicle() {
                           <div key={idx} className="p-2 bg-amber-50 rounded">
                             <p className="font-medium">{ab.litros}L - R$ {ab.valor}</p>
                             {ab.posto && <p className="text-xs text-gray-500">{ab.posto} às {ab.hora}</p>}
+                            {ab.foto_comprovante && (
+                              <a href={ab.foto_comprovante} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline flex items-center gap-1 mt-1">
+                                <Image className="w-3 h-3" /> Ver Comprovante
+                              </a>
+                            )}
                           </div>
                         ))}
                         <p className="font-medium text-amber-800 pt-2 border-t">
