@@ -171,6 +171,7 @@ export default function Veiculos() {
       posto: novoAbastecimento.posto,
       observacoes: novoAbastecimento.observacoes,
       hora: format(new Date(), "HH:mm"),
+      foto_comprovante: novoAbastecimento.foto_comprovante || null,
     };
 
     const abastecimentosAtuais = registro.abastecimentos || [];
@@ -178,7 +179,7 @@ export default function Veiculos() {
       id: registro.id,
       data: { abastecimentos: [...abastecimentosAtuais, abastecimentoData] },
     });
-    setNovoAbastecimento({ litros: "", valor: "", posto: "", observacoes: "" });
+    setNovoAbastecimento({ litros: "", valor: "", posto: "", observacoes: "", foto_comprovante: "" });
   };
 
   const openHistoricoDialog = (veiculo) => {

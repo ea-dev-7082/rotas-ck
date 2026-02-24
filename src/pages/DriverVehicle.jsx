@@ -132,6 +132,7 @@ export default function DriverVehicle() {
       posto: abastecimento.posto,
       observacoes: abastecimento.observacoes,
       hora: format(new Date(), "HH:mm"),
+      foto_comprovante: abastecimento.foto_comprovante || null,
     };
 
     const abastecimentosAtuais = registroDia.abastecimentos || [];
