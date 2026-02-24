@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Car, Gauge, CheckCircle2, Fuel, Play, Square, Plus } from "lucide-react";
+import { Car, Gauge, CheckCircle2, Fuel, Play, Square, Plus, Camera, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
