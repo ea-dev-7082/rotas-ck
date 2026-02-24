@@ -53,7 +53,7 @@ export default function DeliveryCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                  {delivery.order}
+                  {delivery.order - 1}
                 </span>
                 <span className="text-xs text-gray-500 truncate">
                   {delivery.notas_fiscais?.length > 0 
