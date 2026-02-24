@@ -165,6 +165,74 @@ export default function Veiculos() {
     }
   };
 
+  const openRegistroDialog = (veiculo) => {
+    setSelectedVeiculo(veiculo);
+    const registro = getRegistroDia(veiculo.id);
+    if (registro) {
+      setRegistroData({
+        motorista_nome: registro.motorista_nome || "",
+        km_inicial: registro.km_inicial || "",
+        km_final: registro.km_final || "",
+        abastecimento: registro.abastecimento || { litros: "", valor: "", posto: "", observacoes: "" },
+        observacoes: registro.observacoes || "",
+      });
+    } else {
+      setRegistroData({
+        motorista_nome: "",
+        km_inicial: "",
+        km_final: "",
+        abastecimento: { litros: "", valor: "", posto: "", observacoes: "" },
+        observacoes: "",
+      });
+    }
+    setRegistroDialogOpen(true);
+  };
+
+  const handleSaveRegistro = () => {
+    if (!selectedVeiculo || !registroData.km_inicial) {
+      toast.error("Preencha a quilometragem inicial");
+      return;
+    }
+
+    const registro = getRegistroDia(selectedVeiculo.id);
+    const data = {
+      veiculo_id: selectedVeiculo.id,
+      veiculo_descricao: selectedVeiculo.descricao,
+      veiculo_placa: selectedVeiculo.placa,
+      data: today,
+      motorista_email: currentUser?.email,
+      motorista_nome: registroData.motorista_nome,
+      km_inicial: registroData.km_inicial,
+      km_final: registroData.km_final || null,
+      observacoes: registroData.observacoes,
+      status: registroData.km_final ? "fechado" : "aberto",
+    };
+
+    if (registroData.abastecimento.litros || registroData.abastecimento.valor) {
+      data.abastecimento = {
+        litros: registroData.abastecimento.litros ? Number(registroData.abastecimento.litros) : null,
+        valor: registroData.abastecimento.valor ? Number(registroData.abastecimento.valor) : null,
+        posto: registroData.abastecimento.posto,
+        observacoes: registroData.abastecimento.observacoes,
+      };
+    }
+
+    if (!registro) {
+      data.hora_inicio = new Date().toISOString();
+      createRegistroMutation.mutate(data);
+    } else {
+      if (registroData.km_final && !registro.km_final) {
+        data.hora_fim = new Date().toISOString();
+      }
+      updateRegistroMutation.mutate({ id: registro.id, data });
+    }
+  };
+
+  const openHistoricoDialog = (veiculo) => {
+    setSelectedVeiculo(veiculo);
+    setHistoricoDialogOpen(true);
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
