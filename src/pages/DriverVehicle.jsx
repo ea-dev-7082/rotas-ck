@@ -366,6 +366,43 @@ export default function DriverVehicle() {
                           onChange={(e) => setAbastecimento({ ...abastecimento, posto: e.target.value })}
                         />
                       </div>
+                      {/* Foto do comprovante */}
+                      <div className="space-y-2">
+                        <Label>Foto do Comprovante (opcional)</Label>
+                        <div className="flex gap-2">
+                          <label className="flex-1">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={handleUploadFoto}
+                              className="hidden"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full"
+                              disabled={uploadingFoto}
+                              asChild
+                            >
+                              <span>
+                                <Camera className="w-4 h-4 mr-2" />
+                                {uploadingFoto ? "Enviando..." : "Tirar Foto / Anexar"}
+                              </span>
+                            </Button>
+                          </label>
+                          {abastecimento.foto_comprovante && (
+                            <a
+                              href={abastecimento.foto_comprovante}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                            >
+                              <Image className="w-4 h-4" /> Ver
+                            </a>
+                          )}
+                        </div>
+                      </div>
                       <Button
                         onClick={handleAddAbastecimento}
                         disabled={isSaving || (!abastecimento.litros && !abastecimento.valor)}

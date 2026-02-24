@@ -412,6 +412,44 @@ export default function Veiculos() {
                       onChange={(e) => setNovoAbastecimento({ ...novoAbastecimento, posto: e.target.value })}
                     />
                   </div>
+                  {/* Foto do comprovante */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Foto do Comprovante (opcional)</Label>
+                    <div className="flex gap-2">
+                      <label className="flex-1">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleUploadFoto}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          disabled={uploadingFoto}
+                          asChild
+                        >
+                          <span>
+                            <Camera className="w-3 h-3 mr-1" />
+                            {uploadingFoto ? "Enviando..." : "Anexar Foto"}
+                          </span>
+                        </Button>
+                      </label>
+                      {novoAbastecimento.foto_comprovante && (
+                        <a
+                          href={novoAbastecimento.foto_comprovante}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                        >
+                          <Image className="w-3 h-3" /> Ver
+                        </a>
+                      )}
+                    </div>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
