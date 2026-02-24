@@ -344,52 +344,75 @@ export default function Veiculos() {
               </div>
             )}
 
-            {/* Abastecimento */}
-            <div className="border-t pt-4">
-              <Label className="flex items-center gap-2 mb-3">
-                <Fuel className="w-4 h-4 text-amber-600" />
-                Abastecimento (opcional)
-              </Label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-xs">Litros</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Ex: 45.5"
-                    value={registroData.abastecimento.litros}
-                    onChange={(e) => setRegistroData({
-                      ...registroData,
-                      abastecimento: { ...registroData.abastecimento, litros: e.target.value }
-                    })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Valor (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Ex: 250.00"
-                    value={registroData.abastecimento.valor}
-                    onChange={(e) => setRegistroData({
-                      ...registroData,
-                      abastecimento: { ...registroData.abastecimento, valor: e.target.value }
-                    })}
-                  />
+            {/* Lista de Abastecimentos */}
+            {getRegistroDia(selectedVeiculo?.id) && (
+              <div className="border-t pt-4">
+                <Label className="flex items-center gap-2 mb-3">
+                  <Fuel className="w-4 h-4 text-amber-600" />
+                  Abastecimentos do Dia
+                </Label>
+                
+                {/* Lista de abastecimentos já registrados */}
+                {(getRegistroDia(selectedVeiculo?.id)?.abastecimentos || []).length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {getRegistroDia(selectedVeiculo?.id)?.abastecimentos?.map((ab, idx) => (
+                      <div key={idx} className="p-2 bg-amber-50 rounded-lg text-sm flex items-center justify-between">
+                        <div>
+                          <span className="font-medium">{ab.litros}L - R$ {ab.valor}</span>
+                          {ab.posto && <span className="text-gray-500 ml-2">({ab.posto})</span>}
+                          <span className="text-gray-400 ml-2 text-xs">{ab.hora}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Adicionar novo abastecimento */}
+                <div className="p-3 bg-gray-50 rounded-lg space-y-3">
+                  <p className="text-xs font-medium text-gray-600">Adicionar abastecimento:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Litros</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Ex: 45.5"
+                        value={novoAbastecimento.litros}
+                        onChange={(e) => setNovoAbastecimento({ ...novoAbastecimento, litros: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Valor (R$)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Ex: 250.00"
+                        value={novoAbastecimento.valor}
+                        onChange={(e) => setNovoAbastecimento({ ...novoAbastecimento, valor: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Posto</Label>
+                    <Input
+                      placeholder="Nome do posto"
+                      value={novoAbastecimento.posto}
+                      onChange={(e) => setNovoAbastecimento({ ...novoAbastecimento, posto: e.target.value })}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddAbastecimento}
+                    className="w-full"
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Adicionar Abastecimento
+                  </Button>
                 </div>
               </div>
-              <div className="space-y-2 mt-3">
-                <Label className="text-xs">Posto</Label>
-                <Input
-                  placeholder="Nome do posto"
-                  value={registroData.abastecimento.posto}
-                  onChange={(e) => setRegistroData({
-                    ...registroData,
-                    abastecimento: { ...registroData.abastecimento, posto: e.target.value }
-                  })}
-                />
-              </div>
-            </div>
+            )}
 
             <div className="space-y-2">
               <Label>Observações</Label>
