@@ -104,20 +104,42 @@ export default function DriverVehicle() {
       observacoes: observacoes,
       status: "fechado",
     };
-
-    // Adiciona abastecimento se preenchido
-    if (abastecimento.litros || abastecimento.valor) {
-      updateData.abastecimento = {
-        litros: abastecimento.litros ? Number(abastecimento.litros) : null,
-        valor: abastecimento.valor ? Number(abastecimento.valor) : null,
-        posto: abastecimento.posto,
-        observacoes: abastecimento.observacoes,
-      };
-    }
     
     await base44.entities.RegistroDiarioVeiculo.update(registroDia.id, updateData);
     
     toast.success("Dia encerrado com sucesso!");
+    refetchRegistro();
+    setIsSaving(false);
+  };
+
+  const handleAddAbastecimento = async () => {
+    if (!abastecimento.litros && !abastecimento.valor) {
+      toast.error("Preencha litros ou valor");
+      return;
+    }
+
+    if (!registroDia) {
+      toast.error("Inicie o dia antes de adicionar abastecimento");
+      return;
+    }
+
+    setIsSaving(true);
+
+    const abastecimentoData = {
+      litros: abastecimento.litros ? Number(abastecimento.litros) : null,
+      valor: abastecimento.valor ? Number(abastecimento.valor) : null,
+      posto: abastecimento.posto,
+      observacoes: abastecimento.observacoes,
+      hora: format(new Date(), "HH:mm"),
+    };
+
+    const abastecimentosAtuais = registroDia.abastecimentos || [];
+    await base44.entities.RegistroDiarioVeiculo.update(registroDia.id, {
+      abastecimentos: [...abastecimentosAtuais, abastecimentoData],
+    });
+
+    toast.success("Abastecimento adicionado!");
+    setAbastecimento({ litros: "", valor: "", posto: "", observacoes: "" });
     refetchRegistro();
     setIsSaving(false);
   };
