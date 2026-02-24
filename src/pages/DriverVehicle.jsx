@@ -443,21 +443,22 @@ export default function DriverVehicle() {
                     </div>
                   </div>
                   
-                  {registroDia.abastecimento && (registroDia.abastecimento.litros || registroDia.abastecimento.valor) && (
+                  {registroDia.abastecimentos?.length > 0 && (
                     <div className="pt-3 border-t">
                       <p className="font-medium text-amber-700 flex items-center gap-1 mb-2">
-                        <Fuel className="w-4 h-4" /> Abastecimento
+                        <Fuel className="w-4 h-4" /> {registroDia.abastecimentos.length} Abastecimento(s)
                       </p>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        {registroDia.abastecimento.litros && (
-                          <p>Litros: <strong>{registroDia.abastecimento.litros}L</strong></p>
-                        )}
-                        {registroDia.abastecimento.valor && (
-                          <p>Valor: <strong>R$ {registroDia.abastecimento.valor}</strong></p>
-                        )}
-                        {registroDia.abastecimento.posto && (
-                          <p className="col-span-2">Posto: {registroDia.abastecimento.posto}</p>
-                        )}
+                      <div className="space-y-2 text-sm">
+                        {registroDia.abastecimentos.map((ab, idx) => (
+                          <div key={idx} className="p-2 bg-amber-50 rounded">
+                            <p className="font-medium">{ab.litros}L - R$ {ab.valor}</p>
+                            {ab.posto && <p className="text-xs text-gray-500">{ab.posto} às {ab.hora}</p>}
+                          </div>
+                        ))}
+                        <p className="font-medium text-amber-800 pt-2 border-t">
+                          Total: {registroDia.abastecimentos.reduce((acc, a) => acc + (a.litros || 0), 0).toFixed(1)}L - 
+                          R$ {registroDia.abastecimentos.reduce((acc, a) => acc + (a.valor || 0), 0).toFixed(2)}
+                        </p>
                       </div>
                     </div>
                   )}
