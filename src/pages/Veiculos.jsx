@@ -23,9 +23,9 @@ export default function Veiculos() {
     motorista_nome: "",
     km_inicial: "",
     km_final: "",
-    abastecimento: { litros: "", valor: "", posto: "", observacoes: "" },
     observacoes: "",
   });
+  const [novoAbastecimento, setNovoAbastecimento] = useState({ litros: "", valor: "", posto: "", observacoes: "" });
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
