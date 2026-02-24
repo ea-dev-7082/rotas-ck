@@ -23,10 +23,22 @@ export default function DriverVehicle() {
     base44.auth.me().then(setCurrentUser);
   }, []);
 
-  // Busca veículos cadastrados
+  // Busca veículos cadastrados pelo admin/empresa
   const { data: veiculos = [] } = useQuery({
     queryKey: ["veiculos-driver"],
-    queryFn: () => base44.entities.Veiculo.list(),
+    queryFn: async () => {
+      // Busca veículos de todas as rotas do motorista para encontrar o owner
+      if (!currentUser) return [];
+      const rotas = await base44.entities.RotaAgendada.list("-created_date", 10);
+      const owners = [...new Set(rotas.map(r => r.created_by).filter(Boolean))];
+      
+      if (owners.length === 0) return [];
+      
+      // Busca veículos dos owners das rotas
+      const allVeiculos = await base44.entities.Veiculo.list();
+      return allVeiculos.filter(v => owners.includes(v.created_by));
+    },
+    enabled: !!currentUser,
     initialData: [],
   });
 
