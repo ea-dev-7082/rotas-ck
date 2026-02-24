@@ -60,6 +60,7 @@ import Home from './pages/Home';
 import Optimizer from './pages/Optimizer';
 import Relatorios from './pages/Relatorios';
 import RotasEmAndamento from './pages/RotasEmAndamento';
+import Veiculos from './pages/Veiculos';
 import __Layout from './Layout.jsx';
 
 
@@ -77,6 +78,7 @@ export const PAGES = {
     "Optimizer": Optimizer,
     "Relatorios": Relatorios,
     "RotasEmAndamento": RotasEmAndamento,
+    "Veiculos": Veiculos,
 }
 
 export const pagesConfig = {
