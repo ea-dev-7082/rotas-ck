@@ -479,13 +479,17 @@ export default function Veiculos() {
                       </p>
                     )}
                   </div>
-                  {reg.abastecimento?.litros && (
+                  {reg.abastecimentos?.length > 0 && (
                     <div className="mt-2 pt-2 border-t text-sm">
-                      <p className="text-amber-700 flex items-center gap-1">
+                      <p className="text-amber-700 flex items-center gap-1 font-medium mb-1">
                         <Fuel className="w-3 h-3" />
-                        {reg.abastecimento.litros}L - R$ {reg.abastecimento.valor}
-                        {reg.abastecimento.posto && ` (${reg.abastecimento.posto})`}
+                        {reg.abastecimentos.length} Abastecimento(s)
                       </p>
+                      {reg.abastecimentos.map((ab, idx) => (
+                        <p key={idx} className="text-amber-600 text-xs ml-4">
+                          {ab.litros}L - R$ {ab.valor} {ab.posto && `(${ab.posto})`} às {ab.hora}
+                        </p>
+                      ))}
                     </div>
                   )}
                   {reg.observacoes && (
