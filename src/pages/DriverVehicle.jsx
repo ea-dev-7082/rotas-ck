@@ -290,57 +290,78 @@ export default function DriverVehicle() {
                   </CardContent>
                 </Card>
 
-                {/* Abastecimento */}
+                {/* Abastecimentos */}
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <Fuel className="w-4 h-4 text-amber-600" />
-                      Abastecimento (opcional)
+                      Abastecimentos do Dia
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="litros">Litros</Label>
-                        <Input
-                          id="litros"
-                          type="number"
-                          step="0.01"
-                          placeholder="Ex: 45.5"
-                          value={abastecimento.litros}
-                          onChange={(e) => setAbastecimento({ ...abastecimento, litros: e.target.value })}
-                        />
+                    {/* Lista de abastecimentos já registrados */}
+                    {(registroDia?.abastecimentos || []).length > 0 && (
+                      <div className="space-y-2 mb-3">
+                        {registroDia?.abastecimentos?.map((ab, idx) => (
+                          <div key={idx} className="p-3 bg-amber-50 rounded-lg text-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-amber-800">{ab.litros}L - R$ {ab.valor}</span>
+                              <span className="text-amber-600 text-xs">{ab.hora}</span>
+                            </div>
+                            {ab.posto && <p className="text-amber-600 text-xs mt-1">Posto: {ab.posto}</p>}
+                          </div>
+                        ))}
+                        <div className="text-sm text-amber-700 font-medium pt-2 border-t border-amber-200">
+                          Total: {registroDia.abastecimentos.reduce((acc, a) => acc + (a.litros || 0), 0).toFixed(1)}L - 
+                          R$ {registroDia.abastecimentos.reduce((acc, a) => acc + (a.valor || 0), 0).toFixed(2)}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Adicionar novo abastecimento */}
+                    <div className="p-3 bg-gray-50 rounded-lg space-y-3">
+                      <p className="text-xs font-medium text-gray-600">Adicionar abastecimento:</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="litros">Litros</Label>
+                          <Input
+                            id="litros"
+                            type="number"
+                            step="0.01"
+                            placeholder="Ex: 45.5"
+                            value={abastecimento.litros}
+                            onChange={(e) => setAbastecimento({ ...abastecimento, litros: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="valor">Valor (R$)</Label>
+                          <Input
+                            id="valor"
+                            type="number"
+                            step="0.01"
+                            placeholder="Ex: 250.00"
+                            value={abastecimento.valor}
+                            onChange={(e) => setAbastecimento({ ...abastecimento, valor: e.target.value })}
+                          />
+                        </div>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="valor">Valor (R$)</Label>
+                        <Label htmlFor="posto">Posto</Label>
                         <Input
-                          id="valor"
-                          type="number"
-                          step="0.01"
-                          placeholder="Ex: 250.00"
-                          value={abastecimento.valor}
-                          onChange={(e) => setAbastecimento({ ...abastecimento, valor: e.target.value })}
+                          id="posto"
+                          placeholder="Nome do posto"
+                          value={abastecimento.posto}
+                          onChange={(e) => setAbastecimento({ ...abastecimento, posto: e.target.value })}
                         />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="posto">Posto</Label>
-                      <Input
-                        id="posto"
-                        placeholder="Nome do posto"
-                        value={abastecimento.posto}
-                        onChange={(e) => setAbastecimento({ ...abastecimento, posto: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="obs-abastecimento">Observações do Abastecimento</Label>
-                      <Textarea
-                        id="obs-abastecimento"
-                        placeholder="Notas sobre o abastecimento"
-                        value={abastecimento.observacoes}
-                        onChange={(e) => setAbastecimento({ ...abastecimento, observacoes: e.target.value })}
-                        rows={2}
-                      />
+                      <Button
+                        onClick={handleAddAbastecimento}
+                        disabled={isSaving || (!abastecimento.litros && !abastecimento.valor)}
+                        className="w-full bg-amber-600 hover:bg-amber-700"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar Abastecimento
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
