@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Car, Gauge, Calendar, CheckCircle2 } from "lucide-react";
+import { Car, Gauge, CheckCircle2, Fuel, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,28 +13,29 @@ import { toast } from "sonner";
 import BottomNav from "../components/driver/BottomNav";
 
 export default function DriverVehicle() {
+  const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState(null);
+  const [selectedVeiculo, setSelectedVeiculo] = useState(null);
   const [kmInicial, setKmInicial] = useState("");
   const [kmFinal, setKmFinal] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [abastecimento, setAbastecimento] = useState({ litros: "", valor: "", posto: "", observacoes: "" });
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
   }, []);
 
+  const today = format(new Date(), "yyyy-MM-dd");
+
   // Busca veículos cadastrados pelo admin/empresa
   const { data: veiculos = [] } = useQuery({
     queryKey: ["veiculos-driver"],
     queryFn: async () => {
-      // Busca veículos de todas as rotas do motorista para encontrar o owner
       if (!currentUser) return [];
       const rotas = await base44.entities.RotaAgendada.list("-created_date", 10);
       const owners = [...new Set(rotas.map(r => r.created_by).filter(Boolean))];
-      
       if (owners.length === 0) return [];
-      
-      // Busca veículos dos owners das rotas
       const allVeiculos = await base44.entities.Veiculo.list();
       return allVeiculos.filter(v => owners.includes(v.created_by));
     },
@@ -42,53 +43,82 @@ export default function DriverVehicle() {
     initialData: [],
   });
 
-  // Busca rota atual em andamento (opcional)
-  const today = format(new Date(), "yyyy-MM-dd");
-
-  const { data: rotaAtual, refetch } = useQuery({
-    queryKey: ["rota-veiculo", currentUser?.email, today],
+  // Busca registro diário do veículo selecionado (hoje)
+  const { data: registroDia, refetch: refetchRegistro } = useQuery({
+    queryKey: ["registro-dia", selectedVeiculo?.id, today],
     queryFn: async () => {
-      if (!currentUser) return null;
-      const rotas = await base44.entities.RotaAgendada.filter({
+      if (!selectedVeiculo || !currentUser) return null;
+      const registros = await base44.entities.RegistroDiarioVeiculo.filter({
+        veiculo_id: selectedVeiculo.id,
+        data: today,
         motorista_email: currentUser.email,
-        status: "em_andamento",
-      }, "-data_prevista", 1);
-      return rotas[0] || null;
+      }, "-created_date", 1);
+      return registros[0] || null;
     },
-    enabled: !!currentUser,
+    enabled: !!selectedVeiculo && !!currentUser,
   });
 
-  // Carrega dados salvos da rota
+  // Carrega dados salvos do registro
   useEffect(() => {
-    if (rotaAtual) {
-      setKmInicial(rotaAtual.km_inicial || "");
-      setKmFinal(rotaAtual.km_final || "");
-      setObservacoes(rotaAtual.observacoes_veiculo || "");
+    if (registroDia) {
+      setKmInicial(registroDia.km_inicial || "");
+      setKmFinal(registroDia.km_final || "");
+      setObservacoes(registroDia.observacoes || "");
+      setAbastecimento(registroDia.abastecimento || { litros: "", valor: "", posto: "", observacoes: "" });
+    } else {
+      setKmInicial("");
+      setKmFinal("");
+      setObservacoes("");
+      setAbastecimento({ litros: "", valor: "", posto: "", observacoes: "" });
     }
-  }, [rotaAtual?.id]);
+  }, [registroDia?.id, selectedVeiculo?.id]);
 
-  const handleSaveKmInicial = async () => {
-    if (!rotaAtual || !kmInicial) return;
+  const handleIniciarDia = async () => {
+    if (!selectedVeiculo || !kmInicial || !currentUser) return;
     setIsSaving(true);
-    await base44.entities.RotaAgendada.update(rotaAtual.id, {
+    
+    await base44.entities.RegistroDiarioVeiculo.create({
+      veiculo_id: selectedVeiculo.id,
+      veiculo_descricao: selectedVeiculo.descricao,
+      veiculo_placa: selectedVeiculo.placa,
+      data: today,
+      motorista_email: currentUser.email,
+      motorista_nome: currentUser.full_name,
       km_inicial: kmInicial,
-      hora_saida: new Date().toISOString(),
+      hora_inicio: new Date().toISOString(),
+      status: "aberto",
     });
-    toast.success("Km inicial registrado!");
-    refetch();
+    
+    toast.success("Dia iniciado com sucesso!");
+    refetchRegistro();
     setIsSaving(false);
   };
 
-  const handleSaveKmFinal = async () => {
-    if (!rotaAtual || !kmFinal) return;
+  const handleFecharDia = async () => {
+    if (!registroDia || !kmFinal) return;
     setIsSaving(true);
-    await base44.entities.RotaAgendada.update(rotaAtual.id, {
+    
+    const updateData = {
       km_final: kmFinal,
-      hora_retorno: new Date().toISOString(),
-      observacoes_veiculo: observacoes,
-    });
-    toast.success("Km final registrado!");
-    refetch();
+      hora_fim: new Date().toISOString(),
+      observacoes: observacoes,
+      status: "fechado",
+    };
+
+    // Adiciona abastecimento se preenchido
+    if (abastecimento.litros || abastecimento.valor) {
+      updateData.abastecimento = {
+        litros: abastecimento.litros ? Number(abastecimento.litros) : null,
+        valor: abastecimento.valor ? Number(abastecimento.valor) : null,
+        posto: abastecimento.posto,
+        observacoes: abastecimento.observacoes,
+      };
+    }
+    
+    await base44.entities.RegistroDiarioVeiculo.update(registroDia.id, updateData);
+    
+    toast.success("Dia encerrado com sucesso!");
+    refetchRegistro();
     setIsSaving(false);
   };
 
@@ -102,28 +132,33 @@ export default function DriverVehicle() {
             Veículo
           </h1>
           <p className="text-sm text-gray-500">
-            Registro de quilometragem
+            Registro diário de quilometragem
           </p>
         </div>
       </header>
 
       {/* Content */}
       <div className="max-w-md mx-auto px-4 py-6 space-y-4">
-        {/* Lista de Veículos */}
+        {/* Seleção de Veículo */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Car className="w-4 h-4 text-blue-600" />
-              Veículos Disponíveis
+              Selecione o Veículo
             </CardTitle>
           </CardHeader>
           <CardContent>
             {veiculos.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {veiculos.map((veiculo) => (
-                  <div 
-                    key={veiculo.id} 
-                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  <button
+                    key={veiculo.id}
+                    onClick={() => setSelectedVeiculo(veiculo)}
+                    className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                      selectedVeiculo?.id === veiculo.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 bg-gray-50 hover:border-gray-300"
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -138,154 +173,261 @@ export default function DriverVehicle() {
                         {veiculo.tipo === "moto" ? "Moto" : "Carro"}
                       </span>
                     </div>
-                    {veiculo.capacidade && (
-                      <p className="text-xs text-gray-500 mt-1">Capacidade: {veiculo.capacidade}</p>
-                    )}
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (
               <p className="text-sm text-gray-500 text-center py-4">
-                Nenhum veículo cadastrado
+                Nenhum veículo disponível
               </p>
             )}
           </CardContent>
         </Card>
 
-        {/* Rota em Andamento (se houver) */}
-        {rotaAtual && (
+        {/* Registro do Dia */}
+        {selectedVeiculo && (
           <>
-            {/* Info Card */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-blue-600" />
-                  Rota em Andamento
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Veículo:</span>
-                  <span className="font-medium">
-                    {rotaAtual.veiculo_descricao} - {rotaAtual.veiculo_placa}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Data:</span>
-                  <span className="font-medium">{rotaAtual.data_prevista}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Entregas:</span>
-                  <span className="font-medium">{rotaAtual.total_entregas}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Km Inicial */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Gauge className="w-4 h-4 text-green-600" />
-                  Km Inicial (Saída)
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="km-inicial">Quilometragem atual</Label>
-                  <Input
-                    id="km-inicial"
-                    type="number"
-                    placeholder="Ex: 45230"
-                    value={kmInicial}
-                    onChange={(e) => setKmInicial(e.target.value)}
-                    className="h-12 text-lg"
-                    disabled={!!rotaAtual.km_inicial}
-                  />
-                </div>
-                {rotaAtual.km_inicial ? (
-                  <div className="flex items-center gap-2 text-green-600 text-sm">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>
-                      Registrado: {rotaAtual.km_inicial} km às{" "}
-                      {rotaAtual.hora_saida 
-                        ? format(new Date(rotaAtual.hora_saida), "HH:mm", { locale: ptBR })
-                        : "--:--"}
-                    </span>
+            {/* Status do Dia */}
+            {registroDia && (
+              <Card className={registroDia.status === "fechado" ? "border-green-200 bg-green-50" : "border-blue-200 bg-blue-50"}>
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {registroDia.status === "fechado" ? "Dia Encerrado" : "Dia em Andamento"}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Iniciado às {registroDia.hora_inicio 
+                          ? format(new Date(registroDia.hora_inicio), "HH:mm", { locale: ptBR })
+                          : "--:--"}
+                      </p>
+                    </div>
+                    <CheckCircle2 className={`w-6 h-6 ${
+                      registroDia.status === "fechado" ? "text-green-600" : "text-blue-600"
+                    }`} />
                   </div>
-                ) : (
+                  {registroDia.status === "fechado" && registroDia.km_inicial && registroDia.km_final && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <p className="text-sm text-gray-600">
+                        Km percorrido: <strong>{Number(registroDia.km_final) - Number(registroDia.km_inicial)} km</strong>
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Iniciar Dia */}
+            {!registroDia && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Play className="w-4 h-4 text-green-600" />
+                    Iniciar Dia
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="km-inicial">Quilometragem Inicial</Label>
+                    <Input
+                      id="km-inicial"
+                      type="number"
+                      placeholder="Ex: 45230"
+                      value={kmInicial}
+                      onChange={(e) => setKmInicial(e.target.value)}
+                      className="h-12 text-lg"
+                    />
+                  </div>
                   <Button
-                    onClick={handleSaveKmInicial}
+                    onClick={handleIniciarDia}
                     disabled={!kmInicial || isSaving}
                     className="w-full h-12 bg-green-600 hover:bg-green-700"
                   >
-                    Registrar Saída
+                    <Play className="w-4 h-4 mr-2" />
+                    Iniciar Dia
                   </Button>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Km Final */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Gauge className="w-4 h-4 text-red-600" />
-                  Km Final (Retorno)
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="km-final">Quilometragem final</Label>
-                  <Input
-                    id="km-final"
-                    type="number"
-                    placeholder="Ex: 45320"
-                    value={kmFinal}
-                    onChange={(e) => setKmFinal(e.target.value)}
-                    className="h-12 text-lg"
-                    disabled={!!rotaAtual.km_final}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="observacoes">Observações (opcional)</Label>
-                  <Textarea
-                    id="observacoes"
-                    placeholder="Problemas no veículo, abastecimento, etc."
-                    value={observacoes}
-                    onChange={(e) => setObservacoes(e.target.value)}
-                    rows={3}
-                    disabled={!!rotaAtual.km_final}
-                  />
-                </div>
-                {rotaAtual.km_final ? (
-                  <div className="space-y-2">
+            {/* Encerrar Dia */}
+            {registroDia && registroDia.status === "aberto" && (
+              <>
+                {/* Km Registrado */}
+                <Card>
+                  <CardContent className="py-4">
                     <div className="flex items-center gap-2 text-green-600 text-sm">
-                      <CheckCircle2 className="w-4 h-4" />
+                      <Gauge className="w-4 h-4" />
                       <span>
-                        Registrado: {rotaAtual.km_final} km às{" "}
-                        {rotaAtual.hora_retorno
-                          ? format(new Date(rotaAtual.hora_retorno), "HH:mm", { locale: ptBR })
+                        Km inicial: <strong>{registroDia.km_inicial} km</strong> às{" "}
+                        {registroDia.hora_inicio 
+                          ? format(new Date(registroDia.hora_inicio), "HH:mm", { locale: ptBR })
                           : "--:--"}
                       </span>
                     </div>
-                    {rotaAtual.km_inicial && rotaAtual.km_final && (
-                      <div className="p-3 bg-blue-50 rounded-lg">
-                        <p className="text-sm text-blue-800 font-medium">
-                          Distância percorrida: {Number(rotaAtual.km_final) - Number(rotaAtual.km_inicial)} km
-                        </p>
+                  </CardContent>
+                </Card>
+
+                {/* Abastecimento */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Fuel className="w-4 h-4 text-amber-600" />
+                      Abastecimento (opcional)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="litros">Litros</Label>
+                        <Input
+                          id="litros"
+                          type="number"
+                          step="0.01"
+                          placeholder="Ex: 45.5"
+                          value={abastecimento.litros}
+                          onChange={(e) => setAbastecimento({ ...abastecimento, litros: e.target.value })}
+                        />
                       </div>
-                    )}
+                      <div className="space-y-2">
+                        <Label htmlFor="valor">Valor (R$)</Label>
+                        <Input
+                          id="valor"
+                          type="number"
+                          step="0.01"
+                          placeholder="Ex: 250.00"
+                          value={abastecimento.valor}
+                          onChange={(e) => setAbastecimento({ ...abastecimento, valor: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="posto">Posto</Label>
+                      <Input
+                        id="posto"
+                        placeholder="Nome do posto"
+                        value={abastecimento.posto}
+                        onChange={(e) => setAbastecimento({ ...abastecimento, posto: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="obs-abastecimento">Observações do Abastecimento</Label>
+                      <Textarea
+                        id="obs-abastecimento"
+                        placeholder="Notas sobre o abastecimento"
+                        value={abastecimento.observacoes}
+                        onChange={(e) => setAbastecimento({ ...abastecimento, observacoes: e.target.value })}
+                        rows={2}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Encerrar Dia */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Square className="w-4 h-4 text-red-600" />
+                      Encerrar Dia
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="km-final">Quilometragem Final</Label>
+                      <Input
+                        id="km-final"
+                        type="number"
+                        placeholder="Ex: 45320"
+                        value={kmFinal}
+                        onChange={(e) => setKmFinal(e.target.value)}
+                        className="h-12 text-lg"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="observacoes">Observações Gerais (opcional)</Label>
+                      <Textarea
+                        id="observacoes"
+                        placeholder="Problemas no veículo, ocorrências, etc."
+                        value={observacoes}
+                        onChange={(e) => setObservacoes(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                    <Button
+                      onClick={handleFecharDia}
+                      disabled={!kmFinal || isSaving}
+                      className="w-full h-12 bg-red-600 hover:bg-red-700"
+                    >
+                      <Square className="w-4 h-4 mr-2" />
+                      Encerrar Dia
+                    </Button>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {/* Dia já encerrado - mostra resumo */}
+            {registroDia && registroDia.status === "fechado" && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Resumo do Dia</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-500">Km Inicial</p>
+                      <p className="font-medium">{registroDia.km_inicial} km</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Km Final</p>
+                      <p className="font-medium">{registroDia.km_final} km</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Início</p>
+                      <p className="font-medium">
+                        {registroDia.hora_inicio 
+                          ? format(new Date(registroDia.hora_inicio), "HH:mm", { locale: ptBR })
+                          : "--:--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Fim</p>
+                      <p className="font-medium">
+                        {registroDia.hora_fim 
+                          ? format(new Date(registroDia.hora_fim), "HH:mm", { locale: ptBR })
+                          : "--:--"}
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  <Button
-                    onClick={handleSaveKmFinal}
-                    disabled={!kmFinal || !rotaAtual.km_inicial || isSaving}
-                    className="w-full h-12 bg-red-600 hover:bg-red-700"
-                  >
-                    Registrar Retorno
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+                  
+                  {registroDia.abastecimento && (registroDia.abastecimento.litros || registroDia.abastecimento.valor) && (
+                    <div className="pt-3 border-t">
+                      <p className="font-medium text-amber-700 flex items-center gap-1 mb-2">
+                        <Fuel className="w-4 h-4" /> Abastecimento
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        {registroDia.abastecimento.litros && (
+                          <p>Litros: <strong>{registroDia.abastecimento.litros}L</strong></p>
+                        )}
+                        {registroDia.abastecimento.valor && (
+                          <p>Valor: <strong>R$ {registroDia.abastecimento.valor}</strong></p>
+                        )}
+                        {registroDia.abastecimento.posto && (
+                          <p className="col-span-2">Posto: {registroDia.abastecimento.posto}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {registroDia.observacoes && (
+                    <div className="pt-3 border-t">
+                      <p className="text-gray-500 text-sm">Observações:</p>
+                      <p className="text-sm">{registroDia.observacoes}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
       </div>
