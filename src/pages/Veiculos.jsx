@@ -95,6 +95,29 @@ export default function Veiculos() {
     },
   });
 
+  const createRegistroMutation = useMutation({
+    mutationFn: (data) => base44.entities.RegistroDiarioVeiculo.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["registros-dia"] });
+      toast.success("Registro criado!");
+      setRegistroDialogOpen(false);
+    },
+  });
+
+  const updateRegistroMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.RegistroDiarioVeiculo.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["registros-dia"] });
+      toast.success("Registro atualizado!");
+      setRegistroDialogOpen(false);
+    },
+  });
+
+  // Retorna o registro do dia para um veículo
+  const getRegistroDia = (veiculoId) => {
+    return registrosDia.find(r => r.veiculo_id === veiculoId);
+  };
+
   const openDialog = (veiculo = null) => {
     if (veiculo) {
       setEditingVeiculo(veiculo);
