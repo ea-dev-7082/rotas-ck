@@ -446,6 +446,188 @@ export default function Veiculos() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de Registro Diário */}
+      <Dialog open={registroDialogOpen} onOpenChange={setRegistroDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gauge className="w-5 h-5" />
+              Registro Diário - {selectedVeiculo?.descricao}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-gray-500 flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Motorista</Label>
+              <Input
+                placeholder="Nome do motorista"
+                value={registroData.motorista_nome}
+                onChange={(e) => setRegistroData({ ...registroData, motorista_nome: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Km Inicial *</Label>
+                <Input
+                  type="number"
+                  placeholder="Ex: 45230"
+                  value={registroData.km_inicial}
+                  onChange={(e) => setRegistroData({ ...registroData, km_inicial: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Km Final</Label>
+                <Input
+                  type="number"
+                  placeholder="Ex: 45320"
+                  value={registroData.km_final}
+                  onChange={(e) => setRegistroData({ ...registroData, km_final: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {registroData.km_inicial && registroData.km_final && (
+              <div className="p-2 bg-blue-50 rounded-lg text-sm text-blue-700">
+                Km percorrido: <strong>{Number(registroData.km_final) - Number(registroData.km_inicial)} km</strong>
+              </div>
+            )}
+
+            {/* Abastecimento */}
+            <div className="border-t pt-4">
+              <Label className="flex items-center gap-2 mb-3">
+                <Fuel className="w-4 h-4 text-amber-600" />
+                Abastecimento (opcional)
+              </Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Litros</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Ex: 45.5"
+                    value={registroData.abastecimento.litros}
+                    onChange={(e) => setRegistroData({
+                      ...registroData,
+                      abastecimento: { ...registroData.abastecimento, litros: e.target.value }
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Valor (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Ex: 250.00"
+                    value={registroData.abastecimento.valor}
+                    onChange={(e) => setRegistroData({
+                      ...registroData,
+                      abastecimento: { ...registroData.abastecimento, valor: e.target.value }
+                    })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 mt-3">
+                <Label className="text-xs">Posto</Label>
+                <Input
+                  placeholder="Nome do posto"
+                  value={registroData.abastecimento.posto}
+                  onChange={(e) => setRegistroData({
+                    ...registroData,
+                    abastecimento: { ...registroData.abastecimento, posto: e.target.value }
+                  })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Textarea
+                placeholder="Problemas, ocorrências, etc."
+                value={registroData.observacoes}
+                onChange={(e) => setRegistroData({ ...registroData, observacoes: e.target.value })}
+                rows={2}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRegistroDialogOpen(false)}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSaveRegistro}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+              >
+                Salvar Registro
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Histórico */}
+      <Dialog open={historicoDialogOpen} onOpenChange={setHistoricoDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Histórico - {selectedVeiculo?.descricao}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {historico.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">Nenhum registro encontrado</p>
+            ) : (
+              historico.map((reg) => (
+                <div key={reg.id} className="p-3 bg-gray-50 rounded-lg border">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium">
+                      {format(new Date(reg.data), "dd/MM/yyyy", { locale: ptBR })}
+                    </span>
+                    <Badge variant={reg.status === "fechado" ? "default" : "secondary"}>
+                      {reg.status === "fechado" ? "Fechado" : "Aberto"}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <p><span className="text-gray-500">Km Inicial:</span> {reg.km_inicial}</p>
+                    <p><span className="text-gray-500">Km Final:</span> {reg.km_final || "-"}</p>
+                    {reg.motorista_nome && (
+                      <p className="col-span-2"><span className="text-gray-500">Motorista:</span> {reg.motorista_nome}</p>
+                    )}
+                    {reg.km_inicial && reg.km_final && (
+                      <p className="col-span-2 text-blue-600 font-medium">
+                        Percorrido: {Number(reg.km_final) - Number(reg.km_inicial)} km
+                      </p>
+                    )}
+                  </div>
+                  {reg.abastecimento?.litros && (
+                    <div className="mt-2 pt-2 border-t text-sm">
+                      <p className="text-amber-700 flex items-center gap-1">
+                        <Fuel className="w-3 h-3" />
+                        {reg.abastecimento.litros}L - R$ {reg.abastecimento.valor}
+                        {reg.abastecimento.posto && ` (${reg.abastecimento.posto})`}
+                      </p>
+                    </div>
+                  )}
+                  {reg.observacoes && (
+                    <p className="mt-2 text-xs text-gray-600">{reg.observacoes}</p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
