@@ -96,7 +96,6 @@ export default function Veiculos() {
         motorista_nome: registro.motorista_nome || "",
         km_inicial: registro.km_inicial || "",
         km_final: registro.km_final || "",
-        abastecimento: registro.abastecimento || { litros: "", valor: "", posto: "", observacoes: "" },
         observacoes: registro.observacoes || "",
       });
     } else {
@@ -104,10 +103,10 @@ export default function Veiculos() {
         motorista_nome: "",
         km_inicial: "",
         km_final: "",
-        abastecimento: { litros: "", valor: "", posto: "", observacoes: "" },
         observacoes: "",
       });
     }
+    setNovoAbastecimento({ litros: "", valor: "", posto: "", observacoes: "" });
     setRegistroDialogOpen(true);
   };
 
