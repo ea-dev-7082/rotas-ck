@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Car, Fuel, Gauge, Calendar, CheckCircle2, Clock } from "lucide-react";
+import { Car, Gauge, Calendar, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,14 @@ export default function DriverVehicle() {
     base44.auth.me().then(setCurrentUser);
   }, []);
 
-  // Busca rota atual em andamento
+  // Busca veículos cadastrados
+  const { data: veiculos = [] } = useQuery({
+    queryKey: ["veiculos-driver"],
+    queryFn: () => base44.entities.Veiculo.filter({ ativo: true }),
+    initialData: [],
+  });
+
+  // Busca rota atual em andamento (opcional)
   const today = format(new Date(), "yyyy-MM-dd");
 
   const { data: rotaAtual, refetch } = useQuery({
@@ -31,7 +38,7 @@ export default function DriverVehicle() {
     queryFn: async () => {
       if (!currentUser) return null;
       const rotas = await base44.entities.RotaAgendada.filter({
-        owner: currentUser.email,
+        motorista_email: currentUser.email,
         status: "em_andamento",
       }, "-data_prevista", 1);
       return rotas[0] || null;
@@ -51,33 +58,25 @@ export default function DriverVehicle() {
   const handleSaveKmInicial = async () => {
     if (!rotaAtual || !kmInicial) return;
     setIsSaving(true);
-    try {
-      await base44.entities.RotaAgendada.update(rotaAtual.id, {
-        km_inicial: kmInicial,
-        hora_saida: new Date().toISOString(),
-      });
-      toast.success("Km inicial registrado!");
-      refetch();
-    } catch (error) {
-      toast.error("Erro ao salvar");
-    }
+    await base44.entities.RotaAgendada.update(rotaAtual.id, {
+      km_inicial: kmInicial,
+      hora_saida: new Date().toISOString(),
+    });
+    toast.success("Km inicial registrado!");
+    refetch();
     setIsSaving(false);
   };
 
   const handleSaveKmFinal = async () => {
     if (!rotaAtual || !kmFinal) return;
     setIsSaving(true);
-    try {
-      await base44.entities.RotaAgendada.update(rotaAtual.id, {
-        km_final: kmFinal,
-        hora_retorno: new Date().toISOString(),
-        observacoes_veiculo: observacoes,
-      });
-      toast.success("Km final registrado!");
-      refetch();
-    } catch (error) {
-      toast.error("Erro ao salvar");
-    }
+    await base44.entities.RotaAgendada.update(rotaAtual.id, {
+      km_final: kmFinal,
+      hora_retorno: new Date().toISOString(),
+      observacoes_veiculo: observacoes,
+    });
+    toast.success("Km final registrado!");
+    refetch();
     setIsSaving(false);
   };
 
@@ -98,7 +97,51 @@ export default function DriverVehicle() {
 
       {/* Content */}
       <div className="max-w-md mx-auto px-4 py-6 space-y-4">
-        {rotaAtual ? (
+        {/* Lista de Veículos */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Car className="w-4 h-4 text-blue-600" />
+              Veículos Disponíveis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {veiculos.length > 0 ? (
+              <div className="space-y-3">
+                {veiculos.map((veiculo) => (
+                  <div 
+                    key={veiculo.id} 
+                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{veiculo.descricao}</p>
+                        <p className="text-sm text-gray-500">Placa: {veiculo.placa || "Não informada"}</p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        veiculo.tipo === "moto" 
+                          ? "bg-orange-100 text-orange-700" 
+                          : "bg-blue-100 text-blue-700"
+                      }`}>
+                        {veiculo.tipo === "moto" ? "Moto" : "Carro"}
+                      </span>
+                    </div>
+                    {veiculo.capacidade && (
+                      <p className="text-xs text-gray-500 mt-1">Capacidade: {veiculo.capacidade}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-4">
+                Nenhum veículo cadastrado
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Rota em Andamento (se houver) */}
+        {rotaAtual && (
           <>
             {/* Info Card */}
             <Card>
@@ -232,18 +275,6 @@ export default function DriverVehicle() {
               </CardContent>
             </Card>
           </>
-        ) : (
-          <div className="text-center py-12">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Car className="w-10 h-10 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Nenhuma rota em andamento
-            </h3>
-            <p className="text-sm text-gray-500 max-w-xs mx-auto">
-              Inicie uma rota para registrar a quilometragem do veículo
-            </p>
-          </div>
         )}
       </div>
 

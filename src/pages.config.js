@@ -52,6 +52,7 @@ import Clientes from './pages/Clientes';
 import Configuracoes from './pages/Configuracoes';
 import DriverDashboard from './pages/DriverDashboard';
 import DriverHistory from './pages/DriverHistory';
+import DriverProfile from './pages/DriverProfile';
 import DriverRouteView from './pages/DriverRouteView';
 import DriverVehicle from './pages/DriverVehicle';
 import EmRota from './pages/EmRota';
@@ -59,7 +60,6 @@ import Home from './pages/Home';
 import Optimizer from './pages/Optimizer';
 import Relatorios from './pages/Relatorios';
 import RotasEmAndamento from './pages/RotasEmAndamento';
-import DriverProfile from './pages/DriverProfile';
 import __Layout from './Layout.jsx';
 
 
@@ -69,6 +69,7 @@ export const PAGES = {
     "Configuracoes": Configuracoes,
     "DriverDashboard": DriverDashboard,
     "DriverHistory": DriverHistory,
+    "DriverProfile": DriverProfile,
     "DriverRouteView": DriverRouteView,
     "DriverVehicle": DriverVehicle,
     "EmRota": EmRota,
@@ -76,7 +77,6 @@ export const PAGES = {
     "Optimizer": Optimizer,
     "Relatorios": Relatorios,
     "RotasEmAndamento": RotasEmAndamento,
-    "DriverProfile": DriverProfile,
 }
 
 export const pagesConfig = {
