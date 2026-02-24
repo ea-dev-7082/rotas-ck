@@ -17,7 +17,11 @@ import { toast } from "sonner";
 
 export default function Veiculos() {
   const queryClient = useQueryClient();
+  const [currentUser, setCurrentUser] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [registroDialogOpen, setRegistroDialogOpen] = useState(false);
+  const [historicoDialogOpen, setHistoricoDialogOpen] = useState(false);
+  const [selectedVeiculo, setSelectedVeiculo] = useState(null);
   const [editingVeiculo, setEditingVeiculo] = useState(null);
   const [formData, setFormData] = useState({
     descricao: "",
@@ -26,10 +30,42 @@ export default function Veiculos() {
     capacidade: "",
     ativo: true,
   });
+  const [registroData, setRegistroData] = useState({
+    motorista_nome: "",
+    km_inicial: "",
+    km_final: "",
+    abastecimento: { litros: "", valor: "", posto: "", observacoes: "" },
+    observacoes: "",
+  });
+
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser);
+  }, []);
+
+  const today = format(new Date(), "yyyy-MM-dd");
 
   const { data: veiculos = [], isLoading } = useQuery({
     queryKey: ["veiculos"],
     queryFn: () => base44.entities.Veiculo.list(),
+    initialData: [],
+  });
+
+  // Busca registros diários dos veículos
+  const { data: registrosDia = [] } = useQuery({
+    queryKey: ["registros-dia", today],
+    queryFn: () => base44.entities.RegistroDiarioVeiculo.filter({ data: today }),
+    initialData: [],
+  });
+
+  // Busca histórico de registros (últimos 30 dias)
+  const { data: historico = [], refetch: refetchHistorico } = useQuery({
+    queryKey: ["historico-veiculo", selectedVeiculo?.id],
+    queryFn: () => base44.entities.RegistroDiarioVeiculo.filter(
+      { veiculo_id: selectedVeiculo?.id },
+      "-data",
+      30
+    ),
+    enabled: !!selectedVeiculo && historicoDialogOpen,
     initialData: [],
   });
 
