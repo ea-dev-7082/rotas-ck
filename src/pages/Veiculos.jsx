@@ -265,25 +265,6 @@ export default function Veiculos() {
                       <History className="w-3 h-3" />
                     </Button>
                   </div>
-                  <div className="flex gap-2 mt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => openDialog(veiculo)}
-                    >
-                      <Pencil className="w-3 h-3 mr-1" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 hover:bg-red-50"
-                      onClick={() => handleDelete(veiculo)}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
             );
