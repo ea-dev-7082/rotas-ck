@@ -130,17 +130,9 @@ export default function Veiculos() {
       status: registroData.km_final ? "fechado" : "aberto",
     };
 
-    if (registroData.abastecimento.litros || registroData.abastecimento.valor) {
-      data.abastecimento = {
-        litros: registroData.abastecimento.litros ? Number(registroData.abastecimento.litros) : null,
-        valor: registroData.abastecimento.valor ? Number(registroData.abastecimento.valor) : null,
-        posto: registroData.abastecimento.posto,
-        observacoes: registroData.abastecimento.observacoes,
-      };
-    }
-
     if (!registro) {
       data.hora_inicio = new Date().toISOString();
+      data.abastecimentos = [];
       createRegistroMutation.mutate(data);
     } else {
       if (registroData.km_final && !registro.km_final) {
@@ -148,6 +140,34 @@ export default function Veiculos() {
       }
       updateRegistroMutation.mutate({ id: registro.id, data });
     }
+  };
+
+  const handleAddAbastecimento = () => {
+    if (!novoAbastecimento.litros && !novoAbastecimento.valor) {
+      toast.error("Preencha litros ou valor");
+      return;
+    }
+
+    const registro = getRegistroDia(selectedVeiculo.id);
+    if (!registro) {
+      toast.error("Inicie o dia antes de adicionar abastecimento");
+      return;
+    }
+
+    const abastecimentoData = {
+      litros: novoAbastecimento.litros ? Number(novoAbastecimento.litros) : null,
+      valor: novoAbastecimento.valor ? Number(novoAbastecimento.valor) : null,
+      posto: novoAbastecimento.posto,
+      observacoes: novoAbastecimento.observacoes,
+      hora: format(new Date(), "HH:mm"),
+    };
+
+    const abastecimentosAtuais = registro.abastecimentos || [];
+    updateRegistroMutation.mutate({
+      id: registro.id,
+      data: { abastecimentos: [...abastecimentosAtuais, abastecimentoData] },
+    });
+    setNovoAbastecimento({ litros: "", valor: "", posto: "", observacoes: "" });
   };
 
   const openHistoricoDialog = (veiculo) => {
