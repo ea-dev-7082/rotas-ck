@@ -25,7 +25,8 @@ export default function Veiculos() {
     km_final: "",
     observacoes: "",
   });
-  const [novoAbastecimento, setNovoAbastecimento] = useState({ litros: "", valor: "", posto: "", observacoes: "" });
+  const [novoAbastecimento, setNovoAbastecimento] = useState({ litros: "", valor: "", posto: "", observacoes: "", foto_comprovante: "" });
+  const [uploadingFoto, setUploadingFoto] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);

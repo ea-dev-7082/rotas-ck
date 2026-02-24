@@ -19,8 +19,9 @@ export default function DriverVehicle() {
   const [kmInicial, setKmInicial] = useState("");
   const [kmFinal, setKmFinal] = useState("");
   const [observacoes, setObservacoes] = useState("");
-  const [abastecimento, setAbastecimento] = useState({ litros: "", valor: "", posto: "", observacoes: "" });
+  const [abastecimento, setAbastecimento] = useState({ litros: "", valor: "", posto: "", observacoes: "", foto_comprovante: "" });
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
