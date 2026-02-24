@@ -3,33 +3,22 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Car, Plus, Pencil, Trash2, Bike, Gauge, Fuel, History, Calendar } from "lucide-react";
+import { Car, Bike, Gauge, Fuel, History, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 export default function Veiculos() {
   const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [registroDialogOpen, setRegistroDialogOpen] = useState(false);
   const [historicoDialogOpen, setHistoricoDialogOpen] = useState(false);
   const [selectedVeiculo, setSelectedVeiculo] = useState(null);
-  const [editingVeiculo, setEditingVeiculo] = useState(null);
-  const [formData, setFormData] = useState({
-    descricao: "",
-    tipo: "carro",
-    placa: "",
-    capacidade: "",
-    ativo: true,
-  });
   const [registroData, setRegistroData] = useState({
     motorista_nome: "",
     km_inicial: "",
@@ -44,9 +33,16 @@ export default function Veiculos() {
 
   const today = format(new Date(), "yyyy-MM-dd");
 
+  // Busca apenas veículos ativos da empresa do usuário (pelo created_by)
   const { data: veiculos = [], isLoading } = useQuery({
-    queryKey: ["veiculos"],
-    queryFn: () => base44.entities.Veiculo.list(),
+    queryKey: ["veiculos", currentUser?.email],
+    queryFn: async () => {
+      if (!currentUser) return [];
+      const allVeiculos = await base44.entities.Veiculo.list();
+      // Filtra apenas veículos ativos criados pelo usuário atual
+      return allVeiculos.filter(v => v.created_by === currentUser.email && v.ativo !== false);
+    },
+    enabled: !!currentUser,
     initialData: [],
   });
 
@@ -58,7 +54,7 @@ export default function Veiculos() {
   });
 
   // Busca histórico de registros (últimos 30 dias)
-  const { data: historico = [], refetch: refetchHistorico } = useQuery({
+  const { data: historico = [] } = useQuery({
     queryKey: ["historico-veiculo", selectedVeiculo?.id],
     queryFn: () => base44.entities.RegistroDiarioVeiculo.filter(
       { veiculo_id: selectedVeiculo?.id },
@@ -67,32 +63,6 @@ export default function Veiculos() {
     ),
     enabled: !!selectedVeiculo && historicoDialogOpen,
     initialData: [],
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Veiculo.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["veiculos"] });
-      toast.success("Veículo cadastrado!");
-      closeDialog();
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Veiculo.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["veiculos"] });
-      toast.success("Veículo atualizado!");
-      closeDialog();
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Veiculo.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["veiculos"] });
-      toast.success("Veículo excluído!");
-    },
   });
 
   const createRegistroMutation = useMutation({
@@ -116,53 +86,6 @@ export default function Veiculos() {
   // Retorna o registro do dia para um veículo
   const getRegistroDia = (veiculoId) => {
     return registrosDia.find(r => r.veiculo_id === veiculoId);
-  };
-
-  const openDialog = (veiculo = null) => {
-    if (veiculo) {
-      setEditingVeiculo(veiculo);
-      setFormData({
-        descricao: veiculo.descricao || "",
-        tipo: veiculo.tipo || "carro",
-        placa: veiculo.placa || "",
-        capacidade: veiculo.capacidade || "",
-        ativo: veiculo.ativo !== false,
-      });
-    } else {
-      setEditingVeiculo(null);
-      setFormData({
-        descricao: "",
-        tipo: "carro",
-        placa: "",
-        capacidade: "",
-        ativo: true,
-      });
-    }
-    setDialogOpen(true);
-  };
-
-  const closeDialog = () => {
-    setDialogOpen(false);
-    setEditingVeiculo(null);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!formData.descricao) {
-      toast.error("Preencha a descrição do veículo");
-      return;
-    }
-    if (editingVeiculo) {
-      updateMutation.mutate({ id: editingVeiculo.id, data: formData });
-    } else {
-      createMutation.mutate(formData);
-    }
-  };
-
-  const handleDelete = (veiculo) => {
-    if (confirm(`Deseja excluir o veículo "${veiculo.descricao}"?`)) {
-      deleteMutation.mutate(veiculo.id);
-    }
   };
 
   const openRegistroDialog = (veiculo) => {
