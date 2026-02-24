@@ -257,10 +257,12 @@ export default function Veiculos() {
                       {registro.motorista_nome && (
                         <p className="mt-1">Motorista: {registro.motorista_nome}</p>
                       )}
-                      {registro.abastecimento?.litros && (
+                      {registro.abastecimentos?.length > 0 && (
                         <div className="flex items-center gap-1 mt-1">
                           <Fuel className="w-3 h-3" />
-                          <span>{registro.abastecimento.litros}L</span>
+                          <span>
+                            {registro.abastecimentos.length} abastecimento(s) - {registro.abastecimentos.reduce((acc, a) => acc + (a.litros || 0), 0).toFixed(1)}L
+                          </span>
                         </div>
                       )}
                     </div>
