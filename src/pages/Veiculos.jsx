@@ -161,15 +161,11 @@ export default function Veiculos() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Car className="w-6 h-6" />
+            <Gauge className="w-6 h-6" />
             Veículos
           </h1>
-          <p className="text-gray-500">Gerencie os veículos da frota</p>
+          <p className="text-gray-500">Registro e monitoramento de quilometragem e abastecimento</p>
         </div>
-        <Button onClick={() => openDialog()} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Veículo
-        </Button>
       </div>
 
       {isLoading ? (
@@ -181,12 +177,8 @@ export default function Veiculos() {
       ) : veiculos.length === 0 ? (
         <Card className="p-12 text-center">
           <Car className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">Nenhum veículo cadastrado</h3>
-          <p className="text-gray-500 mb-4">Cadastre veículos para usar nas rotas</p>
-          <Button onClick={() => openDialog()}>
-            <Plus className="w-4 h-4 mr-2" />
-            Cadastrar Veículo
-          </Button>
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">Nenhum veículo ativo</h3>
+          <p className="text-gray-500">Cadastre veículos em Configurações para monitorá-los aqui</p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
