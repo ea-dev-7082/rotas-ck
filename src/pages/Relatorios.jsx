@@ -201,8 +201,8 @@ export default function Relatorios() {
     const initialOccurrences = {};
     if (relatorio.rota) {
       relatorio.rota.forEach((item, index) => {
-        if (item.ocorrencia) {
-          initialOccurrences[index] = item.ocorrencia;
+        if (item.notes) {
+          initialOccurrences[index] = item.notes;
         }
       });
     }
@@ -213,10 +213,10 @@ export default function Relatorios() {
   const handleSaveOccurrences = () => {
     if (!selectedRelatorio) return;
 
-    // Cria uma cópia da rota e injeta as ocorrências
+    // Cria uma cópia da rota e injeta as ocorrências no campo 'notes'
     const novaRota = selectedRelatorio.rota.map((item, index) => ({
       ...item,
-      ocorrencia: occurrences[index] || ""
+      notes: occurrences[index] || item.notes || ""
     }));
 
     updateOcorrenciasMutation.mutate({
@@ -289,7 +289,7 @@ export default function Relatorios() {
                 <td>${idx + 1}</td>
                 <td>${item.client_name}</td>
                 <td>${item.address}</td>
-                <td>${item.ocorrencia || "-"}</td>
+                <td>${item.notes || "-"}</td>
               </tr>
             `).join("")}
           </tbody>
