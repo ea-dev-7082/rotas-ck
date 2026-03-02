@@ -60,6 +60,9 @@ export default function Clientes() {
     observacoes: "",
   });
 
+  const [clienteSearch, setClienteSearch] = useState("");
+  const [showClienteDropdown, setShowClienteDropdown] = useState(false);
+
   const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -94,6 +97,23 @@ export default function Clientes() {
       enderecoStr.includes(term)
     );
   });
+
+  // Filtragem de clientes para o dropdown de busca no campo endereço alternativo
+  const clienteSearchResults = clientes.filter((cliente) => {
+    if (!clienteSearch.trim()) return false;
+    // Excluir o cliente sendo editado da busca
+    if (editingCliente && cliente.id === editingCliente.id) return false;
+    return cliente.nome.toLowerCase().includes(clienteSearch.toLowerCase());
+  }).slice(0, 5);
+
+  const handleSelectClienteEndereco = (cliente) => {
+    const enderecoSelecionado = cliente.usar_endereco_entrega && cliente.endereco_entrega
+      ? cliente.endereco_entrega
+      : cliente.endereco;
+    setFormData({ ...formData, endereco_entrega: enderecoSelecionado });
+    setClienteSearch("");
+    setShowClienteDropdown(false);
+  };
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Cliente.create(data),
@@ -556,6 +576,43 @@ export default function Clientes() {
                     Endereço de Entrega Alternativo (Galpão/Depósito)
                   </Label>
                 </div>
+                
+                {/* Campo de busca de cliente */}
+                <div className="relative mb-2">
+                  <div className="flex items-center gap-2">
+                    <Search className="w-4 h-4 text-orange-500" />
+                    <Input
+                      placeholder="Buscar cliente para usar endereço..."
+                      value={clienteSearch}
+                      onChange={(e) => {
+                        setClienteSearch(e.target.value);
+                        setShowClienteDropdown(true);
+                      }}
+                      onFocus={() => setShowClienteDropdown(true)}
+                      className="flex-1 bg-white border-orange-200"
+                    />
+                  </div>
+                  {showClienteDropdown && clienteSearchResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-orange-200 rounded-md shadow-lg max-h-48 overflow-auto">
+                      {clienteSearchResults.map((cliente) => (
+                        <button
+                          key={cliente.id}
+                          type="button"
+                          onClick={() => handleSelectClienteEndereco(cliente)}
+                          className="w-full px-3 py-2 text-left hover:bg-orange-50 border-b border-orange-100 last:border-b-0"
+                        >
+                          <p className="font-medium text-gray-900 text-sm">{cliente.nome}</p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {cliente.usar_endereco_entrega && cliente.endereco_entrega
+                              ? cliente.endereco_entrega
+                              : cliente.endereco}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <Textarea
                   id="endereco_entrega"
                   value={formData.endereco_entrega}
@@ -566,7 +623,7 @@ export default function Clientes() {
                     })
                   }
                   placeholder="Ex: Av. Industrial, 500 - Galpão 3, Zona Industrial"
-                  className="min-h-[60px]"
+                  className="min-h-[60px] bg-white"
                 />
                 {formData.endereco_entrega && (
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-orange-200">
