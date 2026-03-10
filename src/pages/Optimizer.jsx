@@ -344,7 +344,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     setIsOptimizing(false);
   };
 
-  // 2. REORDENAÇÃO (CORRIGIDO: DICIONÁRIO MESTRE)
+  // 2. REORDENAÇÃO — usa Directions API para respeitar a ordem manual
   const handleReorderRoute = async (newEntregas, priorityIndex) => {
     if (newEntregas.length === 0) return;
 
@@ -356,164 +356,117 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       const matrizData = [{ nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco }];
       const [matrizGeocodificada] = await geocodeMultiple(matrizData, mapboxToken);
 
-      // --- CRIAÇÃO DO DICIONÁRIO MESTRE DE COORDENADAS ---
+      // --- DICIONÁRIO MESTRE DE COORDENADAS ---
       const coordsMap = {};
-
-      // 1. Popula com dados do Banco (Garantia Base)
       clientes.forEach(c => {
         if (c.nome && c.latitude) coordsMap[c.nome.trim()] = { lat: c.latitude, lng: c.longitude };
       });
-
-      // 2. Popula com Cache Recente (Garantia API)
       geocodedClients.forEach(g => {
         if (g.nome && g.latitude) coordsMap[g.nome.trim()] = { lat: g.latitude, lng: g.longitude };
       });
-
-      // 3. Popula com Itens da Lista Atual (Garantia Estado Anterior)
       newEntregas.forEach(item => {
-        if (item.client_name && item.latitude) {
-            coordsMap[item.client_name.trim()] = { lat: item.latitude, lng: item.longitude };
-        }
+        if (item.client_name && item.latitude) coordsMap[item.client_name.trim()] = { lat: item.latitude, lng: item.longitude };
+      });
+      const getSafeCoords = (name) => coordsMap[name?.trim()] || null;
+
+      // Monta lista final na ordem exata: Matriz → entregas (ordem do drag) → Matriz
+      const allDeliveries = newEntregas.map(item => {
+        const c = getSafeCoords(item.client_name);
+        return {
+          ...item,
+          latitude: c?.lat || item.latitude,
+          longitude: c?.lng || item.longitude
+        };
       });
 
-      // Helper seguro para buscar coordenada
-      const getSafeCoords = (name) => {
-        const key = name?.trim();
-        return coordsMap[key] || null;
+      // Pontos para a Directions API (na ordem exata)
+      const pontosOrdenados = [
+        matrizGeocodificada,
+        ...allDeliveries,
+        matrizGeocodificada // retorno
+      ].filter(p => p.latitude && p.longitude);
+
+      // Usa Directions API (respeita a ordem) em vez de Optimization API (reordena)
+      const directionsData = await getDirections(pontosOrdenados, mapboxToken);
+      const route = directionsData.routes?.[0];
+      const legs = route?.legs || [];
+
+      // Helpers
+      const parseTime = (timeStr) => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 60 + minutes;
       };
-      // ----------------------------------------------------
+      const formatTime = (totalMinutes) => {
+        const hours = Math.floor(totalMinutes / 60) % 24;
+        const minutes = Math.round(totalMinutes % 60);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      };
 
-      const beforePriority = newEntregas.slice(0, priorityIndex + 1);
-      const afterPriority = newEntregas.slice(priorityIndex + 1);
+      const TRAFFIC_BUFFER = 1 + (margemTransito / 100);
+      const SERVICE_TIME = tempoParadaEntrega;
+      let currentTime = parseTime(startTime);
 
-      let finalRoute;
+      const matrizInicio = {
+        order: 1,
+        client_name: PONTO_PARTIDA.nome,
+        address: PONTO_PARTIDA.endereco,
+        latitude: matrizGeocodificada.latitude,
+        longitude: matrizGeocodificada.longitude,
+        estimated_arrival: startTime
+      };
 
-      if (afterPriority.length > 0) {
-        // Garante coordenadas antes de processar
-        const afterPriorityWithCoords = afterPriority.map(item => {
-          const coords = getSafeCoords(item.client_name);
-          return {
-            ...item,
-            latitude: coords?.lat || item.latitude,
-            longitude: coords?.lng || item.longitude,
-            nome: item.client_name
-          };
-        });
-
-        const lastPriorityItem = beforePriority[beforePriority.length - 1];
-        const lastCoords = getSafeCoords(lastPriorityItem.client_name);
-        
-        const lastPriorityRef = {
-          latitude: lastCoords?.lat || lastPriorityItem.latitude,
-          longitude: lastCoords?.lng || lastPriorityItem.longitude
-        };
-
-        const ordenadosPorProximidade = ordenarPorProximidade(afterPriorityWithCoords, lastPriorityRef);
-
-        const todosOsPontos = [
-            matrizGeocodificada,
-            ...beforePriority.map(item => {
-                const c = getSafeCoords(item.client_name);
-                return { nome: item.client_name, latitude: c?.lat, longitude: c?.lng };
-            }),
-            ...ordenadosPorProximidade.map(item => ({
-                nome: item.client_name, latitude: item.latitude, longitude: item.longitude
-            }))
-        ];
-
-        // Filtra para Mapbox
-        const pontosValidos = todosOsPontos.filter(p => p.latitude && p.longitude);
-
-        const optimizationData = await optimizeRoute(pontosValidos, mapboxToken);
-        const trip = optimizationData.trips?.[0];
-        const legs = trip?.legs || [];
-
-        // Reconstrói Rota Visual
-        const parseTime = (timeStr) => {
-          const [hours, minutes] = timeStr.split(':').map(Number);
-          return hours * 60 + minutes;
-        };
-        const formatTime = (totalMinutes) => {
-          const hours = Math.floor(totalMinutes / 60) % 24;
-          const minutes = Math.round(totalMinutes % 60);
-          return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        };
-
-        let currentTime = parseTime(startTime);
-        
-        const TRAFFIC_BUFFER = 1 + (margemTransito / 100);
-        const SERVICE_TIME = tempoParadaEntrega;
-
-        const matrizInicio = {
-          order: 1,
-          client_name: PONTO_PARTIDA.nome,
-          address: PONTO_PARTIDA.endereco,
-          latitude: matrizGeocodificada.latitude,
-          longitude: matrizGeocodificada.longitude,
-          estimated_arrival: startTime
-        };
-
-        let currentOrder = 2;
-        const allDeliveries = [...beforePriority, ...ordenadosPorProximidade];
-
-        const deliveryItems = allDeliveries.map((item, idx) => {
-          // legs[idx] contém duração em segundos da API Mapbox
-          // Converte para minutos e aplica buffer de trânsito
-          if (legs[idx]) {
-            const legDurationMinutes = (legs[idx].duration || 0) / 60; // segundos -> minutos
-            currentTime += Math.round(legDurationMinutes * TRAFFIC_BUFFER);
-          }
-          
-          const arrivalTime = formatTime(currentTime);
-          currentTime += SERVICE_TIME;
-
-          // AQUI: Recupera a coordenada do Dicionário Mestre para o estado final
-          const coords = getSafeCoords(item.client_name);
-
-          return {
-            ...item,
-            order: currentOrder++,
-            latitude: coords?.lat || item.latitude, // Blindagem Final
-            longitude: coords?.lng || item.longitude,
-            estimated_arrival: arrivalTime
-          };
-        });
-
-        // Tempo de retorno à matriz (última leg) - já processado no loop acima para entregas
-        // A última leg do Mapbox é o retorno à matriz
-        if (legs.length > allDeliveries.length && legs[allDeliveries.length]) {
-          const returnDurationMinutes = (legs[allDeliveries.length].duration || 0) / 60;
-          currentTime += Math.round(returnDurationMinutes * TRAFFIC_BUFFER);
+      let currentOrder = 2;
+      const deliveryItems = allDeliveries.map((item, idx) => {
+        // legs[idx] = trecho do ponto anterior até este ponto
+        if (legs[idx]) {
+          const legDurationMinutes = (legs[idx].duration || 0) / 60;
+          currentTime += Math.round(legDurationMinutes * TRAFFIC_BUFFER);
         }
 
-        const matrizFim = {
-          order: currentOrder,
-          client_name: PONTO_PARTIDA.nome,
-          address: PONTO_PARTIDA.endereco,
-          latitude: matrizGeocodificada.latitude,
-          longitude: matrizGeocodificada.longitude,
-          estimated_arrival: formatTime(currentTime)
+        const arrivalTime = formatTime(currentTime);
+        currentTime += SERVICE_TIME;
+
+        const coords = getSafeCoords(item.client_name);
+        return {
+          ...item,
+          order: currentOrder++,
+          latitude: coords?.lat || item.latitude,
+          longitude: coords?.lng || item.longitude,
+          estimated_arrival: arrivalTime
         };
+      });
 
-        finalRoute = [matrizInicio, ...deliveryItems, matrizFim];
-
-        if (trip) {
-          // Calcula tempo total: tempo de direção com buffer + tempo de serviço por entrega
-          const totalDrivingTime = Math.round(((trip.duration || 0) * TRAFFIC_BUFFER) / 60);
-          const totalServiceTime = allDeliveries.length * SERVICE_TIME;
-          
-          setStats(prev => ({
-            ...prev,
-            distance: (trip.distance || 0) / 1000,
-            time: totalDrivingTime + totalServiceTime,
-            routeGeometry: trip.geometry?.coordinates || []
-          }));
-        }
-      } else {
-        finalRoute = buildManualRoute(matrizGeocodificada, newEntregas, startTime);
+      // Último leg = retorno à matriz
+      const returnLegIdx = allDeliveries.length;
+      if (legs[returnLegIdx]) {
+        const returnMinutes = (legs[returnLegIdx].duration || 0) / 60;
+        currentTime += Math.round(returnMinutes * TRAFFIC_BUFFER);
       }
 
+      const matrizFim = {
+        order: currentOrder,
+        client_name: PONTO_PARTIDA.nome,
+        address: PONTO_PARTIDA.endereco,
+        latitude: matrizGeocodificada.latitude,
+        longitude: matrizGeocodificada.longitude,
+        estimated_arrival: formatTime(currentTime)
+      };
+
+      const finalRoute = [matrizInicio, ...deliveryItems, matrizFim];
       setOptimizedRoute(finalRoute);
+
+      if (route) {
+        // Soma real de cada leg (direção + buffer) + tempo de serviço
+        const totalDrivingMinutes = legs.reduce((sum, leg) => sum + Math.round(((leg.duration || 0) / 60) * TRAFFIC_BUFFER), 0);
+        const totalServiceTime = allDeliveries.length * SERVICE_TIME;
+
+        setStats(prev => ({
+          ...prev,
+          distance: (route.distance || 0) / 1000,
+          time: totalDrivingMinutes + totalServiceTime,
+          routeGeometry: route.geometry?.coordinates || []
+        }));
+      }
 
     } catch (error) {
       console.error("Erro ao reordenar rota:", error);
