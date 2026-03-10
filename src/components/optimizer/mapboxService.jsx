@@ -104,12 +104,18 @@ export async function optimizeRoute(coordinates, mapboxToken) {
   return data;
 }
 
-// Obter direções entre pontos
+// Obter direções entre pontos (respeita a ordem fornecida)
 export async function getDirections(coordinates, mapboxToken) {
   const validCoords = coordinates.filter(c => c.latitude && c.longitude);
+  
+  if (validCoords.length < 2) {
+    return { routes: [{ legs: [], distance: 0, duration: 0, geometry: { coordinates: [] } }] };
+  }
+
+  // Mapbox Directions API tem limite de 25 coordenadas por requisição
   const coordsString = validCoords.map(c => `${c.longitude},${c.latitude}`).join(';');
   
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coordsString}?access_token=${mapboxToken}&geometries=geojson&overview=full`;
+  const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coordsString}?access_token=${mapboxToken}&geometries=geojson&overview=full&annotations=duration,distance`;
   
   const response = await fetch(url);
   const data = await response.json();
