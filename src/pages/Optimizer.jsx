@@ -16,7 +16,7 @@ import VehicleDriverSelector from "../components/optimizer/VehicleDriverSelector
 import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
 
 // --- SERVIÇOS (MAPBOX) ---
-import { geocodeMultiple, optimizeRoute, processOptimizationResult, TIME_CONFIG } from "../components/optimizer/mapboxService";
+import { geocodeMultiple, optimizeRoute, getDirections, processOptimizationResult, TIME_CONFIG } from "../components/optimizer/mapboxService";
 
 const DEFAULT_MATRIZ = "Configure o endereço da matriz em Configurações";
 
