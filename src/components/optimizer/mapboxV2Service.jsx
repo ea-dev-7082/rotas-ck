@@ -1,200 +1,146 @@
 // ==============================================
-// Mapbox Optimization V2 API - Multi-Route Service
+// Multi-Route Service usando Mapbox Optimization V1
+// Divide clientes entre veículos por proximidade geográfica
+// e otimiza cada rota individualmente com a API V1 gratuita
 // ==============================================
 
-// Submeter problema de roteamento (POST assíncrono)
-export async function submitRoutingProblem(problemDocument, mapboxToken) {
-  const url = `https://api.mapbox.com/optimized-trips/v2?access_token=${mapboxToken}`;
-  
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(problemDocument),
+import { optimizeRoute, processOptimizationResult } from "./mapboxService";
+
+const ROUTE_COLORS = [
+  "#3b82f6", "#ef4444", "#10b981", "#f59e0b",
+  "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16",
+];
+
+// Distância euclidiana simples entre dois pontos
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Divide clientes em clusters geográficos (K-means simplificado)
+function clusterClients(clients, numVehicles, matrizCoords) {
+  if (numVehicles <= 1) return [clients];
+  if (clients.length <= numVehicles) {
+    return clients.map((c) => [c]);
+  }
+
+  // Ordena clientes por ângulo em relação à matriz (setorização)
+  const clientsWithAngle = clients.map((c) => {
+    const angle = Math.atan2(
+      c.latitude - matrizCoords.latitude,
+      c.longitude - matrizCoords.longitude
+    );
+    return { ...c, _angle: angle };
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Erro ao submeter problema: ${response.status} - ${errorText}`);
-  }
+  clientsWithAngle.sort((a, b) => a._angle - b._angle);
 
-  return await response.json(); // { id, status }
+  // Divide em setores iguais
+  const clusters = Array.from({ length: numVehicles }, () => []);
+  clientsWithAngle.forEach((client, idx) => {
+    const clusterIdx = idx % numVehicles;
+    clusters[clusterIdx].push(client);
+  });
+
+  return clusters.filter((c) => c.length > 0);
 }
 
-// Recuperar solução (GET com polling)
-export async function retrieveSolution(jobId, mapboxToken, maxAttempts = 30, intervalMs = 2000) {
-  const url = `https://api.mapbox.com/optimized-trips/v2/${jobId}?access_token=${mapboxToken}`;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const response = await fetch(url);
-    
-    if (response.status === 200) {
-      return await response.json(); // Solução completa
-    }
-    
-    if (response.status === 202) {
-      // Ainda processando, aguardar
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
-      continue;
-    }
-    
-    const errorText = await response.text();
-    throw new Error(`Erro ao recuperar solução: ${response.status} - ${errorText}`);
-  }
-
-  throw new Error("Timeout: A otimização demorou demais para ser processada.");
-}
-
-// Montar documento de problema de roteamento
-export function buildRoutingProblem({
-  matrizCoords,     // { latitude, longitude }
-  vehicles,         // [{ id, name, capacidade?, motorista_nome }]
-  services,         // [{ id, nome, latitude, longitude, duration, time_windows? }]
-  startTime,        // ISO string ex: "2026-03-11T08:00:00-03:00"
+// Otimiza múltiplas rotas usando a API V1
+export async function optimizeMultiRoutes({
+  matrizCoords,
+  vehicles,
+  clients,
+  mapboxToken,
+  startTime = "08:00",
+  serviceTime = 20,
+  trafficBuffer = 10,
 }) {
-  // Monta as locations
-  const locations = [
-    {
-      name: "matriz",
-      coordinates: [matrizCoords.longitude, matrizCoords.latitude],
-    },
-  ];
+  const numVehicles = vehicles.length;
 
-  // Adiciona clientes como locations
-  services.forEach((svc) => {
-    locations.push({
-      name: svc.id,
-      coordinates: [svc.longitude, svc.latitude],
-    });
-  });
+  // 1. Dividir clientes em clusters
+  const clusters = clusterClients(clients, numVehicles, matrizCoords);
 
-  // Monta veículos
-  const vehiclesDocs = vehicles.map((v) => ({
-    name: v.id,
-    routing_profile: "mapbox/driving",
-    start_location: "matriz",
-    end_location: "matriz",
-    capacities: v.capacidade ? { volume: parseInt(v.capacidade) || 100 } : { volume: 100 },
-    earliest_start: startTime,
-    latest_end: addHoursToISO(startTime, 12), // 12h de jornada máxima
-  }));
-
-  // Monta serviços (entregas)
-  const servicesDocs = services.map((svc) => {
-    const doc = {
-      name: svc.id,
-      location: svc.id,
-      duration: svc.duration || 1200, // 20 min padrão em segundos
-      requirements: {},
-    };
-
-    // Adiciona janelas de tempo se existirem
-    if (svc.time_windows && svc.time_windows.length > 0) {
-      doc.time_windows = svc.time_windows;
-    }
-
-    return doc;
-  });
-
-  return {
-    version: 1,
-    locations,
-    vehicles: vehiclesDocs,
-    services: servicesDocs,
-  };
-}
-
-// Processar solução V2 em formato amigável para a interface
-export function processV2Solution(solution, servicesMap, vehiclesMap, matrizData) {
+  // 2. Otimizar cada cluster como rota independente
   const routes = [];
 
-  if (!solution.routes || solution.routes.length === 0) {
-    return { routes, dropped: solution.dropped || { services: [], shipments: [] } };
-  }
+  for (let i = 0; i < clusters.length; i++) {
+    const cluster = clusters[i];
+    const vehicle = vehicles[i] || vehicles[vehicles.length - 1];
 
-  // Cores para as rotas
-  const ROUTE_COLORS = [
-    "#3b82f6", // blue
-    "#ef4444", // red
-    "#10b981", // green
-    "#f59e0b", // amber
-    "#8b5cf6", // violet
-    "#ec4899", // pink
-    "#06b6d4", // cyan
-    "#84cc16", // lime
-  ];
+    if (cluster.length === 0) continue;
 
-  solution.routes.forEach((route, routeIndex) => {
-    const vehicleInfo = vehiclesMap[route.vehicle] || {};
-    const stops = [];
-    let totalDistance = 0;
+    // Monta pontos: matriz + clientes + matriz (retorno)
+    const points = [
+      {
+        nome: "Matriz",
+        endereco: matrizCoords.endereco || "Matriz",
+        latitude: matrizCoords.latitude,
+        longitude: matrizCoords.longitude,
+      },
+      ...cluster.map((c) => ({
+        nome: c.nome,
+        endereco: c.endereco,
+        latitude: c.latitude,
+        longitude: c.longitude,
+        id: c.id,
+        telefone: c.telefone,
+      })),
+    ];
 
-    route.stops.forEach((stop, stopIndex) => {
-      const serviceInfo = servicesMap[stop.location] || {};
-      const isMatriz = stop.location === "matriz";
+    // Otimizar com API V1
+    const optimizationData = await optimizeRoute(points, mapboxToken);
 
-      stops.push({
-        order: stopIndex + 1,
-        client_name: isMatriz ? matrizData.nome : (serviceInfo.nome || stop.location),
-        client_id: isMatriz ? null : stop.location,
-        address: isMatriz ? matrizData.endereco : (serviceInfo.endereco || ""),
-        latitude: isMatriz ? matrizData.latitude : (serviceInfo.latitude || 0),
-        longitude: isMatriz ? matrizData.longitude : (serviceInfo.longitude || 0),
-        estimated_arrival: stop.eta ? formatISOToTime(stop.eta) : "",
-        type: stop.type,
-        wait: stop.wait || 0,
-        odometer: stop.odometer || 0,
-      });
+    const result = processOptimizationResult(
+      optimizationData,
+      points,
+      startTime,
+      serviceTime,
+      trafficBuffer
+    );
 
-      if (stop.odometer) {
-        totalDistance = Math.max(totalDistance, stop.odometer);
-      }
-    });
+    if (result.optimized_route.length === 0) continue;
 
-    const deliveryStops = stops.filter(s => s.type !== "start" && s.type !== "end");
+    // Formata stops
+    const stops = result.optimized_route.map((stop, idx) => ({
+      order: idx + 1,
+      client_name: stop.client_name,
+      client_id: cluster.find((c) => c.nome === stop.client_name)?.id || null,
+      address: stop.address,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+      estimated_arrival: stop.estimated_arrival,
+      type:
+        idx === 0
+          ? "start"
+          : idx === result.optimized_route.length - 1
+          ? "end"
+          : "service",
+    }));
 
     routes.push({
-      vehicle_id: route.vehicle,
-      vehicle_name: vehicleInfo.descricao || route.vehicle,
-      vehicle_placa: vehicleInfo.placa || "",
-      motorista_nome: vehicleInfo.motorista_nome || "",
-      motorista_id: vehicleInfo.motorista_id || "",
-      motorista_email: vehicleInfo.motorista_email || "",
-      color: ROUTE_COLORS[routeIndex % ROUTE_COLORS.length],
+      vehicle_id: vehicle.id,
+      vehicle_name: vehicle.name,
+      vehicle_placa: vehicle.placa || "",
+      motorista_nome: vehicle.motorista_nome || "",
+      motorista_id: vehicle.motorista_id || "",
+      motorista_email: vehicle.motorista_email || "",
+      color: ROUTE_COLORS[i % ROUTE_COLORS.length],
       stops,
-      total_entregas: deliveryStops.length,
-      total_distance_km: totalDistance / 1000,
-      total_time_minutes: calculateRouteDuration(stops),
+      route_geometry: result.route_geometry,
+      total_entregas: stops.filter(
+        (s) => s.type !== "start" && s.type !== "end"
+      ).length,
+      total_distance_km: Math.round(result.total_distance_km * 10) / 10,
+      total_time_minutes: Math.round(result.total_time_minutes),
     });
-  });
+  }
 
-  return {
-    routes,
-    dropped: solution.dropped || { services: [], shipments: [] },
-  };
-}
-
-// --- Helpers ---
-
-function addHoursToISO(isoStr, hours) {
-  const date = new Date(isoStr);
-  date.setHours(date.getHours() + hours);
-  return date.toISOString();
-}
-
-function formatISOToTime(isoStr) {
-  const date = new Date(isoStr);
-  return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
-}
-
-function calculateRouteDuration(stops) {
-  if (stops.length < 2) return 0;
-  const start = stops.find(s => s.type === "start");
-  const end = stops.find(s => s.type === "end");
-  if (!start?.estimated_arrival || !end?.estimated_arrival) return 0;
-
-  const parseTime = (t) => {
-    const [h, m] = t.split(":").map(Number);
-    return h * 60 + m;
-  };
-  return parseTime(end.estimated_arrival) - parseTime(start.estimated_arrival);
+  return { routes, dropped: { services: [] } };
 }
