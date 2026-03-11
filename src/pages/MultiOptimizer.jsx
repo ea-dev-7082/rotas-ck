@@ -23,12 +23,7 @@ import MultiRouteMap from "../components/multi-optimizer/MultiRouteMap";
 import MultiRouteList from "../components/multi-optimizer/MultiRouteList";
 import ClientSelector from "../components/optimizer/ClientSelector";
 import { geocodeMultiple } from "../components/optimizer/mapboxService";
-import {
-  submitRoutingProblem,
-  retrieveSolution,
-  buildRoutingProblem,
-  processV2Solution,
-} from "../components/optimizer/mapboxV2Service";
+import { optimizeMultiRoutes } from "../components/optimizer/mapboxV2Service";
 
 const DEFAULT_MATRIZ = "Configure o endereço da matriz em Configurações";
 
@@ -205,86 +200,25 @@ export default function MultiOptimizer() {
       };
     });
 
-    // 4. Montar serviços
-    const now = new Date();
-    const todayStr = now.toISOString().split("T")[0]; // "2026-03-11"
-    const startTimeISO = `${todayStr}T08:00:00-03:00`;
+    setOptimizationStatus("Otimizando rotas...");
 
-    const servicesData = clientesValidos.map((c) => {
-      const svc = {
-        id: c.id,
-        nome: c.nome,
-        endereco: c.endereco || c.place_name || "",
-        latitude: c.latitude,
-        longitude: c.longitude,
-        duration: tempoParadaEntrega * 60, // em segundos
-      };
+    // Hora de início da configuração ou padrão 08:00
+    const horaInicio = configs.find((c) => c.chave === "hora_inicio")?.valor || "08:00";
 
-      // Janelas de tempo
-      if (c.janela_inicio && c.janela_fim) {
-        svc.time_windows = [
-          {
-            earliest: `${todayStr}T${c.janela_inicio}:00-03:00`,
-            latest: `${todayStr}T${c.janela_fim}:00-03:00`,
-          },
-        ];
-      }
-
-      return svc;
-    });
-
-    setOptimizationStatus("Enviando problema para otimização...");
-
-    // 5. Montar e submeter problema
-    const problem = buildRoutingProblem({
-      matrizCoords: matrizGeocodificada,
-      vehicles: vehiclesData,
-      services: servicesData,
-      startTime: startTimeISO,
-    });
-
-    const submission = await submitRoutingProblem(problem, mapboxToken);
-
-    setOptimizationStatus(
-      "Calculando rotas ótimas... (pode levar até 1 minuto)"
-    );
-
-    // 6. Polling pela solução
-    const solution = await retrieveSolution(
-      submission.id,
-      mapboxToken,
-      30,
-      3000
-    );
-
-    // 7. Processar solução
-    const servicesMap = {};
-    clientesValidos.forEach((c) => {
-      servicesMap[c.id] = c;
-    });
-
-    const vehiclesMap = {};
-    vehiclesData.forEach((v) => {
-      const veiculo = veiculos.find((ve) => ve.id === v.id);
-      vehiclesMap[v.id] = {
-        ...veiculo,
-        motorista_nome: v.motorista_nome,
-        motorista_id: v.motorista_id,
-        motorista_email: v.motorista_email,
-      };
-    });
-
-    const processed = processV2Solution(
-      solution,
-      servicesMap,
-      vehiclesMap,
-      {
-        nome: PONTO_PARTIDA.nome,
-        endereco: PONTO_PARTIDA.endereco,
+    // 4. Otimizar usando API V1 (divide clientes e otimiza cada rota)
+    const processed = await optimizeMultiRoutes({
+      matrizCoords: {
         latitude: matrizGeocodificada.latitude,
         longitude: matrizGeocodificada.longitude,
-      }
-    );
+        endereco: PONTO_PARTIDA.endereco,
+      },
+      vehicles: vehiclesData,
+      clients: clientesValidos,
+      mapboxToken,
+      startTime: horaInicio,
+      serviceTime: tempoParadaEntrega,
+      trafficBuffer: parseInt(configs.find((c) => c.chave === "margem_transito")?.valor) || 10,
+    });
 
     setMultiRoutes(processed.routes);
     setDroppedServices(processed.dropped);
