@@ -515,6 +515,12 @@ export default function Clientes() {
                                   <span>{cliente.telefone}</span>
                                 </div>
                               )}
+                              {(cliente.janela_inicio && cliente.janela_fim) && (
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <Clock className="w-4 h-4 text-blue-500" />
+                                  <span>Janela: {cliente.janela_inicio} - {cliente.janela_fim}</span>
+                                </div>
+                              )}
                               {cliente.observacoes && (
                                 <div className="mt-3 pt-3 border-t border-gray-100">
                                   <Badge variant="outline" className="mb-2">
