@@ -57,7 +57,6 @@ import DriverRouteView from './pages/DriverRouteView';
 import DriverVehicle from './pages/DriverVehicle';
 import EmRota from './pages/EmRota';
 import Home from './pages/Home';
-import MultiOptimizer from './pages/MultiOptimizer';
 import Optimizer from './pages/Optimizer';
 import Relatorios from './pages/Relatorios';
 import RotasEmAndamento from './pages/RotasEmAndamento';
@@ -76,7 +75,6 @@ export const PAGES = {
     "DriverVehicle": DriverVehicle,
     "EmRota": EmRota,
     "Home": Home,
-    "MultiOptimizer": MultiOptimizer,
     "Optimizer": Optimizer,
     "Relatorios": Relatorios,
     "RotasEmAndamento": RotasEmAndamento,

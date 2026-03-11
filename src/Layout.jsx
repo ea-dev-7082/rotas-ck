@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
-import { Route, Users, Settings, FileText, CalendarClock, Navigation, Car, Truck } from "lucide-react";
+import { Route, Users, Settings, FileText, CalendarClock, Navigation, Car } from "lucide-react";
 
 const LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69134403eb36c8c975510ceb/250c13318_image.png";
 
@@ -35,11 +35,6 @@ export default function Layout({ children, currentPageName }) {
       title: "Otimizador",
       url: createPageUrl("Optimizer"),
       icon: Route,
-    },
-    {
-      title: "Multi-Rotas",
-      url: createPageUrl("MultiOptimizer"),
-      icon: Truck,
     },
     {
       title: "Agendados",
