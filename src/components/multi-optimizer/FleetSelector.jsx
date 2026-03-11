@@ -97,6 +97,36 @@ export default function FleetSelector({
 
       <CardContent className="p-4">
         <div className="space-y-3">
+          {/* Botão Selecionar Todos */}
+          {mode === "veiculo" && veiculos.length > 0 && (
+            <button
+              onClick={() => {
+                if (selectedFleet.length === veiculos.length) {
+                  onFleetChange([]);
+                } else {
+                  onFleetChange(veiculos.map((v) => ({ veiculoId: v.id, motoristaId: "" })));
+                }
+              }}
+              className="w-full text-sm font-medium text-indigo-600 hover:text-indigo-800 py-2 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+            >
+              {selectedFleet.length === veiculos.length ? "Desmarcar Todos" : "Selecionar Todos"}
+            </button>
+          )}
+          {mode === "motorista" && motoristas.length > 0 && (
+            <button
+              onClick={() => {
+                if (selectedFleet.length === motoristas.length) {
+                  onFleetChange([]);
+                } else {
+                  onFleetChange(motoristas.map((m) => ({ veiculoId: "", motoristaId: m.id })));
+                }
+              }}
+              className="w-full text-sm font-medium text-indigo-600 hover:text-indigo-800 py-2 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+            >
+              {selectedFleet.length === motoristas.length ? "Desmarcar Todos" : "Selecionar Todos"}
+            </button>
+          )}
+
           {mode === "veiculo" ? (
             /* =========== MODO VEÍCULO =========== */
             veiculos.length === 0 ? (
