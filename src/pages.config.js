@@ -61,6 +61,7 @@ import Optimizer from './pages/Optimizer';
 import Relatorios from './pages/Relatorios';
 import RotasEmAndamento from './pages/RotasEmAndamento';
 import Veiculos from './pages/Veiculos';
+import MultiOptimizer from './pages/MultiOptimizer';
 import __Layout from './Layout.jsx';
 
 
@@ -79,6 +80,7 @@ export const PAGES = {
     "Relatorios": Relatorios,
     "RotasEmAndamento": RotasEmAndamento,
     "Veiculos": Veiculos,
+    "MultiOptimizer": MultiOptimizer,
 }
 
 export const pagesConfig = {
