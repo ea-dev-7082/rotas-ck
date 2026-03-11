@@ -190,16 +190,17 @@ export default function MultiOptimizer() {
       return;
     }
 
-    // 3. Montar veículos com motoristas
-    const vehiclesData = selectedFleet.map((f) => {
-      const veiculo = veiculos.find((v) => v.id === f.veiculoId);
-      const motorista = motoristas.find((m) => m.id === f.motoristaId);
+    // 3. Montar veículos com motoristas (suporta seleção por veículo ou motorista)
+    const vehiclesData = selectedFleet.map((f, idx) => {
+      const veiculo = f.veiculoId ? veiculos.find((v) => v.id === f.veiculoId) : null;
+      const motorista = f.motoristaId ? motoristas.find((m) => m.id === f.motoristaId) : null;
       return {
-        id: f.veiculoId,
-        name: veiculo?.descricao || "Veículo",
+        id: f.veiculoId || `motorista-${f.motoristaId || idx}`,
+        name: veiculo?.descricao || (motorista ? `Veículo de ${motorista.nome}` : `Veículo ${idx + 1}`),
         capacidade: veiculo?.capacidade,
+        placa: veiculo?.placa || "",
         motorista_nome: motorista?.nome || "",
-        motorista_id: motorista?.id || "",
+        motorista_id: motorista?.id || f.motoristaId || "",
         motorista_email: motorista?.email || "",
       };
     });
