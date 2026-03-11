@@ -25,6 +25,7 @@ import {
   Upload,
   Loader2,
   Search,
+  Clock,
 } from "lucide-react";
 
 import { Switch } from "@/components/ui/switch";
@@ -58,6 +59,8 @@ export default function Clientes() {
     usar_endereco_entrega: false,
     telefone: "",
     observacoes: "",
+    janela_inicio: "",
+    janela_fim: "",
   });
 
   const [clienteSearch, setClienteSearch] = useState("");
@@ -311,6 +314,8 @@ export default function Clientes() {
       usar_endereco_entrega: cliente.usar_endereco_entrega || false,
       telefone: cliente.telefone || "",
       observacoes: cliente.observacoes || "",
+      janela_inicio: cliente.janela_inicio || "",
+      janela_fim: cliente.janela_fim || "",
     });
     setShowDialog(true);
   };
@@ -325,6 +330,8 @@ export default function Clientes() {
       usar_endereco_entrega: false,
       telefone: "",
       observacoes: "",
+      janela_inicio: "",
+      janela_fim: "",
     });
   };
 
@@ -657,6 +664,43 @@ export default function Clientes() {
                   }
                   placeholder="Ex: (11) 3456-7890"
                 />
+              </div>
+
+              {/* Janela de Tempo */}
+              <div className="space-y-2 p-4 border-2 border-dashed border-blue-200 rounded-lg bg-blue-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-blue-600" />
+                  <Label className="text-blue-800">
+                    Janela de Entrega (opcional - usado no Multi-Rotas)
+                  </Label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-blue-600">Início</Label>
+                    <Input
+                      type="time"
+                      value={formData.janela_inicio}
+                      onChange={(e) =>
+                        setFormData({ ...formData, janela_inicio: e.target.value })
+                      }
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-blue-600">Fim</Label>
+                    <Input
+                      type="time"
+                      value={formData.janela_fim}
+                      onChange={(e) =>
+                        setFormData({ ...formData, janela_fim: e.target.value })
+                      }
+                      className="bg-white"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-blue-500 mt-1">
+                  Ex: 08:00 a 12:00 = entrega somente pela manhã
+                </p>
               </div>
 
               <div className="space-y-2">
