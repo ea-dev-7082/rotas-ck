@@ -25,7 +25,7 @@ import ClientSelector from "../components/optimizer/ClientSelector";
 import { geocodeMultiple } from "../components/optimizer/mapboxService";
 import { optimizeMultiRoutes } from "../components/optimizer/mapboxV2Service";
 
-const DEFAULT_MATRIZ = "Configure o endereço da matriz em Configurações";
+const DEFAULT_MATRIZ = "Configure o endereço da matriz em Configurações"; // v2
 
 export default function MultiOptimizer() {
   // --- ESTADOS ---
