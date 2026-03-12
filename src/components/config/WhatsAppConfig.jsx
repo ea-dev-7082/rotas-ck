@@ -5,27 +5,20 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Loader2, CheckCircle2, RefreshCw, Wifi, WifiOff } from "lucide-react";
 
+const WEBHOOK_URL = "https://n8n.kaffspiel.cloud/webhook/rotasck-connect";
+
 export default function WhatsAppConfig({ configs, saveConfig }) {
-  const [webhookUrl, setWebhookUrl] = useState("");
   const [instanceName, setInstanceName] = useState("");
   const [qrBase64, setQrBase64] = useState("");
   const [connectionState, setConnectionState] = useState("");
   const [loading, setLoading] = useState(false);
-  const [urlSaved, setUrlSaved] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
 
   useEffect(() => {
     if (configs.length > 0) {
-      setWebhookUrl(configs.find(c => c.chave === "whatsapp_webhook_url")?.valor || "");
       setInstanceName(configs.find(c => c.chave === "whatsapp_instance_name")?.valor || "");
     }
   }, [configs]);
-
-  const handleSaveUrl = () => {
-    saveConfig({ chave: "whatsapp_webhook_url", valor: webhookUrl });
-    setUrlSaved(true);
-    setTimeout(() => setUrlSaved(false), 3000);
-  };
 
   const handleSaveName = () => {
     saveConfig({ chave: "whatsapp_instance_name", valor: instanceName });
@@ -34,12 +27,12 @@ export default function WhatsAppConfig({ configs, saveConfig }) {
   };
 
   const handleConnect = async () => {
-    if (!webhookUrl || !instanceName) return;
+    if (!instanceName) return;
     setLoading(true);
     setQrBase64("");
     setConnectionState("");
 
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "connect", instance: instanceName })
@@ -68,23 +61,8 @@ export default function WhatsAppConfig({ configs, saveConfig }) {
       </CardHeader>
       <CardContent className="pt-6 space-y-4">
         <p className="text-xs text-gray-500">
-          Configure a conexão com o WhatsApp via Evolution API integrado ao seu n8n.
+          Configure a conexão com o WhatsApp via Evolution API integrado ao n8n.
         </p>
-
-        {/* Webhook URL */}
-        <div>
-          <label className="text-sm font-medium text-gray-700 block mb-1">URL do Webhook (n8n)</label>
-          <div className="flex gap-2">
-            <Input
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-              placeholder="https://n8n.seudominio.com/webhook/rotasck-connect"
-            />
-            <Button onClick={handleSaveUrl} size="sm" className="bg-green-600 hover:bg-green-700 shrink-0">
-              {urlSaved ? <CheckCircle2 className="w-4 h-4" /> : "Salvar"}
-            </Button>
-          </div>
-        </div>
 
         {/* Nome da Instância */}
         <div>
@@ -106,7 +84,7 @@ export default function WhatsAppConfig({ configs, saveConfig }) {
         <div className="flex items-center gap-3 pt-2">
           <Button
             onClick={handleConnect}
-            disabled={loading || !webhookUrl || !instanceName}
+            disabled={loading || !instanceName}
             className="bg-green-600 hover:bg-green-700 text-white"
           >
             {loading ? (
