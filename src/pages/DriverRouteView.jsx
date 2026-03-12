@@ -11,6 +11,7 @@ import BottomNav from "../components/driver/BottomNav";
 import DeliveryCard from "../components/driver/DeliveryCard";
 import MarkDeliveredDialog from "../components/driver/MarkDeliveredDialog";
 import OccurrenceDialog from "../components/driver/OccurrenceDialog";
+import NotifyClientButton from "../components/whatsapp/NotifyClientButton";
 
 export default function DriverRouteView() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -19,8 +20,26 @@ export default function DriverRouteView() {
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
   const [occurrenceOpen, setOccurrenceOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [instanceName, setInstanceName] = useState("");
 
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser);
+  }, []);
+
+  // Carrega configurações para pegar nome da instância WhatsApp
+  const { data: configs } = useQuery({
+    queryKey: ["configs-driver"],
+    queryFn: () => base44.entities.Configuracao.list(),
+    initialData: [],
+  });
+
+  useEffect(() => {
+    const inst = configs.find(c => c.chave === "whatsapp_instance_name");
+    if (inst) setInstanceName(inst.valor);
+  }, [configs]);
 
   // Busca rota
   const { data: rota, isLoading } = useQuery({
@@ -225,15 +244,24 @@ export default function DriverRouteView() {
       {/* Content */}
       <div className="max-w-md mx-auto px-4 py-6 space-y-4">
         {entregas.map((delivery) => (
-          <DeliveryCard
-            key={delivery.order}
-            delivery={delivery}
-            isNext={delivery.order === nextDelivery?.order}
-            onMarkDelivered={handleMarkDelivered}
-            onReportOccurrence={handleOccurrence}
-            onNavigate={handleNavigate}
-            onCall={handleCall}
-          />
+          <div key={delivery.order} className="space-y-2">
+            <DeliveryCard
+              delivery={delivery}
+              isNext={delivery.order === nextDelivery?.order}
+              onMarkDelivered={handleMarkDelivered}
+              onReportOccurrence={handleOccurrence}
+              onNavigate={handleNavigate}
+              onCall={handleCall}
+            />
+            {delivery.status !== "delivered" && delivery.phone && (
+              <NotifyClientButton
+                delivery={delivery}
+                driverName={rota.motorista_nome}
+                vehicleDescription={`${rota.veiculo_descricao} - ${rota.veiculo_placa}`}
+                instanceName={instanceName}
+              />
+            )}
+          </div>
         ))}
 
         {/* Rota Concluída */}
