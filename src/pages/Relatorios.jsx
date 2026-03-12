@@ -27,12 +27,14 @@ import {
   Route,
   Filter,
   X,
-  BarChart3, // NOVO
-  Save, // NOVO
-  AlertTriangle // NOVO
+  BarChart3,
+  Save,
+  AlertTriangle,
+  LayoutGrid
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import moment from "moment";
+import RoteiroEntregaDialog from "../components/relatorios/RoteiroEntregaDialog";
 
 export default function Relatorios() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -51,6 +53,7 @@ export default function Relatorios() {
 
   // Ocorrências (Estado local para edição no modal)
   const [occurrences, setOccurrences] = useState({});
+  const [showRoteiroDialog, setShowRoteiroDialog] = useState(false);
 
   const queryClient = useQueryClient();
 
