@@ -46,6 +46,7 @@ import { createPageUrl } from "@/utils";
 
 import { geocodeMultiple, optimizeRoute, processOptimizationResult, TIME_CONFIG } from "../components/optimizer/mapboxService";
 import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
+import SendRouteSummaryButton from "../components/whatsapp/SendRouteSummaryButton";
 
 export default function Agendados() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -88,6 +89,15 @@ export default function Agendados() {
   });
 
   const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || "";
+  const instanceName = configs.find(c => c.chave === "whatsapp_instance_name")?.valor || "";
+
+  // Buscar motoristas para pegar telefone
+  const { data: motoristasList } = useQuery({
+    queryKey: ["motoristas-agendados", currentUser?.email],
+    queryFn: () => currentUser ? base44.entities.Motorista.filter({ owner: currentUser.email }) : [],
+    enabled: !!currentUser,
+    initialData: [],
+  });
 
   // Lista de motoristas únicos
   const motoristas = useMemo(() => {
@@ -430,6 +440,11 @@ export default function Agendados() {
                                   <Eye className="w-4 h-4 mr-2" />
                                   Detalhes
                                 </Button>
+                                <SendRouteSummaryButton
+                                  rota={rota}
+                                  motoristas={motoristasList}
+                                  instanceName={instanceName}
+                                />
                                 <Button
                                   variant="ghost"
                                   size="icon"
