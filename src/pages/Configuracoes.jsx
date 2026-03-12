@@ -37,7 +37,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import WhatsAppConfig from "../components/config/WhatsAppConfig";
 
 export default function Configuracoes() {
   const [mapboxToken, setMapboxToken] = useState("");
@@ -401,12 +400,6 @@ export default function Configuracoes() {
               </ScrollArea>
             </CardContent>
           </Card>
-
-          {/* WhatsApp Config */}
-          <WhatsAppConfig
-            configs={configs}
-            saveConfig={(data) => saveConfigMutation.mutate(data)}
-          />
 
           {/* Botão Sair */}
           <div className="pt-6 border-t">
