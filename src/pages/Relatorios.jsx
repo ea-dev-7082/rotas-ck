@@ -334,7 +334,6 @@ export default function Relatorios() {
           <div className="flex items-center gap-3">
             <Button
               onClick={() => setShowRoteiroDialog(true)}
-              disabled={filteredRelatorios.length === 0}
               className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold shadow-sm"
             >
               <LayoutGrid className="w-4 h-4 mr-2" />
@@ -738,7 +737,7 @@ export default function Relatorios() {
       <RoteiroEntregaDialog
         open={showRoteiroDialog}
         onClose={() => setShowRoteiroDialog(false)}
-        relatorios={filteredRelatorios}
+        userEmail={currentUser?.email}
       />
     </div>);
 

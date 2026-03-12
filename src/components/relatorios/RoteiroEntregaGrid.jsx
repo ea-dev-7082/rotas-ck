@@ -6,16 +6,16 @@ function getNotasText(item) {
   return notas.map(n => n.numero || "").filter(Boolean).join(" / ") || "-";
 }
 
-function RouteCard({ relatorio }) {
-  const veiculo = relatorio.veiculo_descricao || "Veículo";
-  const placa = relatorio.veiculo_placa || "";
-  const motorista = relatorio.motorista_nome || "S/ Motorista";
-  const entregas = (relatorio.rota || []).slice(1, -1);
+function RouteCard({ rota }) {
+  const veiculo = rota.veiculo_descricao || "Veículo";
+  const placa = rota.veiculo_placa || "";
+  const motorista = rota.motorista_nome || "S/ Motorista";
+  const entregas = (rota.rota || []).slice(1, -1);
 
   const headerLabel = placa ? `${veiculo} ${placa}`.toUpperCase() : veiculo.toUpperCase();
 
   return (
-    <div className="border-2 border-black min-w-[260px] flex-1 break-inside-avoid">
+    <div className="border-2 border-black min-w-[260px] flex-1 break-inside-avoid" style={{maxWidth: "33%"}}>
       {/* Cabeçalho com veículo */}
       <div className="text-center border-b-2 border-black px-2 py-1 font-bold text-sm uppercase bg-white">
         {headerLabel}
@@ -48,23 +48,26 @@ function RouteCard({ relatorio }) {
   );
 }
 
-export default function RoteiroEntregaGrid({ relatorios }) {
-  if (!relatorios || relatorios.length === 0) {
+export default function RoteiroEntregaGrid({ rotas, dateLabel }) {
+  if (!rotas || rotas.length === 0) {
     return (
       <div className="text-center py-8 text-gray-400">
-        Nenhum relatório para exibir no roteiro.
+        Nenhuma rota agendada para este dia.
       </div>
     );
   }
 
   return (
     <div>
-      <div className="roteiro-title bg-yellow-400 inline-block font-bold text-2xl px-5 py-2 mb-4">
+      <div className="roteiro-title bg-yellow-400 inline-block font-bold text-2xl px-5 py-2 mb-1">
         ROTEIRO DE ENTREGA
       </div>
+      {dateLabel && (
+        <div className="roteiro-date text-sm text-gray-600 mb-4">{dateLabel}</div>
+      )}
       <div className="flex flex-wrap gap-4">
-        {relatorios.map((relatorio) => (
-          <RouteCard key={relatorio.id} relatorio={relatorio} />
+        {rotas.map((rota) => (
+          <RouteCard key={rota.id} rota={rota} />
         ))}
       </div>
     </div>
