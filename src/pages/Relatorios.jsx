@@ -330,6 +330,17 @@ export default function Relatorios() {
             </div>
           </div>
 
+          {/* Botões de ação */}
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setShowRoteiroDialog(true)}
+              disabled={filteredRelatorios.length === 0}
+              className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold shadow-sm"
+            >
+              <LayoutGrid className="w-4 h-4 mr-2" />
+              Roteiro de Entrega
+            </Button>
+
           {/* Botões de Filtro Rápido */}
           <div className="flex bg-white p-1 rounded-lg border shadow-sm">
             <Button
@@ -356,6 +367,7 @@ export default function Relatorios() {
 
                 Todos
             </Button>
+          </div>
           </div>
         </motion.div>
 
@@ -722,6 +734,12 @@ export default function Relatorios() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* --- DIALOG ROTEIRO DE ENTREGA --- */}
+      <RoteiroEntregaDialog
+        open={showRoteiroDialog}
+        onClose={() => setShowRoteiroDialog(false)}
+        relatorios={filteredRelatorios}
+      />
     </div>);
 
 }
