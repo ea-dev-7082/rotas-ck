@@ -13,13 +13,14 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import { Wrench, Plus, Filter, Download, Fuel, BarChart3 } from "lucide-react";
+import { Wrench, Plus, Filter, Download, Fuel, BarChart3, Car } from "lucide-react";
 import { motion } from "framer-motion";
 import moment from "moment";
 
 import ManutencaoForm from "../components/manutencao/ManutencaoForm";
 import ManutencaoList from "../components/manutencao/ManutencaoList";
 import CustoKmReport from "../components/manutencao/CustoKmReport";
+import RegistroDiarioTab from "../components/manutencao/RegistroDiarioTab";
 
 export default function Manutencao() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -182,6 +183,10 @@ export default function Manutencao() {
               <BarChart3 className="w-4 h-4" />
               Relatório Custo/Km
             </TabsTrigger>
+            <TabsTrigger value="veiculos" className="gap-2">
+              <Car className="w-4 h-4" />
+              Veículos - Registro Diário
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="registros">
@@ -202,6 +207,10 @@ export default function Manutencao() {
 
           <TabsContent value="relatorio">
             <CustoKmReport registros={filteredRegistros} veiculos={veiculos} />
+          </TabsContent>
+
+          <TabsContent value="veiculos">
+            <RegistroDiarioTab veiculos={veiculos} currentUser={currentUser} />
           </TabsContent>
         </Tabs>
       </div>
