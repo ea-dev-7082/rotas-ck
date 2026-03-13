@@ -344,7 +344,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     setIsOptimizing(false);
   };
 
-  // 2. REORDENAÇÃO — usa Directions API para respeitar a ordem manual
+  // 2. REORDENAÇÃO — reordena itens restantes por proximidade a partir da posição movida
   const handleReorderRoute = async (newEntregas, priorityIndex) => {
     if (newEntregas.length === 0) return;
 
@@ -369,8 +369,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       });
       const getSafeCoords = (name) => coordsMap[name?.trim()] || null;
 
-      // Monta lista final na ordem exata: Matriz → entregas (ordem do drag) → Matriz
-      const allDeliveries = newEntregas.map(item => {
+      // Enriquece entregas com coordenadas
+      const enriched = newEntregas.map(item => {
         const c = getSafeCoords(item.client_name);
         return {
           ...item,
@@ -379,14 +379,34 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         };
       });
 
-      // Pontos para a Directions API (na ordem exata)
+      // --- REORDENAÇÃO POR PROXIMIDADE ---
+      // Itens até a posição do drag (inclusive) ficam fixos
+      // Itens após são reordenados por nearest-neighbor a partir do último fixo
+      const fixedPart = enriched.slice(0, priorityIndex + 1);
+      const remainingPart = enriched.slice(priorityIndex + 1);
+
+      // Ponto de referência: último item fixo (ou matriz se não houver)
+      const lastFixed = fixedPart.length > 0 
+        ? fixedPart[fixedPart.length - 1] 
+        : matrizGeocodificada;
+
+      const reordered = ordenarPorProximidade(
+        remainingPart.filter(p => p.latitude && p.longitude),
+        { latitude: lastFixed.latitude, longitude: lastFixed.longitude }
+      );
+
+      // Itens sem coordenadas vão ao final
+      const semCoords = remainingPart.filter(p => !p.latitude || !p.longitude);
+      const allDeliveries = [...fixedPart, ...reordered, ...semCoords];
+
+      // Pontos para a Directions API (na ordem final)
       const pontosOrdenados = [
         matrizGeocodificada,
         ...allDeliveries,
         matrizGeocodificada // retorno
       ].filter(p => p.latitude && p.longitude);
 
-      // Usa Directions API (respeita a ordem) em vez de Optimization API (reordena)
+      // Usa Directions API (respeita a ordem) 
       const directionsData = await getDirections(pontosOrdenados, mapboxToken);
       const route = directionsData.routes?.[0];
       const legs = route?.legs || [];
@@ -417,7 +437,6 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
 
       let currentOrder = 2;
       const deliveryItems = allDeliveries.map((item, idx) => {
-        // legs[idx] = trecho do ponto anterior até este ponto
         if (legs[idx]) {
           const legDurationMinutes = (legs[idx].duration || 0) / 60;
           currentTime += Math.round(legDurationMinutes * TRAFFIC_BUFFER);
@@ -456,7 +475,6 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       setOptimizedRoute(finalRoute);
 
       if (route) {
-        // Soma real de cada leg (direção + buffer) + tempo de serviço
         const totalDrivingMinutes = legs.reduce((sum, leg) => sum + Math.round(((leg.duration || 0) / 60) * TRAFFIC_BUFFER), 0);
         const totalServiceTime = allDeliveries.length * SERVICE_TIME;
 
