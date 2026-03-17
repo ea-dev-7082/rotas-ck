@@ -57,8 +57,9 @@ export default function Agendados() {
   }, [rotasAgendadas]);
 
   const filteredRotas = useMemo(() => {
-    if (filterMotorista === "todos") return rotasAgendadas;
-    return rotasAgendadas.filter(r => r.motorista_nome === filterMotorista);
+    const ativas = rotasAgendadas.filter(r => r.status !== "concluido" && r.status !== "cancelado");
+    if (filterMotorista === "todos") return ativas;
+    return ativas.filter(r => r.motorista_nome === filterMotorista);
   }, [rotasAgendadas, filterMotorista]);
 
   const rotasAgrupadas = useMemo(() => {
