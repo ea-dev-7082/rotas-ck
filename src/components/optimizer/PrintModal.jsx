@@ -35,6 +35,40 @@ export default function PrintModal({
     setIsAgendado(false);
   }, [responsavelExpedicao, open]);
 
+  // Função para salvar relatório automaticamente
+  const saveRelatorio = async (rotaAgendadaId) => {
+    if (!onSaveRelatorio) return;
+    const timeValue = stats?.time ? Number(stats.time) : 0;
+    const distanceValue = stats?.distance ? Number(stats.distance) : 0;
+    
+    const rotaComNotas = route?.map(item => {
+      const notas = notasFiscais?.[item.client_name] || [];
+      const volumeTotal = notas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
+      return { ...item, notas_fiscais: notas, volume_total: volumeTotal };
+    });
+
+    const dadosCompletos = {
+      data_impressao: new Date().toISOString(),
+      motorista_nome: motoristaData?.nome || "",
+      motorista_telefone: motoristaData?.telefone || "",
+      veiculo_descricao: veiculoData?.descricao || "",
+      veiculo_placa: veiculoData?.placa || "",
+      total_entregas: route ? route.length - 2 : 0,
+      distancia_km: distanceValue,
+      tempo_minutos: timeValue,
+      responsavel_expedicao: expedidor,
+      endereco_matriz: route?.[0]?.address || "Matriz",
+      rota: rotaComNotas,
+      notas_fiscais: notasFiscais,
+      total_volumes: totalVolumesGeral,
+      rota_agendada_id: rotaAgendadaId || "",
+      status: "pendente"
+    };
+
+    await onSaveRelatorio(dadosCompletos);
+    setIsSaved(true);
+  };
+
   // --- FUNÇÕES DE APOIO E CÁLCULOS ---
   
   const formatDuration = (minutes) => {
@@ -324,15 +358,10 @@ export default function PrintModal({
                   const timeValue = stats?.time ? Number(stats.time) : 0;
                   const distanceValue = stats?.distance ? Number(stats.distance) : 0;
                   
-                  // Monta rota com notas fiscais incluídas
                   const rotaComNotas = route?.map(item => {
                     const notas = notasFiscais?.[item.client_name] || [];
                     const volumeTotal = notas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
-                    return {
-                      ...item,
-                      notas_fiscais: notas,
-                      volume_total: volumeTotal
-                    };
+                    return { ...item, notas_fiscais: notas, volume_total: volumeTotal };
                   });
 
                   const dadosAgendado = {
@@ -369,56 +398,17 @@ export default function PrintModal({
               )}
             </Button>
 
-            {/* Botão Salvar Relatório */}
+            {/* Botão Imprimir Romaneio (salva relatório automaticamente) */}
             <Button 
-              variant="outline"
-              onClick={() => {
-                if (onSaveRelatorio) {
-                  const timeValue = stats?.time ? Number(stats.time) : 0;
-                  const distanceValue = stats?.distance ? Number(stats.distance) : 0;
-                  
-                  // Monta rota com notas fiscais incluídas para o relatório
-                  const rotaComNotas = route?.map(item => {
-                    const notas = notasFiscais?.[item.client_name] || [];
-                    const volumeTotal = notas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
-                    return {
-                      ...item,
-                      notas_fiscais: notas,
-                      volume_total: volumeTotal
-                    };
-                  });
-
-                  const dadosCompletos = {
-                    data_impressao: new Date().toISOString(),
-                    motorista_nome: motoristaData?.nome || "",
-                    motorista_telefone: motoristaData?.telefone || "",
-                    veiculo_descricao: veiculoData?.descricao || "",
-                    veiculo_placa: veiculoData?.placa || "", 
-                    total_entregas: route ? route.length - 2 : 0, 
-                    distancia_km: distanceValue,
-                    tempo_minutos: timeValue, 
-                    responsavel_expedicao: expedidor,
-                    endereco_matriz: route?.[0]?.address || "Matriz",
-                    rota: rotaComNotas,
-                    notas_fiscais: notasFiscais,
-                    total_volumes: totalVolumesGeral
-                  };
-
-                  onSaveRelatorio(dadosCompletos);
-                  setIsSaved(true);
-                  setTimeout(() => setIsSaved(false), 3000); 
+              onClick={async () => {
+                // Salva relatório automaticamente
+                if (onSaveRelatorio && !isSaved) {
+                  await saveRelatorio();
                 }
+                handlePrint();
               }}
-              className={`transition-all ${isSaved ? "bg-green-50 border-green-500 text-green-600" : "border-green-500 text-green-600 hover:bg-green-50"}`}
+              className="bg-black hover:bg-gray-800 text-white"
             >
-              {isSaved ? (
-                <><CheckCircle2 className="w-4 h-4 mr-2" /> Salvo!</>
-              ) : (
-                <><FileText className="w-4 h-4 mr-2" /> Salvar Relatório</>
-              )}
-            </Button>
-
-            <Button onClick={handlePrint} className="bg-black hover:bg-gray-800 text-white">
               <Printer className="w-4 h-4 mr-2" />
               Imprimir Romaneio
             </Button>
@@ -426,6 +416,8 @@ export default function PrintModal({
             {/* Botão Imprimir e Enviar ao Motorista */}
             <Button 
               onClick={async () => {
+                let agendadoId = null;
+
                 // 1. Agendar rota (enviar para o motorista)
                 if (onSaveAgendado && !isAgendado) {
                   const timeValue = stats?.time ? Number(stats.time) : 0;
@@ -454,11 +446,17 @@ export default function PrintModal({
                     status: "liberado"
                   };
 
-                  await onSaveAgendado(dadosAgendado);
+                  const result = await onSaveAgendado(dadosAgendado);
+                  agendadoId = result?.id;
                   setIsAgendado(true);
                 }
 
-                // 2. Imprimir
+                // 2. Salva relatório automaticamente vinculado à rota
+                if (onSaveRelatorio && !isSaved) {
+                  await saveRelatorio(agendadoId);
+                }
+
+                // 3. Imprimir
                 handlePrint();
               }}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"

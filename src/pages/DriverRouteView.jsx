@@ -104,25 +104,48 @@ export default function DriverRouteView() {
       status: novoStatus,
     });
 
-    // Cria relatório automaticamente quando a rota é concluída
+    // Atualiza relatório existente quando a rota é concluída
     if (todasConcluidas) {
       try {
-        await base44.entities.Relatorio.create({
-          data_impressao: new Date().toISOString(),
-          motorista_nome: rota.motorista_nome || "",
-          motorista_telefone: "",
-          veiculo_descricao: rota.veiculo_descricao || "",
-          veiculo_placa: rota.veiculo_placa || "",
-          total_entregas: entregasAtualizadas.length,
-          distancia_km: rota.distancia_km || 0,
-          tempo_minutos: rota.tempo_minutos || 0,
-          endereco_matriz: rota.endereco_matriz || "",
-          rota: updatedRota,
-          total_volumes: rota.total_volumes || 0,
-          owner: rota.owner || rota.created_by,
-        });
+        const entregasRealizadas = entregasAtualizadas.filter(e => e.status === "delivered").length;
+        const entregasComProblema = entregasAtualizadas.filter(e => e.status === "problem").length;
+
+        // Busca relatório vinculado a esta rota
+        const relatorios = await base44.entities.Relatorio.filter({ rota_agendada_id: rotaId });
+        
+        if (relatorios.length > 0) {
+          // Atualiza o relatório existente com dados de conclusão
+          await base44.entities.Relatorio.update(relatorios[0].id, {
+            rota: updatedRota,
+            status: "concluido",
+            data_conclusao: new Date().toISOString(),
+            entregas_realizadas: entregasRealizadas,
+            entregas_com_problema: entregasComProblema,
+          });
+        } else {
+          // Fallback: cria relatório se não existir (rota antiga sem relatório vinculado)
+          await base44.entities.Relatorio.create({
+            data_impressao: new Date().toISOString(),
+            motorista_nome: rota.motorista_nome || "",
+            motorista_telefone: "",
+            veiculo_descricao: rota.veiculo_descricao || "",
+            veiculo_placa: rota.veiculo_placa || "",
+            total_entregas: entregasAtualizadas.length,
+            distancia_km: rota.distancia_km || 0,
+            tempo_minutos: rota.tempo_minutos || 0,
+            endereco_matriz: rota.endereco_matriz || "",
+            rota: updatedRota,
+            total_volumes: rota.total_volumes || 0,
+            rota_agendada_id: rotaId,
+            status: "concluido",
+            data_conclusao: new Date().toISOString(),
+            entregas_realizadas: entregasRealizadas,
+            entregas_com_problema: entregasComProblema,
+            owner: rota.owner || rota.created_by,
+          });
+        }
       } catch (err) {
-        console.error("Erro ao criar relatório:", err);
+        console.error("Erro ao atualizar relatório:", err);
       }
     }
 
