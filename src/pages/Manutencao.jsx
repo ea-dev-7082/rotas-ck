@@ -221,6 +221,7 @@ export default function Manutencao() {
         onClose={() => { setShowForm(false); setEditItem(null); }}
         veiculos={veiculos}
         editItem={editItem}
+        currentUser={currentUser}
         onSaved={() => queryClient.invalidateQueries({ queryKey: ["manutencao"] })}
       />
     </div>

@@ -29,7 +29,7 @@ const TIPOS = [
   { value: "outros", label: "Outros" }
 ];
 
-export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editItem }) {
+export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editItem, currentUser }) {
   const [form, setForm] = useState(editItem || {
     veiculo_id: "",
     tipo: "abastecimento",
@@ -86,7 +86,8 @@ export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editI
       litros: form.litros ? Number(form.litros) : null,
       preco_litro: form.preco_litro ? Number(form.preco_litro) : null,
       veiculo_descricao: selectedVeiculo?.descricao || "",
-      veiculo_placa: selectedVeiculo?.placa || ""
+      veiculo_placa: selectedVeiculo?.placa || "",
+      owner: currentUser?.email || ""
     };
 
     if (editItem?.id) {
