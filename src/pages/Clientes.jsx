@@ -180,54 +180,35 @@ export default function Clientes() {
     return result;
   };
 
-  // Função para processar arquivo XLSX usando ExtractDataFromUploadedFile
+  // Função para processar arquivo XLSX localmente com a lib xlsx
   const parseXLSX = async (file) => {
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
     
-    const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
-      file_url,
-      json_schema: {
-        type: "object",
-        properties: {
-          clientes: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                nome: { type: "string", description: "Nome do cliente" },
-                endereco: { type: "string", description: "Rua/Avenida" },
-                endereco_num: { type: "string", description: "Número do endereço" },
-                bairro: { type: "string", description: "Bairro" },
-                municipio: { type: "string", description: "Município/Cidade" },
-                telefone: { type: "string" },
-                observacoes: { type: "string" },
-                endereco_entrega: { type: "string" },
-                usar_endereco_entrega: { type: "string", description: "Sim ou Não" }
-              }
-            }
-          }
-        }
-      }
+    return rawData.map(item => {
+      // Monta endereço completo concatenando rua, número, bairro e município
+      const parts = [
+        String(item.endereco || "").trim(),
+        item.endereco_num ? String(item.endereco_num).trim() : "",
+        item.bairro ? `- ${String(item.bairro).trim()}` : "",
+        item.municipio ? String(item.municipio).trim() : ""
+      ].filter(Boolean);
+      
+      return {
+        nome: String(item.nome || "").trim(),
+        endereco: parts.join(", ").replace(", - ", " - "),
+        telefone: String(item.telefone || "").trim(),
+        observacoes: String(item.observacoes || "").trim(),
+        endereco_entrega: String(item.endereco_entrega || "").trim(),
+        usar_endereco_entrega:
+          item.usar_endereco_entrega === "Sim" ||
+          item.usar_endereco_entrega === "sim" ||
+          item.usar_endereco_entrega === true
+      };
     });
-    
-    if (result.status === "error") {
-      throw new Error(result.details || "Erro ao extrair dados do arquivo");
-    }
-    
-    // Monta endereço completo concatenando rua, número, bairro e município
-    return (result.output?.clientes || []).map(item => ({
-      ...item,
-      endereco: [
-        item.endereco,
-        item.endereco_num ? item.endereco_num : "",
-        item.bairro ? `- ${item.bairro}` : "",
-        item.municipio || ""
-      ].filter(Boolean).join(", ").replace(", - ", " - "),
-      usar_endereco_entrega: 
-        item.usar_endereco_entrega === "Sim" || 
-        item.usar_endereco_entrega === "sim" || 
-        item.usar_endereco_entrega === true
-    }));
   };
 
   // Importação sequencial de clientes (CSV ou XLSX)
