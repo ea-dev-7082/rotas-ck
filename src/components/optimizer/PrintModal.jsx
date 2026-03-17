@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Printer, FileText, CheckCircle2, CalendarClock, Send } from "lucide-react";
 
-
 export default function PrintModal({ 
   open, 
   onClose, 
