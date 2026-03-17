@@ -41,6 +41,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
+import * as XLSX from "xlsx";
 
 export default function Clientes() {
   const [showDialog, setShowDialog] = useState(false);
