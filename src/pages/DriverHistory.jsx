@@ -23,7 +23,7 @@ export default function DriverHistory() {
       if (!currentUser) return [];
       // Com RLS atualizado, busca rotas pelo email do motorista
       const todasRotas = await base44.entities.RotaAgendada.list("-data_prevista", 50);
-      return todasRotas.filter(r => r.motorista_email === currentUser.email);
+      return todasRotas.filter(r => r.motorista_email === currentUser.email && r.status !== "agendado");
     },
     enabled: !!currentUser,
     initialData: [],
@@ -59,7 +59,7 @@ export default function DriverHistory() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="agendado">Agendadas</SelectItem>
+                <SelectItem value="liberado">Liberadas</SelectItem>
                 <SelectItem value="em_andamento">Em Andamento</SelectItem>
                 <SelectItem value="concluido">Concluídas</SelectItem>
                 <SelectItem value="cancelado">Canceladas</SelectItem>
