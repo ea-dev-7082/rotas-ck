@@ -139,13 +139,19 @@ export default function Clientes() {
     },
   });
 
-  // Função parseCSV robusta
+  // Função parseCSV robusta (detecta separador automaticamente)
   const parseCSV = (text) => {
     const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
     if (lines.length === 0) return [];
 
-    const headers = lines[0]
-      .split(",")
+    // Detecta separador: ponto-e-vírgula, tabulação ou vírgula
+    const firstLine = lines[0];
+    let separator = ",";
+    if (firstLine.includes("\t")) separator = "\t";
+    else if (firstLine.split(";").length > firstLine.split(",").length) separator = ";";
+
+    const headers = firstLine
+      .split(separator)
       .map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
 
     const result = [];
@@ -161,7 +167,7 @@ export default function Clientes() {
 
         if (char === '"' && (j === 0 || line[j - 1] !== "\\")) {
           inQuotes = !inQuotes;
-        } else if (char === "," && !inQuotes) {
+        } else if (char === separator && !inQuotes) {
           values.push(current.replace(/^"|"$/g, "").trim());
           current = "";
         } else {
