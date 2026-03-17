@@ -36,8 +36,11 @@ export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editI
     data: moment().format("YYYY-MM-DD"),
     km_atual: "",
     valor: "",
+    tipo_combustivel: "gasolina",
     litros: "",
+    metros_cubicos: "",
     preco_litro: "",
+    preco_m3: "",
     posto: "",
     descricao: "",
     foto_comprovante: ""
@@ -55,8 +58,11 @@ export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editI
         data: moment().format("YYYY-MM-DD"),
         km_atual: "",
         valor: "",
+        tipo_combustivel: "gasolina",
         litros: "",
+        metros_cubicos: "",
         preco_litro: "",
+        preco_m3: "",
         posto: "",
         descricao: "",
         foto_comprovante: ""
@@ -84,7 +90,9 @@ export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editI
       km_atual: form.km_atual ? Number(form.km_atual) : null,
       valor: Number(form.valor),
       litros: form.litros ? Number(form.litros) : null,
+      metros_cubicos: form.metros_cubicos ? Number(form.metros_cubicos) : null,
       preco_litro: form.preco_litro ? Number(form.preco_litro) : null,
+      preco_m3: form.preco_m3 ? Number(form.preco_m3) : null,
       veiculo_descricao: selectedVeiculo?.descricao || "",
       veiculo_placa: selectedVeiculo?.placa || "",
       owner: currentUser?.email || ""
@@ -101,6 +109,7 @@ export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editI
   };
 
   const isAbastecimento = form.tipo === "abastecimento";
+  const isGNV = form.tipo_combustivel === "gnv";
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -160,15 +169,42 @@ export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editI
 
           {/* Campos de abastecimento */}
           {isAbastecimento && (
-            <div className="grid grid-cols-2 gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 space-y-3">
               <div>
-                <label className="text-sm font-medium text-blue-700 block mb-1">Litros</label>
-                <Input type="number" step="0.01" placeholder="Ex: 40" value={form.litros} onChange={e => setForm(f => ({ ...f, litros: e.target.value }))} />
+                <label className="text-sm font-medium text-blue-700 block mb-1">Tipo de Combustível</label>
+                <Select value={form.tipo_combustivel} onValueChange={v => setForm(f => ({ ...f, tipo_combustivel: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gasolina">Gasolina</SelectItem>
+                    <SelectItem value="alcool">Álcool/Etanol</SelectItem>
+                    <SelectItem value="gnv">GNV</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div>
-                <label className="text-sm font-medium text-blue-700 block mb-1">Preço/Litro (R$)</label>
-                <Input type="number" step="0.01" placeholder="Ex: 5.89" value={form.preco_litro} onChange={e => setForm(f => ({ ...f, preco_litro: e.target.value }))} />
-              </div>
+              
+              {isGNV ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-blue-700 block mb-1">Metros Cúbicos (m³)</label>
+                    <Input type="number" step="0.01" placeholder="Ex: 15" value={form.metros_cubicos} onChange={e => setForm(f => ({ ...f, metros_cubicos: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-blue-700 block mb-1">Preço/m³ (R$)</label>
+                    <Input type="number" step="0.01" placeholder="Ex: 4.50" value={form.preco_m3} onChange={e => setForm(f => ({ ...f, preco_m3: e.target.value }))} />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-blue-700 block mb-1">Litros</label>
+                    <Input type="number" step="0.01" placeholder="Ex: 40" value={form.litros} onChange={e => setForm(f => ({ ...f, litros: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-blue-700 block mb-1">Preço/Litro (R$)</label>
+                    <Input type="number" step="0.01" placeholder="Ex: 5.89" value={form.preco_litro} onChange={e => setForm(f => ({ ...f, preco_litro: e.target.value }))} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
