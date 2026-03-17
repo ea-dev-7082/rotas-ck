@@ -193,12 +193,15 @@ export default function Clientes() {
             items: {
               type: "object",
               properties: {
-                nome: { type: "string" },
-                endereco: { type: "string" },
+                nome: { type: "string", description: "Nome do cliente" },
+                endereco: { type: "string", description: "Rua/Avenida" },
+                endereco_num: { type: "string", description: "Número do endereço" },
+                bairro: { type: "string", description: "Bairro" },
+                municipio: { type: "string", description: "Município/Cidade" },
                 telefone: { type: "string" },
                 observacoes: { type: "string" },
                 endereco_entrega: { type: "string" },
-                usar_endereco_entrega: { type: "boolean" }
+                usar_endereco_entrega: { type: "string", description: "Sim ou Não" }
               }
             }
           }
@@ -210,7 +213,20 @@ export default function Clientes() {
       throw new Error(result.details || "Erro ao extrair dados do arquivo");
     }
     
-    return result.output?.clientes || [];
+    // Monta endereço completo concatenando rua, número, bairro e município
+    return (result.output?.clientes || []).map(item => ({
+      ...item,
+      endereco: [
+        item.endereco,
+        item.endereco_num ? item.endereco_num : "",
+        item.bairro ? `- ${item.bairro}` : "",
+        item.municipio || ""
+      ].filter(Boolean).join(", ").replace(", - ", " - "),
+      usar_endereco_entrega: 
+        item.usar_endereco_entrega === "Sim" || 
+        item.usar_endereco_entrega === "sim" || 
+        item.usar_endereco_entrega === true
+    }));
   };
 
   // Importação sequencial de clientes (CSV ou XLSX)
