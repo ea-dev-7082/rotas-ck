@@ -258,17 +258,30 @@ export default function Clientes() {
         const clienteNome = item.nome || item.cliente;
         if (!clienteNome) continue;
 
+        // Monta endereço: se já veio concatenado usa direto, senão monta das partes
+        let enderecoFinal = String(item.endereco || "").trim();
+        if (item.endereco_num || item.bairro || item.municipio) {
+          enderecoFinal = [
+            enderecoFinal,
+            item.endereco_num ? String(item.endereco_num).trim() : "",
+            item.bairro ? `- ${String(item.bairro).trim()}` : "",
+            item.municipio ? String(item.municipio).trim() : ""
+          ].filter(Boolean).join(", ").replace(", - ", " - ");
+        }
+
         try {
           await base44.entities.Cliente.create({
             nome: String(clienteNome).trim(),
-            endereco: String(item.endereco || "").trim(),
+            endereco: enderecoFinal,
             telefone: String(item.telefone || "").trim(),
             observacoes: String(item.observacoes || "").trim(),
             endereco_entrega: String(item.endereco_entrega || "").trim(),
             usar_endereco_entrega:
               item.usar_endereco_entrega === "true" ||
               item.usar_endereco_entrega === true ||
-              item.usar_endereco_entrega === "TRUE",
+              item.usar_endereco_entrega === "TRUE" ||
+              item.usar_endereco_entrega === "Sim" ||
+              item.usar_endereco_entrega === "sim",
             owner: currentUser.email,
           });
           importedCount++;
