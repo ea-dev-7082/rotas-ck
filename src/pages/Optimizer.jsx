@@ -14,6 +14,7 @@ import NearbyClients from "../components/optimizer/NearbyClients";
 import PrintModal from "../components/optimizer/PrintModal";
 import VehicleDriverSelector from "../components/optimizer/VehicleDriverSelector";
 import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
+import MaintenanceAlerts from "../components/manutencao/MaintenanceAlerts";
 
 // --- SERVIÇOS (MAPBOX) ---
 import { geocodeMultiple, optimizeRoute, getDirections, processOptimizationResult, TIME_CONFIG } from "../components/optimizer/mapboxService";
@@ -561,6 +562,9 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       <div className="container mx-auto px-4 py-8">
         
+        {/* ALERTAS DE MANUTENÇÃO */}
+        <MaintenanceAlerts currentUser={currentUser} />
+
         {/* HEADER */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

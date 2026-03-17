@@ -45,8 +45,14 @@ export default function ManutencaoList({ registros, onEdit, onDelete }) {
                 {reg.posto && <span className="text-gray-500">• {reg.posto}</span>}
               </div>
               {reg.descricao && <p className="text-xs text-gray-500 mt-1 truncate">{reg.descricao}</p>}
-              {reg.tipo === "abastecimento" && reg.litros && (
-                <p className="text-xs text-blue-600 mt-0.5">{reg.litros}L × R$ {Number(reg.preco_litro || 0).toFixed(2)}/L</p>
+              {reg.tipo === "abastecimento" && (
+                <p className="text-xs text-blue-600 mt-0.5">
+                  {reg.tipo_combustivel === "gnv" ? (
+                    <>{reg.metros_cubicos || 0} m³ × R$ {Number(reg.preco_m3 || 0).toFixed(2)}/m³ • GNV</>
+                  ) : (
+                    <>{reg.litros || 0}L × R$ {Number(reg.preco_litro || 0).toFixed(2)}/L{reg.tipo_combustivel === "alcool" ? " • Álcool" : " • Gasolina"}</>
+                  )}
+                </p>
               )}
             </div>
 
