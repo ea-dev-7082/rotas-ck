@@ -34,6 +34,7 @@ export default function RotasEmAndamento() {
       const today = format(new Date(), "yyyy-MM-dd");
       return rotas.filter(r => 
         r.status === "em_andamento" || 
+        r.status === "liberado" ||
         (r.status === "agendado" && r.data_prevista === today)
       );
     },
@@ -135,9 +136,11 @@ export default function RotasEmAndamento() {
                       <Badge className={
                         rota.status === "em_andamento" 
                           ? "bg-blue-100 text-blue-800" 
+                          : rota.status === "liberado"
+                          ? "bg-cyan-100 text-cyan-800"
                           : "bg-yellow-100 text-yellow-800"
                       }>
-                        {rota.status === "em_andamento" ? "Em Andamento" : "Agendada"}
+                        {rota.status === "em_andamento" ? "Em Andamento" : rota.status === "liberado" ? "Enviada" : "Agendada"}
                       </Badge>
                     </div>
                   </CardHeader>
