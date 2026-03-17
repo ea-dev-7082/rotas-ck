@@ -31,6 +31,7 @@ export default function DriverDashboard() {
       // Filtra rotas deste motorista (hoje ou em andamento ou sem data_prevista)
       return todasRotas.filter(r => 
         r.motorista_email === currentUser.email && 
+        r.status !== "agendado" &&
         (r.data_prevista === today || r.status === "em_andamento" || !r.data_prevista)
       );
     },
@@ -50,7 +51,7 @@ export default function DriverDashboard() {
 
   // Encontra rota atual (em andamento) ou próxima agendada
   const rotaAtual = rotasHoje.find(r => r.status === "em_andamento") || 
-                    rotasHoje.find(r => r.status === "agendado");
+                    rotasHoje.find(r => r.status === "liberado");
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">

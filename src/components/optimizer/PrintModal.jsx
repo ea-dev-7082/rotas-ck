@@ -451,7 +451,7 @@ export default function PrintModal({
                     endereco_matriz: route?.[0]?.address || "Matriz",
                     rota: rotaComNotas,
                     total_volumes: totalVolumesGeral,
-                    status: "agendado"
+                    status: "liberado"
                   };
 
                   await onSaveAgendado(dadosAgendado);
