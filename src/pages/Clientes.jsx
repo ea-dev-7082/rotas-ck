@@ -186,16 +186,21 @@ export default function Clientes() {
     const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
       file_url,
       json_schema: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            nome: { type: "string" },
-            endereco: { type: "string" },
-            telefone: { type: "string" },
-            observacoes: { type: "string" },
-            endereco_entrega: { type: "string" },
-            usar_endereco_entrega: { type: "boolean" }
+        type: "object",
+        properties: {
+          clientes: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                nome: { type: "string" },
+                endereco: { type: "string" },
+                telefone: { type: "string" },
+                observacoes: { type: "string" },
+                endereco_entrega: { type: "string" },
+                usar_endereco_entrega: { type: "boolean" }
+              }
+            }
           }
         }
       }
@@ -205,7 +210,7 @@ export default function Clientes() {
       throw new Error(result.details || "Erro ao extrair dados do arquivo");
     }
     
-    return result.output || [];
+    return result.output?.clientes || [];
   };
 
   // Importação sequencial de clientes (CSV ou XLSX)
