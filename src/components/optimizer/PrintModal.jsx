@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Printer, FileText, CheckCircle2, CalendarClock } from "lucide-react";
+import { Printer, FileText, CheckCircle2, CalendarClock, Send } from "lucide-react";
 
 
 export default function PrintModal({ 
@@ -421,6 +421,50 @@ export default function PrintModal({
             <Button onClick={handlePrint} className="bg-black hover:bg-gray-800 text-white">
               <Printer className="w-4 h-4 mr-2" />
               Imprimir Romaneio
+            </Button>
+
+            {/* Botão Imprimir e Enviar ao Motorista */}
+            <Button 
+              onClick={async () => {
+                // 1. Agendar rota (enviar para o motorista)
+                if (onSaveAgendado && !isAgendado) {
+                  const timeValue = stats?.time ? Number(stats.time) : 0;
+                  const distanceValue = stats?.distance ? Number(stats.distance) : 0;
+                  
+                  const rotaComNotas = route?.map(item => {
+                    const notas = notasFiscais?.[item.client_name] || [];
+                    const volumeTotal = notas.reduce((acc, n) => acc + (Number(n.volume) || 0), 0);
+                    return { ...item, notas_fiscais: notas, volume_total: volumeTotal };
+                  });
+
+                  const dadosAgendado = {
+                    data_agendamento: new Date().toISOString(),
+                    motorista_id: motoristaData?.id || "",
+                    motorista_nome: motoristaData?.nome || "Não informado",
+                    motorista_email: motoristaData?.email || "",
+                    veiculo_id: veiculoData?.id || "",
+                    veiculo_descricao: veiculoData?.descricao || "Não informado",
+                    veiculo_placa: veiculoData?.placa || "",
+                    total_entregas: route ? route.length - 2 : 0,
+                    distancia_km: distanceValue,
+                    tempo_minutos: timeValue,
+                    endereco_matriz: route?.[0]?.address || "Matriz",
+                    rota: rotaComNotas,
+                    total_volumes: totalVolumesGeral,
+                    status: "agendado"
+                  };
+
+                  await onSaveAgendado(dadosAgendado);
+                  setIsAgendado(true);
+                }
+
+                // 2. Imprimir
+                handlePrint();
+              }}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Imprimir e Enviar
             </Button>
           </div>
         </div>
