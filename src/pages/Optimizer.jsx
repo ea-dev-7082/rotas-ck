@@ -240,7 +240,11 @@ export default function Optimizer() {
 
   // 1. OTIMIZAÇÃO INICIAL (BLINDADA)
   const handleOptimize = async () => {
-    if (selectedClients.length === 0 || !enderecoMatriz || !mapboxToken) return;
+    console.log("handleOptimize chamado", { selectedClients: selectedClients.length, enderecoMatriz, mapboxToken: !!mapboxToken });
+    if (selectedClients.length === 0 || !enderecoMatriz || !mapboxToken) {
+      console.warn("Otimização bloqueada:", { clients: selectedClients.length, matriz: !!enderecoMatriz, token: !!mapboxToken });
+      return;
+    }
 
     setIsOptimizing(true);
     try {
