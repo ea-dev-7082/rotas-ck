@@ -675,7 +675,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
                 <div className="flex gap-3 mt-6">
                   <Button
                     onClick={handleOptimize}
-                    disabled={isOptimizing || selectedClients.length === 0 || !enderecoMatriz || !mapboxToken}
+                    disabled={isOptimizing || selectedClients.length === 0 || !enderecoMatriz}
                     className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
                   >
                     {isOptimizing ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Otimizando...</> : <><Route className="w-5 h-5 mr-2" />Otimizar ({selectedClients.length})</>}

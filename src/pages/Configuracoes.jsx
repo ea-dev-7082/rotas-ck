@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   Settings,
-  Key,
   Save,
   Truck,
   Plus,
@@ -24,8 +23,6 @@ import {
   Trash2,
   CheckCircle2,
   AlertCircle,
-  Eye,
-  EyeOff,
   Home,
   Car,
   Bike,
