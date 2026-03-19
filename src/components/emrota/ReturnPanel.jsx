@@ -79,7 +79,8 @@ export default function ReturnPanel({ rotas }) {
       });
     }
 
-    // 3. Invalida queries
+    // 3. Remove o cartão da lista e invalida queries
+    setDismissedIds((prev) => [...prev, rota.id]);
     queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] });
     queryClient.invalidateQueries({ queryKey: ["relatorios"] });
     queryClient.invalidateQueries({ queryKey: ["relatorios-vinculados"] });
