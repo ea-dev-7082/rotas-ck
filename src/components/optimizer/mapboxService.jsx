@@ -82,16 +82,40 @@ export async function geocodeMultiple(addresses, mapboxToken) {
   return results;
 }
 
-// Otimizar rota usando Mapbox Optimization API (Perfil Trânsito)
-export async function optimizeRoute(coordinates, mapboxToken) {
-  const validCoords = coordinates.filter(c => c.latitude && c.longitude);
-  
-  if (validCoords.length < 2) {
-      return { trips: [], waypoints: [] }; 
-  }
+// Distância Haversine entre dois pontos (km)
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
-  const coordsString = validCoords.map(c => `${c.longitude},${c.latitude}`).join(';');
-  
+// Ordena pontos pelo vizinho mais próximo (nearest-neighbor) a partir de um ponto inicial
+function nearestNeighborSort(points, origin) {
+  const sorted = [];
+  const remaining = [...points];
+  let current = origin;
+
+  while (remaining.length > 0) {
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const d = haversineDistance(current.latitude, current.longitude, remaining[i].latitude, remaining[i].longitude);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    sorted.push(remaining[bestIdx]);
+    current = remaining[bestIdx];
+    remaining.splice(bestIdx, 1);
+  }
+  return sorted;
+}
+
+// Chamada única à Mapbox Optimization API (máx 12 coordenadas)
+async function optimizeSingleBatch(coords, mapboxToken) {
+  const coordsString = coords.map(c => `${c.longitude},${c.latitude}`).join(';');
   const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic/${coordsString}?access_token=${mapboxToken}&roundtrip=true&source=first&destination=last&geometries=geojson&overview=full&steps=true`;
   
   const response = await fetch(url);
@@ -100,8 +124,110 @@ export async function optimizeRoute(coordinates, mapboxToken) {
   if (data.code !== 'Ok' && data.code !== undefined) {
     throw new Error(`Erro Mapbox Optimization: ${data.message || data.code}`);
   }
-  
   return data;
+}
+
+// Otimizar rota usando Mapbox Optimization API (Perfil Trânsito)
+// Segmenta automaticamente em lotes de até 10 paradas + origem quando necessário
+const MAX_WAYPOINTS_PER_BATCH = 10; // paradas por lote (+ origem = 11, dentro do limite de 12)
+
+export async function optimizeRoute(coordinates, mapboxToken) {
+  const validCoords = coordinates.filter(c => c.latitude && c.longitude);
+  
+  if (validCoords.length < 2) {
+    return { trips: [], waypoints: [] };
+  }
+
+  const origin = validCoords[0];
+  const destinations = validCoords.slice(1);
+
+  // Se cabe em uma chamada só (até 11 pontos = origem + 10 paradas), faz direto
+  if (destinations.length <= MAX_WAYPOINTS_PER_BATCH) {
+    return await optimizeSingleBatch(validCoords, mapboxToken);
+  }
+
+  // --- SEGMENTAÇÃO para rotas grandes ---
+  // 1. Pré-ordena todos os destinos por proximidade (nearest-neighbor desde a origem)
+  const sortedDestinations = nearestNeighborSort(destinations, origin);
+
+  // 2. Divide em lotes sequenciais de MAX_WAYPOINTS_PER_BATCH
+  const batches = [];
+  for (let i = 0; i < sortedDestinations.length; i += MAX_WAYPOINTS_PER_BATCH) {
+    batches.push(sortedDestinations.slice(i, i + MAX_WAYPOINTS_PER_BATCH));
+  }
+
+  // 3. Otimiza cada lote individualmente, sempre partindo de um ponto de referência
+  let allLegs = [];
+  let allWaypoints = [];
+  let fullGeometry = [];
+  let totalDistance = 0;
+  let totalDuration = 0;
+  let waypointOffset = 0;
+
+  for (let b = 0; b < batches.length; b++) {
+    const batch = batches[b];
+    // Ponto de partida do lote: origem (primeiro lote) ou último ponto do lote anterior
+    const batchOrigin = b === 0 ? origin : batches[b - 1][batches[b - 1].length - 1];
+    const batchCoords = [batchOrigin, ...batch];
+
+    const result = await optimizeSingleBatch(batchCoords, mapboxToken);
+    const trip = result.trips?.[0];
+    if (!trip) continue;
+
+    const batchWaypoints = result.waypoints || [];
+    const batchLegs = trip.legs || [];
+
+    // Mapeia waypoints de volta para a ordem global
+    // O primeiro waypoint do lote é a origem/ponto de conexão (pula no merge, exceto no lote 0)
+    const sortedBatchWPs = [...batchWaypoints].sort((a, b2) => a.waypoint_index - b2.waypoint_index);
+
+    const startWPIdx = b === 0 ? 0 : 1; // pula a origem duplicada nos lotes >0
+    for (let w = startWPIdx; w < sortedBatchWPs.length; w++) {
+      // Ajusta o waypoint_index para ser global
+      allWaypoints.push({
+        ...sortedBatchWPs[w],
+        waypoint_index: waypointOffset,
+        // Guarda referência ao ponto original
+        _batchCoordIdx: w
+      });
+      waypointOffset++;
+    }
+
+    // Legs: pega todos os legs exceto o último (retorno à origem do lote)
+    // No último lote, pega o último leg também (retorno à origem global)
+    const legsToKeep = b < batches.length - 1
+      ? batchLegs.slice(0, batchLegs.length - 1) // remove leg de retorno intermediário
+      : batchLegs; // último lote: mantém retorno
+
+    // No lote > 0, o primeiro leg é a conexão do ponto anterior ao primeiro do lote
+    if (b > 0 && legsToKeep.length > 0) {
+      allLegs.push(...legsToKeep);
+    } else {
+      allLegs.push(...legsToKeep);
+    }
+
+    // Geometria
+    if (trip.geometry?.coordinates) {
+      fullGeometry.push(...trip.geometry.coordinates);
+    }
+
+    // Distância e duração (sem o leg de retorno intermediário)
+    const relevantLegs = b < batches.length - 1 ? batchLegs.slice(0, batchLegs.length - 1) : batchLegs;
+    totalDistance += relevantLegs.reduce((s, l) => s + (l.distance || 0), 0);
+    totalDuration += relevantLegs.reduce((s, l) => s + (l.duration || 0), 0);
+  }
+
+  // Monta o resultado unificado no formato que processOptimizationResult espera
+  return {
+    code: "Ok",
+    trips: [{
+      legs: allLegs,
+      distance: totalDistance,
+      duration: totalDuration,
+      geometry: { type: "LineString", coordinates: fullGeometry }
+    }],
+    waypoints: allWaypoints
+  };
 }
 
 // Obter direções entre pontos (respeita a ordem fornecida)
