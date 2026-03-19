@@ -118,8 +118,9 @@ export default function DriverRouteView() {
       setIsRecalculating(true);
       const serviceTime = Number(configs.find(c => c.chave === "tempo_parada_entrega")?.valor) || 20;
       const trafficBuffer = Number(configs.find(c => c.chave === "margem_transito")?.valor) || 10;
+      const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || null;
       try {
-        updatedRota = await recalculateRemainingETAs(updatedRota, selectedDelivery.order, serviceTime, trafficBuffer);
+        updatedRota = await recalculateRemainingETAs(updatedRota, selectedDelivery.order, serviceTime, trafficBuffer, mapboxToken);
       } catch (err) {
         console.warn("Erro no recálculo de ETAs, mantendo previsões anteriores:", err);
       }

@@ -8,9 +8,10 @@ import { getDirections, MAPBOX_TOKEN } from "@/components/optimizer/mapboxServic
  * @param {number} deliveredOrder - O `order` da parada que acabou de ser entregue
  * @param {number} serviceTime - Tempo de parada por entrega (minutos)
  * @param {number} trafficBuffer - Margem de trânsito (percentual, ex: 10)
+ * @param {string} mapboxToken - Token do Mapbox (opcional, usa fallback)
  * @returns {Array} Rota atualizada com novos estimated_arrival para paradas futuras
  */
-export async function recalculateRemainingETAs(rotaCompleta, deliveredOrder, serviceTime = 20, trafficBuffer = 10) {
+export async function recalculateRemainingETAs(rotaCompleta, deliveredOrder, serviceTime = 20, trafficBuffer = 10, mapboxToken = null) {
   if (!rotaCompleta || rotaCompleta.length < 2) return rotaCompleta;
 
   const BUFFER = 1 + (trafficBuffer / 100);
@@ -44,7 +45,8 @@ export async function recalculateRemainingETAs(rotaCompleta, deliveredOrder, ser
   // Não adicionamos service time aqui porque a entrega já foi feita
 
   // Chama Mapbox Directions API
-  const directionsResult = await getDirections(coordsForDirections, MAPBOX_TOKEN);
+  const token = mapboxToken || MAPBOX_TOKEN;
+  const directionsResult = await getDirections(coordsForDirections, token);
   const route = directionsResult.routes?.[0];
 
   if (!route || !route.legs) return rotaCompleta;
