@@ -87,7 +87,9 @@ export default function ReturnPanel({ rotas }) {
     setClosingId(null);
   };
 
-  if (motoristasRetorno.length === 0) {
+  const visibleRotas = motoristasRetorno.filter((r) => !dismissedIds.includes(r.id));
+
+  if (visibleRotas.length === 0) {
     return (
       <Card className="bg-white border-dashed">
         <CardContent className="p-6 text-center text-gray-400">
