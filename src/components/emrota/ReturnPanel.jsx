@@ -9,6 +9,7 @@ import { format } from "date-fns";
 
 export default function ReturnPanel({ rotas }) {
   const [closingId, setClosingId] = useState(null);
+  const [dismissedIds, setDismissedIds] = useState([]);
   const queryClient = useQueryClient();
 
   const motoristasRetorno = rotas.filter((rota) => {
