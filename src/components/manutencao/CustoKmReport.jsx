@@ -11,12 +11,13 @@ export default function CustoKmReport({ registros, veiculos, currentUser }) {
   const { data: registrosDiarios = [] } = useQuery({
     queryKey: ["registros-diarios-report", currentUser?.email],
     queryFn: async () => {
+      if (!currentUser?.email) return [];
       const all = await base44.entities.RegistroDiarioVeiculo.list("-data", 500);
       return all.filter(r =>
-        r.owner === currentUser?.email || r.created_by === currentUser?.email
+        r.owner === currentUser.email || r.created_by === currentUser.email
       );
     },
-    enabled: !!currentUser,
+    enabled: !!currentUser?.email,
     initialData: [],
   });
 
