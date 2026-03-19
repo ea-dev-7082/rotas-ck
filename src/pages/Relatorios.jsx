@@ -636,9 +636,21 @@ export default function Relatorios() {
                           <p className="font-bold text-gray-900">{item.client_name}</p>
                           <p className="text-sm text-gray-500">{item.address}</p>
                         </div>
-                        {item.estimated_arrival &&
-                        <Badge variant="secondary">{item.estimated_arrival}</Badge>
-                        }
+                        <div className="flex flex-col items-end gap-1">
+                          {item.deliveredAt && (
+                            <Badge className="bg-green-100 text-green-700 text-xs">
+                              Entregue: {format(new Date(item.deliveredAt), "HH:mm")}
+                            </Badge>
+                          )}
+                          {item.estimated_arrival && (
+                            <Badge variant="secondary" className="text-xs">
+                              Previsto: {item.estimated_arrival}
+                            </Badge>
+                          )}
+                          {item.status === "problem" && (
+                            <Badge className="bg-red-100 text-red-700 text-xs">Problema</Badge>
+                          )}
+                        </div>
                       </div>
                       
                       {/* Campo de Ocorrência */}
