@@ -372,8 +372,6 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   const TRAFFIC_BUFFER = 1 + (trafficBuffer / 100);
   const SERVICE_TIME = serviceTime;
 
-  console.log(`[processOptimizationResult] serviceTime=${SERVICE_TIME}min, trafficBuffer=${trafficBuffer}% (multiplier=${TRAFFIC_BUFFER}), startTime=${startTime}, legs=${legs.length}, points=${originalPoints.length}`);
-
   // Se temos _orderedPoints, usamos diretamente (já está na ordem ótima)
   const orderedPoints = optimizationData._orderedPoints ||
     optimizationData.waypoints
@@ -414,8 +412,6 @@ export function processOptimizationResult(optimizationData, originalPoints, star
 
     currentTime += travelTimeMinutes;
     const arrivalTime = formatTime(currentTime);
-    
-    console.log(`[ETA] Parada ${index}: ${point.nome} | deslocamento=${travelTimeMinutes}min (raw=${Math.round(rawDuration/60)}min) | chegada=${arrivalTime} | +parada=${SERVICE_TIME}min`);
     
     currentTime += SERVICE_TIME;
 
