@@ -1,4 +1,4 @@
-// Token fixo do Mapbox — compartilhado por todos os usuários
+// Token padrão do Mapbox (fallback)
 export const MAPBOX_TOKEN = "pk.eyJ1Ijoicm90YXNtYXJjb3MiLCJhIjoiY205NjV3ZGtvMGJudzJscjF4bnIwOTQ5aCJ9.E8HMrtYLMMLzgBnxFKAfaA";
 
 // --- FUNÇÃO DE LIMPEZA DE ENDEREÇO ---
