@@ -464,7 +464,7 @@ export function processOptimizationResult(optimizationData, originalPoints, star
     route_geometry: routeGeometry,
     total_distance_km: totalDistanceKm,
     total_time_minutes: totalDrivingMinutes + totalServiceTime,
-    optimization_notes: `Rota otimizada${orderedPoints.length <= 12 ? ' (TSP Mapbox)' : ' (nearest-neighbor + 2-opt)'} com trânsito real (+${trafficBuffer}% margem). Inclui ${SERVICE_TIME} min de parada por entrega.`
+    optimization_notes: `Rota otimizada${orderedPoints.length <= 12 ? ' (TSP Mapbox)' : ' (nearest-neighbor + 2-opt)'}. Configuração: ${SERVICE_TIME} min de parada por entrega + ${trafficBuffer}% margem de trânsito. Deslocamento: ${totalDrivingMinutes} min | Paradas: ${totalServiceTime} min (${orderedPoints.length - 1} entregas × ${SERVICE_TIME} min).`
   };
 }
 
