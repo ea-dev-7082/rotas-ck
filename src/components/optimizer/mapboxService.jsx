@@ -230,17 +230,9 @@ export async function optimizeRoute(coordinates, mapboxToken) {
   };
 }
 
-// Obter direções entre pontos (respeita a ordem fornecida)
-export async function getDirections(coordinates, mapboxToken) {
-  const validCoords = coordinates.filter(c => c.latitude && c.longitude);
-  
-  if (validCoords.length < 2) {
-    return { routes: [{ legs: [], distance: 0, duration: 0, geometry: { coordinates: [] } }] };
-  }
-
-  // Mapbox Directions API tem limite de 25 coordenadas por requisição
-  const coordsString = validCoords.map(c => `${c.longitude},${c.latitude}`).join(';');
-  
+// Chamada única à Directions API (máx 25 coordenadas)
+async function directionsSingleBatch(coords, mapboxToken) {
+  const coordsString = coords.map(c => `${c.longitude},${c.latitude}`).join(';');
   const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coordsString}?access_token=${mapboxToken}&geometries=geojson&overview=full&annotations=duration,distance`;
   
   const response = await fetch(url);
@@ -249,8 +241,56 @@ export async function getDirections(coordinates, mapboxToken) {
   if (data.code !== 'Ok') {
     throw new Error(`Erro nas direções: ${data.message || data.code}`);
   }
-  
   return data;
+}
+
+// Obter direções entre pontos (respeita a ordem fornecida)
+// Segmenta automaticamente em lotes de 25 coordenadas
+const MAX_DIRECTIONS_PER_BATCH = 25;
+
+export async function getDirections(coordinates, mapboxToken) {
+  const validCoords = coordinates.filter(c => c.latitude && c.longitude);
+  
+  if (validCoords.length < 2) {
+    return { routes: [{ legs: [], distance: 0, duration: 0, geometry: { coordinates: [] } }] };
+  }
+
+  // Se cabe em uma chamada só
+  if (validCoords.length <= MAX_DIRECTIONS_PER_BATCH) {
+    return await directionsSingleBatch(validCoords, mapboxToken);
+  }
+
+  // Segmenta em lotes com sobreposição de 1 ponto (para continuidade)
+  let allLegs = [];
+  let fullGeometry = [];
+  let totalDistance = 0;
+  let totalDuration = 0;
+
+  for (let i = 0; i < validCoords.length - 1; i += MAX_DIRECTIONS_PER_BATCH - 1) {
+    const batch = validCoords.slice(i, i + MAX_DIRECTIONS_PER_BATCH);
+    if (batch.length < 2) break;
+
+    const result = await directionsSingleBatch(batch, mapboxToken);
+    const route = result.routes?.[0];
+    if (!route) continue;
+
+    allLegs.push(...(route.legs || []));
+    if (route.geometry?.coordinates) {
+      fullGeometry.push(...route.geometry.coordinates);
+    }
+    totalDistance += route.distance || 0;
+    totalDuration += route.duration || 0;
+  }
+
+  return {
+    code: "Ok",
+    routes: [{
+      legs: allLegs,
+      distance: totalDistance,
+      duration: totalDuration,
+      geometry: { type: "LineString", coordinates: fullGeometry }
+    }]
+  };
 }
 
 // --- CONSTANTES DE TEMPO (VALORES PADRÃO - USADOS COMO FALLBACK) ---
