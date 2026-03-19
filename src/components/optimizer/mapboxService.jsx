@@ -232,27 +232,26 @@ export const TIME_CONFIG = {
 // trafficBuffer = margem de trânsito (percentual, ex: 10 para 10%)
 export function processOptimizationResult(optimizationData, originalPoints, startTime, serviceTime = TIME_CONFIG.SERVICE_TIME, trafficBuffer = 10) {
   if (!optimizationData.trips || optimizationData.trips.length === 0) {
-      console.warn("Mapbox não otimizou. Retornando ordem original.");
-      return { 
-          optimized_route: [], 
-          route_geometry: [],
-          total_distance_km: 0,
-          total_time_minutes: 0,
-          optimization_notes: "Erro: Não foi possível calcular rota para os endereços fornecidos."
-      };
+    console.warn("Mapbox não otimizou. Retornando ordem original.");
+    return { 
+      optimized_route: [], 
+      route_geometry: [],
+      total_distance_km: 0,
+      total_time_minutes: 0,
+      optimization_notes: "Erro: Não foi possível calcular rota para os endereços fornecidos."
+    };
   }
 
   const trip = optimizationData.trips[0];
   const waypoints = optimizationData.waypoints;
   const legs = trip.legs || [];
   
-  // Converte margem de % para multiplicador (ex: 10% -> 1.10)
   const TRAFFIC_BUFFER = 1 + (trafficBuffer / 100);
   const SERVICE_TIME = serviceTime;
 
   const validOriginalPoints = originalPoints.filter(p => p.latitude && p.longitude);
 
-  // Mapeia waypoints aos pontos originais usando waypoint_index como ordem final
+  // Waypoints já vêm ordenados (nearest-neighbor) — mapeia aos pontos originais
   const orderedPoints = waypoints
     .sort((a, b) => a.waypoint_index - b.waypoint_index)
     .map((wp, idx) => ({
@@ -262,12 +261,14 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   
   let currentTime = parseTime(startTime);
   
+  // Monta rota: origem + entregas (legs 0..N-2 são entre paradas, leg N-1 é retorno)
+  const deliveryLegs = legs.slice(0, orderedPoints.length - 1); // legs entre paradas
+  const returnLeg = legs[orderedPoints.length - 1]; // último leg = retorno à matriz
+
   const optimizedRoute = orderedPoints.map((point, index) => {
-    const isFirst = index === 0;
-    
-    if (isFirst) {
+    if (index === 0) {
       return {
-        order: index + 1,
+        order: 1,
         client_name: point.nome,
         address: point.endereco,
         latitude: point.latitude,
@@ -278,8 +279,7 @@ export function processOptimizationResult(optimizationData, originalPoints, star
       };
     }
     
-    const legIndex = index - 1;
-    let rawDuration = legs[legIndex] ? legs[legIndex].duration : 0;
+    const rawDuration = deliveryLegs[index - 1]?.duration || 0;
     const travelTimeMinutes = Math.round((rawDuration * TRAFFIC_BUFFER) / 60);
     
     currentTime += travelTimeMinutes;
@@ -299,13 +299,11 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   });
   
   // Retorno à Matriz
-  const lastLegIndex = legs.length - 1;
-  let rawReturnDuration = legs[lastLegIndex] ? legs[lastLegIndex].duration : 0;
+  const rawReturnDuration = returnLeg?.duration || 0;
   const returnTravelTime = Math.round((rawReturnDuration * TRAFFIC_BUFFER) / 60);
   currentTime += returnTravelTime;
   
   const matrizOriginal = validOriginalPoints[0];
-
   const matrizRetorno = {
     order: optimizedRoute.length + 1,
     client_name: matrizOriginal.nome,
@@ -318,7 +316,6 @@ export function processOptimizationResult(optimizationData, originalPoints, star
   };
   
   const routeGeometry = trip.geometry?.coordinates || [];
-  
   const totalDrivingTime = Math.round(((trip.duration || 0) * TRAFFIC_BUFFER) / 60);
   const totalServiceTime = (orderedPoints.length - 1) * SERVICE_TIME;
   
