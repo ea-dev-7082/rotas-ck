@@ -13,42 +13,53 @@ function sanitizeAddress(address) {
     .trim();                   // Remove espaços nas pontas
 }
 
-// Geocodificar um endereço para obter coordenadas
-export async function geocodeAddress(address, mapboxToken) {
-  // 1. Limpa o endereço antes de enviar
-  const cleanAddress = sanitizeAddress(address);
-  
-  // 2. Adiciona contexto (Rio de Janeiro, Brasil) para melhorar precisão
-  const query = encodeURIComponent(cleanAddress + ", Rio de Janeiro, Brazil");
+// Tenta uma busca no Mapbox e retorna coordenadas ou null
+async function tryGeocode(searchText, mapboxToken) {
+  const query = encodeURIComponent(searchText);
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${mapboxToken}&country=BR&limit=1`;
-  
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("Erro na API Mapbox");
-    
-    const data = await response.json();
-    
-    if (data.features && data.features.length > 0) {
-      const [lng, lat] = data.features[0].center;
-      return { latitude: Number(lat), longitude: Number(lng), place_name: data.features[0].place_name };
-    }
-    
-    console.warn(`Geocodificação exata falhou para: ${cleanAddress}. Tentando busca genérica...`);
-    
-    const streetOnly = cleanAddress.split(",")[0]; 
-    if (streetOnly && streetOnly !== cleanAddress) {
-        const queryGeneric = encodeURIComponent(streetOnly + ", Rio de Janeiro, Brazil");
-        const urlGeneric = `https://api.mapbox.com/geocoding/v5/mapbox.places/${queryGeneric}.json?access_token=${mapboxToken}&country=BR&limit=1`;
-        
-        const responseGen = await fetch(urlGeneric);
-        const dataGen = await responseGen.json();
-        
-        if (dataGen.features && dataGen.features.length > 0) {
-            const [lng, lat] = dataGen.features[0].center;
-            return { latitude: Number(lat), longitude: Number(lng), place_name: dataGen.features[0].place_name };
-        }
-    }
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const data = await response.json();
+  if (data.features && data.features.length > 0) {
+    const [lng, lat] = data.features[0].center;
+    return { latitude: Number(lat), longitude: Number(lng), place_name: data.features[0].place_name };
+  }
+  return null;
+}
 
+// Geocodificar um endereço para obter coordenadas
+// Tenta múltiplas estratégias quando a primeira falha
+export async function geocodeAddress(address, mapboxToken, bairro, municipio) {
+  const cleanAddress = sanitizeAddress(address);
+  if (!cleanAddress) return null;
+
+  // Estratégias de busca (da mais específica para a mais genérica)
+  const attempts = [
+    cleanAddress + ", Rio de Janeiro, Brazil",
+    cleanAddress + ", RJ, Brazil",
+  ];
+
+  // Tenta com bairro/município se disponíveis
+  if (bairro) {
+    attempts.push(cleanAddress + ", " + bairro + ", Rio de Janeiro, Brazil");
+  }
+  if (municipio) {
+    attempts.push(cleanAddress + ", " + municipio + ", RJ, Brazil");
+  }
+
+  // Tenta só a primeira parte (rua) se tiver vírgula
+  const streetOnly = cleanAddress.split(",")[0]?.trim();
+  if (streetOnly && streetOnly !== cleanAddress) {
+    attempts.push(streetOnly + ", Rio de Janeiro, Brazil");
+    if (bairro) attempts.push(streetOnly + ", " + bairro + ", RJ, Brazil");
+    if (municipio) attempts.push(streetOnly + ", " + municipio + ", RJ, Brazil");
+  }
+
+  try {
+    for (const attempt of attempts) {
+      const result = await tryGeocode(attempt, mapboxToken);
+      if (result) return result;
+    }
   } catch (err) {
     console.error("Erro Mapbox Fetch:", err);
   }
