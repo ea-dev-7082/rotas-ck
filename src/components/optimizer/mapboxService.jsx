@@ -284,17 +284,11 @@ export function processOptimizationResult(optimizationData, originalPoints, star
 
   const validOriginalPoints = originalPoints.filter(p => p.latitude && p.longitude);
 
-  const waypointsWithOriginal = waypoints.map((wp, index) => {
-      return {
-          ...wp,
-          originalPoint: validOriginalPoints[index] 
-      };
-  });
-  
-  const orderedPoints = waypointsWithOriginal
+  // Mapeia waypoints aos pontos originais usando waypoint_index como ordem final
+  const orderedPoints = waypoints
     .sort((a, b) => a.waypoint_index - b.waypoint_index)
-    .map(wp => ({
-      ...wp.originalPoint,
+    .map((wp, idx) => ({
+      ...(validOriginalPoints[idx] || {}),
       waypoint_index: wp.waypoint_index
     }));
   
