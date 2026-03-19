@@ -202,29 +202,34 @@ export async function optimizeRoute(coordinates, mapboxToken) {
   // Para até 11 destinos (12 pontos total), usa a Optimization API real do Mapbox
   if (validCoords.length <= 12) {
     const optResult = await mapboxOptimize(validCoords, mapboxToken);
-    if (optResult) {
-      // A Optimization API retorna waypoints com waypoint_index indicando a ordem ótima
-      // Precisamos reordenar os pontos conforme a ordem ótima retornada
+    if (optResult && optResult.trips?.[0]) {
       const trip = optResult.trips[0];
       const waypoints = optResult.waypoints;
 
-      // Monta a sequência na ordem retornada pela API
-      const orderedIndices = waypoints.map(wp => wp.waypoint_index);
-      // waypoints[i].waypoint_index = posição do ponto i na trip otimizada
+      // waypoints[i].waypoint_index = posição do ponto i na sequência otimizada da trip
+      // Precisamos criar um array de pontos na ordem da trip
       
-      // Cria array de pontos na ordem ótima (excluindo origem que é fixo no início)
-      const sortedByTripOrder = waypoints
-        .map((wp, originalIdx) => ({ originalIdx, tripOrder: wp.waypoint_index }))
-        .sort((a, b) => a.tripOrder - b.tripOrder);
+      // Cria mapeamento: posição na trip -> ponto original
+      const tripOrderToPoint = new Array(waypoints.length);
+      waypoints.forEach((wp, originalIdx) => {
+        tripOrderToPoint[wp.waypoint_index] = validCoords[originalIdx];
+      });
 
-      // O primeiro da trip é sempre a origem (index 0)
-      const orderedPoints = sortedByTripOrder.map(item => validCoords[item.originalIdx]);
-
-      // Agora preciso obter legs individuais na ordem correta
-      // A trip já vem com legs na ordem otimizada
-      const fullRoute = [...orderedPoints, orderedPoints[0]]; // adiciona retorno
+      // Remove possíveis undefined e garante que origem seja o primeiro
+      const orderedPoints = tripOrderToPoint.filter(Boolean);
       
+      // Garante que o primeiro ponto é a origem
+      if (orderedPoints[0] !== origin) {
+        const originIdx = orderedPoints.indexOf(origin);
+        if (originIdx > 0) {
+          // Rotaciona o array para que a origem fique primeiro
+          const rotated = [...orderedPoints.slice(originIdx), ...orderedPoints.slice(0, originIdx)];
+          orderedPoints.splice(0, orderedPoints.length, ...rotated);
+        }
+      }
+
       // Usa Directions API para obter legs individuais na ordem otimizada
+      const fullRoute = [...orderedPoints, orderedPoints[0]]; // adiciona retorno
       const directionsResult = await getDirections(fullRoute, mapboxToken);
       const route = directionsResult.routes?.[0];
 
