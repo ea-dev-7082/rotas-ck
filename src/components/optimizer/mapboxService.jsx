@@ -1,3 +1,6 @@
+// Token fixo do Mapbox — compartilhado por todos os usuários
+export const MAPBOX_TOKEN = "pk.eyJ1Ijoicm90YXNtYXJjb3MiLCJhIjoiY205NjV3ZGtvMGJudzJscjF4bnIwOTQ5aCJ9.E8HMrtYLMMLzgBnxFKAfaA";
+
 // --- FUNÇÃO DE LIMPEZA DE ENDEREÇO ---
 // Remove quebras de linha, caracteres especiais inúteis e espaços extras
 function sanitizeAddress(address) {

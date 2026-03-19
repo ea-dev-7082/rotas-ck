@@ -17,7 +17,7 @@ import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
 import MaintenanceAlerts from "../components/manutencao/MaintenanceAlerts";
 
 // --- SERVIÇOS (MAPBOX) ---
-import { geocodeMultiple, optimizeRoute, getDirections, processOptimizationResult, TIME_CONFIG } from "../components/optimizer/mapboxService";
+import { geocodeMultiple, optimizeRoute, getDirections, processOptimizationResult, TIME_CONFIG, MAPBOX_TOKEN } from "../components/optimizer/mapboxService";
 
 const DEFAULT_MATRIZ = "Configure o endereço da matriz em Configurações";
 
