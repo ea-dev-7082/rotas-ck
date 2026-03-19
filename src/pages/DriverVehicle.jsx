@@ -37,6 +37,7 @@ export default function DriverVehicle() {
   const [showHistorico, setShowHistorico] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [empresaOwner, setEmpresaOwner] = useState("");
   const [form, setForm] = useState({
     tipo: "abastecimento",
     data: format(new Date(), "yyyy-MM-dd"),
@@ -64,7 +65,9 @@ export default function DriverVehicle() {
       const owners = [...new Set(rotas.map(r => r.created_by).filter(Boolean))];
       if (owners.length === 0) return [];
       const allVeiculos = await base44.entities.Veiculo.list();
-      return allVeiculos.filter(v => owners.includes(v.created_by));
+      const filtered = allVeiculos.filter(v => owners.includes(v.created_by));
+      if (filtered.length > 0) setEmpresaOwner(filtered[0].created_by);
+      return filtered;
     },
     enabled: !!currentUser,
     initialData: [],
@@ -132,7 +135,7 @@ export default function DriverVehicle() {
       posto: form.posto,
       descricao: form.descricao,
       foto_comprovante: form.foto_comprovante,
-      owner: currentUser?.email || "",
+      owner: empresaOwner || currentUser?.email || "",
     };
 
     await base44.entities.ManutencaoVeiculo.create(payload);
