@@ -22,7 +22,8 @@ export default function PrintModal({
   motoristaData, 
   onSaveRelatorio,
   onSaveAgendado,
-  nomeEmpresa 
+  nomeEmpresa,
+  routeConfig
 }) {
   const [expedidor, setExpedidor] = useState(responsavelExpedicao || "");
   const [isSaved, setIsSaved] = useState(false);
@@ -377,7 +378,8 @@ export default function PrintModal({
                     endereco_matriz: route?.[0]?.address || "Matriz",
                     rota: rotaComNotas,
                     total_volumes: totalVolumesGeral,
-                    status: "agendado"
+                    status: "agendado",
+                    ...(routeConfig || {})
                   };
 
                   onSaveAgendado(dadosAgendado).then((result) => {
@@ -442,7 +444,8 @@ export default function PrintModal({
                     endereco_matriz: route?.[0]?.address || "Matriz",
                     rota: rotaComNotas,
                     total_volumes: totalVolumesGeral,
-                    status: "liberado"
+                    status: "liberado",
+                    ...(routeConfig || {})
                   };
 
                   const result = await onSaveAgendado(dadosAgendado);
