@@ -38,7 +38,12 @@ export default function Manutencao() {
 
   const { data: veiculos } = useQuery({
     queryKey: ["veiculos-manutencao", currentUser?.email],
-    queryFn: () => base44.entities.Veiculo.filter({ owner: currentUser.email }),
+    queryFn: async () => {
+      const allVeiculos = await base44.entities.Veiculo.list();
+      return allVeiculos.filter(v => 
+        v.owner === currentUser.email || v.created_by === currentUser.email
+      );
+    },
     enabled: !!currentUser,
     initialData: []
   });
