@@ -45,7 +45,6 @@ export default function RotasEmAndamento() {
     },
     enabled: !!currentUser,
     initialData: [],
-    refetchInterval: 15000, // Atualiza a cada 15 segundos
   });
 
   // Atualização em tempo real
