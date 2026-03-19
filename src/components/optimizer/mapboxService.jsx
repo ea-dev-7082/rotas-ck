@@ -113,24 +113,8 @@ function nearestNeighborSort(points, origin) {
   return sorted;
 }
 
-// Chamada única à Mapbox Optimization API (máx 12 coordenadas)
-async function optimizeSingleBatch(coords, mapboxToken) {
-  const coordsString = coords.map(c => `${c.longitude},${c.latitude}`).join(';');
-  const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic/${coordsString}?access_token=${mapboxToken}&roundtrip=true&source=first&destination=last&geometries=geojson&overview=full&steps=true`;
-  
-  const response = await fetch(url);
-  const data = await response.json();
-  
-  if (data.code !== 'Ok' && data.code !== undefined) {
-    throw new Error(`Erro Mapbox Optimization: ${data.message || data.code}`);
-  }
-  return data;
-}
-
-// Otimizar rota usando Mapbox Optimization API (Perfil Trânsito)
-// Segmenta automaticamente em lotes de até 10 paradas + origem quando necessário
-const MAX_WAYPOINTS_PER_BATCH = 10; // paradas por lote (+ origem = 11, dentro do limite de 12)
-
+// Otimizar rota: ordena por nearest-neighbor (mais perto → mais longe) e usa Directions API para tempos reais
+// Funciona com qualquer quantidade de paradas sem limite
 export async function optimizeRoute(coordinates, mapboxToken) {
   const validCoords = coordinates.filter(c => c.latitude && c.longitude);
   
@@ -141,92 +125,36 @@ export async function optimizeRoute(coordinates, mapboxToken) {
   const origin = validCoords[0];
   const destinations = validCoords.slice(1);
 
-  // Se cabe em uma chamada só (até 11 pontos = origem + 10 paradas), faz direto
-  if (destinations.length <= MAX_WAYPOINTS_PER_BATCH) {
-    return await optimizeSingleBatch(validCoords, mapboxToken);
+  // 1. Ordena TODOS os destinos por nearest-neighbor a partir da origem
+  const sorted = nearestNeighborSort(destinations, origin);
+
+  // 2. Monta a rota completa: origem → entregas ordenadas → retorno à origem
+  const fullRoute = [origin, ...sorted, origin];
+
+  // 3. Usa Directions API (segmentada) para obter tempos, distâncias e geometria reais
+  const directionsResult = await getDirections(fullRoute, mapboxToken);
+  const route = directionsResult.routes?.[0];
+
+  if (!route) {
+    throw new Error("Não foi possível calcular direções para a rota.");
   }
 
-  // --- SEGMENTAÇÃO para rotas grandes ---
-  // 1. Pré-ordena todos os destinos por proximidade (nearest-neighbor desde a origem)
-  const sortedDestinations = nearestNeighborSort(destinations, origin);
+  // 4. Monta waypoints na ordem correta (formato que processOptimizationResult espera)
+  const allPoints = [origin, ...sorted];
+  const waypoints = allPoints.map((p, idx) => ({
+    waypoint_index: idx,
+    location: [p.longitude, p.latitude]
+  }));
 
-  // 2. Divide em lotes sequenciais de MAX_WAYPOINTS_PER_BATCH
-  const batches = [];
-  for (let i = 0; i < sortedDestinations.length; i += MAX_WAYPOINTS_PER_BATCH) {
-    batches.push(sortedDestinations.slice(i, i + MAX_WAYPOINTS_PER_BATCH));
-  }
-
-  // 3. Otimiza cada lote individualmente, sempre partindo de um ponto de referência
-  let allLegs = [];
-  let allWaypoints = [];
-  let fullGeometry = [];
-  let totalDistance = 0;
-  let totalDuration = 0;
-  let waypointOffset = 0;
-
-  for (let b = 0; b < batches.length; b++) {
-    const batch = batches[b];
-    // Ponto de partida do lote: origem (primeiro lote) ou último ponto do lote anterior
-    const batchOrigin = b === 0 ? origin : batches[b - 1][batches[b - 1].length - 1];
-    const batchCoords = [batchOrigin, ...batch];
-
-    const result = await optimizeSingleBatch(batchCoords, mapboxToken);
-    const trip = result.trips?.[0];
-    if (!trip) continue;
-
-    const batchWaypoints = result.waypoints || [];
-    const batchLegs = trip.legs || [];
-
-    // Mapeia waypoints de volta para a ordem global
-    // O primeiro waypoint do lote é a origem/ponto de conexão (pula no merge, exceto no lote 0)
-    const sortedBatchWPs = [...batchWaypoints].sort((a, b2) => a.waypoint_index - b2.waypoint_index);
-
-    const startWPIdx = b === 0 ? 0 : 1; // pula a origem duplicada nos lotes >0
-    for (let w = startWPIdx; w < sortedBatchWPs.length; w++) {
-      // Ajusta o waypoint_index para ser global
-      allWaypoints.push({
-        ...sortedBatchWPs[w],
-        waypoint_index: waypointOffset,
-        // Guarda referência ao ponto original
-        _batchCoordIdx: w
-      });
-      waypointOffset++;
-    }
-
-    // Legs: pega todos os legs exceto o último (retorno à origem do lote)
-    // No último lote, pega o último leg também (retorno à origem global)
-    const legsToKeep = b < batches.length - 1
-      ? batchLegs.slice(0, batchLegs.length - 1) // remove leg de retorno intermediário
-      : batchLegs; // último lote: mantém retorno
-
-    // No lote > 0, o primeiro leg é a conexão do ponto anterior ao primeiro do lote
-    if (b > 0 && legsToKeep.length > 0) {
-      allLegs.push(...legsToKeep);
-    } else {
-      allLegs.push(...legsToKeep);
-    }
-
-    // Geometria
-    if (trip.geometry?.coordinates) {
-      fullGeometry.push(...trip.geometry.coordinates);
-    }
-
-    // Distância e duração (sem o leg de retorno intermediário)
-    const relevantLegs = b < batches.length - 1 ? batchLegs.slice(0, batchLegs.length - 1) : batchLegs;
-    totalDistance += relevantLegs.reduce((s, l) => s + (l.distance || 0), 0);
-    totalDuration += relevantLegs.reduce((s, l) => s + (l.duration || 0), 0);
-  }
-
-  // Monta o resultado unificado no formato que processOptimizationResult espera
   return {
     code: "Ok",
     trips: [{
-      legs: allLegs,
-      distance: totalDistance,
-      duration: totalDuration,
-      geometry: { type: "LineString", coordinates: fullGeometry }
+      legs: route.legs || [],
+      distance: route.distance || 0,
+      duration: route.duration || 0,
+      geometry: route.geometry || { type: "LineString", coordinates: [] }
     }],
-    waypoints: allWaypoints
+    waypoints
   };
 }
 
