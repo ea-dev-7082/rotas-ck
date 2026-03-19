@@ -414,6 +414,9 @@ export function processOptimizationResult(optimizationData, originalPoints, star
 
     currentTime += travelTimeMinutes;
     const arrivalTime = formatTime(currentTime);
+    
+    console.log(`[ETA] Parada ${index}: ${point.nome} | deslocamento=${travelTimeMinutes}min (raw=${Math.round(rawDuration/60)}min) | chegada=${arrivalTime} | +parada=${SERVICE_TIME}min`);
+    
     currentTime += SERVICE_TIME;
 
     return {
