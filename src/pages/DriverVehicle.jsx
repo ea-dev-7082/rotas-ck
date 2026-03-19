@@ -37,7 +37,7 @@ export default function DriverVehicle() {
   const [showHistorico, setShowHistorico] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingFoto, setUploadingFoto] = useState(false);
-  const [empresaOwner, setEmpresaOwner] = useState("");
+
   const [form, setForm] = useState({
     tipo: "abastecimento",
     data: format(new Date(), "yyyy-MM-dd"),
@@ -72,12 +72,7 @@ export default function DriverVehicle() {
     initialData: [],
   });
 
-  // Determina o owner da empresa a partir do veículo selecionado
-  useEffect(() => {
-    if (selectedVeiculo?.created_by) {
-      setEmpresaOwner(selectedVeiculo.created_by);
-    }
-  }, [selectedVeiculo]);
+
 
   const { data: registros = [] } = useQuery({
     queryKey: ["manutencao-driver", selectedVeiculo?.id],
@@ -141,7 +136,7 @@ export default function DriverVehicle() {
       posto: form.posto,
       descricao: form.descricao,
       foto_comprovante: form.foto_comprovante,
-      owner: empresaOwner || currentUser?.email || "",
+      owner: selectedVeiculo.owner || selectedVeiculo.created_by || currentUser?.email || "",
     };
 
     await base44.entities.ManutencaoVeiculo.create(payload);
