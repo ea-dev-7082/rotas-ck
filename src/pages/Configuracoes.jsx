@@ -39,9 +39,6 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Configuracoes() {
-  const [mapboxToken, setMapboxToken] = useState("");
-  const [showToken, setShowToken] = useState(false);
-  const [tokenSaved, setTokenSaved] = useState(false);
   const [enderecoMatriz, setEnderecoMatriz] = useState("");
   const [matrizSaved, setMatrizSaved] = useState(false);
   const [nomeEmpresa, setNomeEmpresa] = useState("");
@@ -104,7 +101,6 @@ export default function Configuracoes() {
   // Carregar dados iniciais
   useEffect(() => {
     if (configs.length > 0) {
-      setMapboxToken(configs.find(c => c.chave === "mapbox_token")?.valor || "");
       setEnderecoMatriz(configs.find(c => c.chave === "endereco_matriz")?.valor || "");
       setNomeEmpresa(configs.find(c => c.chave === "nome_empresa")?.valor || "");
       setTempoParadaEntrega(configs.find(c => c.chave === "tempo_parada_entrega")?.valor || "20");
@@ -123,7 +119,6 @@ export default function Configuracoes() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["configuracoes"] });
-      if (variables.chave === "mapbox_token") { setTokenSaved(true); setTimeout(() => setTokenSaved(false), 3000); }
       if (variables.chave === "endereco_matriz") { setMatrizSaved(true); setTimeout(() => setMatrizSaved(false), 3000); }
       if (variables.chave === "nome_empresa") { setEmpresaSaved(true); setTimeout(() => setEmpresaSaved(false), 3000); }
       if (variables.chave === "tempo_parada_entrega") { setTempoParadaSaved(true); setTimeout(() => setTempoParadaSaved(false), 3000); }
@@ -226,27 +221,6 @@ export default function Configuracoes() {
                   {empresaSaved ? "Salvo" : "Salvar"}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Mapbox Token */}
-          <Card className="shadow-sm">
-            <CardHeader className="pb-3 border-b">
-              <CardTitle className="text-lg flex items-center gap-2"><Key className="w-4 h-4 text-blue-600" /> API Mapbox</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-3">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input type={showToken ? "text" : "password"} value={mapboxToken} onChange={(e) => setMapboxToken(e.target.value)} placeholder="Token de acesso..." />
-                  <button onClick={() => setShowToken(!showToken)} className="absolute right-3 top-3 text-slate-400 hover:text-slate-600">
-                    {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                <Button onClick={() => saveConfigMutation.mutate({ chave: "mapbox_token", valor: mapboxToken })} className="bg-blue-600 hover:bg-blue-700">
-                  {tokenSaved ? "Salvo" : "Salvar"}
-                </Button>
-              </div>
-              <p className="text-xs text-blue-600 bg-blue-50 p-2 rounded">O token é obrigatório para o cálculo de rotas e geolocalização.</p>
             </CardContent>
           </Card>
 
