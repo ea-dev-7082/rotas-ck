@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Home, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { Home, CheckCircle2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 export default function ReturnPanel({ rotas }) {
@@ -19,48 +19,69 @@ export default function ReturnPanel({ rotas }) {
     );
   });
 
+  // Busca relatórios vinculados às rotas em retorno para saber quais já foram fechados
+  const rotaIds = motoristasRetorno.map((r) => r.id);
+  const { data: relatoriosVinculados } = useQuery({
+    queryKey: ["relatorios-vinculados", rotaIds.join(",")],
+    queryFn: async () => {
+      if (rotaIds.length === 0) return [];
+      // Busca todos relatórios do usuário e filtra pelos IDs
+      const todos = await base44.entities.Relatorio.list("-created_date", 100);
+      return todos.filter((r) => rotaIds.includes(r.rota_agendada_id));
+    },
+    enabled: rotaIds.length > 0,
+    initialData: [],
+  });
+
+  const getRelatorioParaRota = (rotaId) => {
+    return relatoriosVinculados.find((r) => r.rota_agendada_id === rotaId);
+  };
+
   const handleRetornou = async (rota) => {
     setClosingId(rota.id);
     const agora = new Date().toISOString();
 
-    // 1. Atualiza a RotaAgendada para concluído com hora de retorno
-    await base44.entities.RotaAgendada.update(rota.id, {
-      status: "concluido",
-      hora_retorno: agora,
-    });
+    // 1. Atualiza a RotaAgendada para concluído com hora de retorno (se ainda não)
+    if (rota.status !== "concluido") {
+      await base44.entities.RotaAgendada.update(rota.id, {
+        status: "concluido",
+        hora_retorno: agora,
+      });
+    }
 
-    // 2. Busca o relatório vinculado a esta rota
-    const relatorios = await base44.entities.Relatorio.filter({
-      rota_agendada_id: rota.id,
-    });
-
-    if (relatorios.length > 0) {
-      const relatorio = relatorios[0];
-
-      // Monta a rota atualizada com dados reais das entregas
-      const rotaAtualizada = (rota.rota || []).map((item) => ({
-        ...item,
-        // Preserva dados já existentes no relatório e sobrepõe com dados reais da rota
-        status: item.status || undefined,
-        deliveredAt: item.deliveredAt || undefined,
-        receivedBy: item.receivedBy || undefined,
-        notes: item.notes || undefined,
-        occurrenceType: item.occurrenceType || undefined,
-        occurrenceDescription: item.occurrenceDescription || undefined,
+    // 2. Busca o relatório vinculado e atualiza com dados reais
+    const relatorio = getRelatorioParaRota(rota.id);
+    if (relatorio) {
+      // Pega a rota da RotaAgendada com dados reais (deliveredAt, status, notes, etc.)
+      const rotaRealAtualizada = (rota.rota || []).map((item) => ({
+        order: item.order,
+        client_name: item.client_name,
+        address: item.address,
+        estimated_arrival: item.estimated_arrival,
+        latitude: item.latitude,
+        longitude: item.longitude,
         notas_fiscais: item.notas_fiscais || [],
         volume_total: item.volume_total || 0,
+        // Dados reais das entregas
+        status: item.status || null,
+        deliveredAt: item.deliveredAt || null,
+        receivedBy: item.receivedBy || null,
+        notes: item.notes || null,
+        occurrenceType: item.occurrenceType || null,
+        occurrenceDescription: item.occurrenceDescription || null,
       }));
 
       await base44.entities.Relatorio.update(relatorio.id, {
-        rota: rotaAtualizada,
+        rota: rotaRealAtualizada,
         hora_retorno: agora,
         status: "concluido",
       });
     }
 
-    // 3. Invalida queries para atualizar a UI
+    // 3. Invalida queries
     queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] });
     queryClient.invalidateQueries({ queryKey: ["relatorios"] });
+    queryClient.invalidateQueries({ queryKey: ["relatorios-vinculados"] });
     setClosingId(null);
   };
 
@@ -89,6 +110,10 @@ export default function ReturnPanel({ rotas }) {
 
         const matrizRetorno = rota.rota?.[rota.rota.length - 1];
 
+        // Verifica se o relatório vinculado já foi fechado
+        const relatorio = getRelatorioParaRota(rota.id);
+        const relatorioFechado = relatorio?.status === "concluido";
+
         return (
           <Card key={rota.id} className="bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200">
             <CardContent className="p-4">
@@ -107,7 +132,7 @@ export default function ReturnPanel({ rotas }) {
                   </div>
                 </div>
                 <Badge className="bg-emerald-100 text-emerald-800 text-xs">
-                  Retornando
+                  {relatorioFechado ? "Finalizado" : "Retornando"}
                 </Badge>
               </div>
 
@@ -135,8 +160,8 @@ export default function ReturnPanel({ rotas }) {
                 </p>
               )}
 
-              {/* Botão Retornou */}
-              {rota.status !== "concluido" && (
+              {/* Botão Retornou - aparece se relatório não foi fechado ainda */}
+              {!relatorioFechado ? (
                 <Button
                   onClick={() => handleRetornou(rota)}
                   disabled={isClosing}
@@ -154,9 +179,7 @@ export default function ReturnPanel({ rotas }) {
                     </>
                   )}
                 </Button>
-              )}
-
-              {rota.status === "concluido" && (
+              ) : (
                 <div className="mt-3 flex items-center justify-center gap-2 text-emerald-700 bg-emerald-100 rounded-lg py-2 text-sm font-medium">
                   <CheckCircle2 className="w-4 h-4" />
                   Rota Finalizada
