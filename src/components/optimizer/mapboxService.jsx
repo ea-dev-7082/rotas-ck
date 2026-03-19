@@ -80,10 +80,10 @@ export async function geocodeMultiple(addresses, mapboxToken) {
             };
         }
 
-        const coords = await geocodeAddress(item.endereco, mapboxToken);
+        const coords = await geocodeAddress(item.endereco, mapboxToken, item.bairro, item.municipio);
         
         if (!coords) {
-            console.error(`❌ FALHA FATAL: Não foi possível localizar: ${item.nome}`);
+            console.warn(`⚠️ Geocodificação falhou para: ${item.nome} (${item.endereco}). Será ignorado na rota.`);
             return { ...item, latitude: null, longitude: null };
         }
 
