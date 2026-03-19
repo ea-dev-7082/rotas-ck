@@ -45,10 +45,14 @@ export default function Manutencao() {
 
   const { data: registros, isLoading } = useQuery({
     queryKey: ["manutencao", currentUser?.email],
-    queryFn: () => base44.entities.ManutencaoVeiculo.filter(
-      { owner: currentUser.email },
-      "-data"
-    ),
+    queryFn: async () => {
+      // Busca registros onde owner é o email da empresa OU onde owner é null mas created_by é a empresa
+      const allRecords = await base44.entities.ManutencaoVeiculo.list("-data");
+      return allRecords.filter(r => 
+        r.owner === currentUser.email || 
+        r.created_by === currentUser.email
+      );
+    },
     enabled: !!currentUser,
     initialData: []
   });
