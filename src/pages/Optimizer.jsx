@@ -255,10 +255,11 @@ export default function Optimizer() {
             ? `${cliente.endereco}, ${cliente.endereco_num}`
             : cliente.endereco;
         }
-        // Preserva lat/lng originais do banco como backup
         return { 
           nome: cliente.nome, 
           endereco: enderecoFinal,
+          bairro: cliente.bairro,
+          municipio: cliente.municipio,
           latitude: cliente.latitude,
           longitude: cliente.longitude
         };
