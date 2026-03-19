@@ -11,6 +11,7 @@ import BottomNav from "../components/driver/BottomNav";
 import DeliveryCard from "../components/driver/DeliveryCard";
 import MarkDeliveredDialog from "../components/driver/MarkDeliveredDialog";
 import OccurrenceDialog from "../components/driver/OccurrenceDialog";
+import { recalculateRemainingETAs } from "@/lib/recalculateETA";
 
 export default function DriverRouteView() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -19,6 +20,7 @@ export default function DriverRouteView() {
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
   const [occurrenceOpen, setOccurrenceOpen] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -30,6 +32,18 @@ export default function DriverRouteView() {
       return rotas[0];
     },
     enabled: !!rotaId,
+  });
+
+  // Busca configurações do dono da rota para recálculo
+  const { data: configs } = useQuery({
+    queryKey: ["configs-recalc", rota?.owner || rota?.created_by],
+    queryFn: async () => {
+      const ownerEmail = rota?.owner || rota?.created_by;
+      if (!ownerEmail) return [];
+      return base44.entities.Configuracao.filter({ owner: ownerEmail });
+    },
+    enabled: !!(rota?.owner || rota?.created_by),
+    initialData: [],
   });
 
   // Mutation para atualizar rota
@@ -78,7 +92,7 @@ export default function DriverRouteView() {
   const handleConfirmDelivery = async ({ notes, receivedBy, photoUrl }) => {
     if (!selectedDelivery || !rota) return;
 
-    const updatedRota = rota.rota.map((item) =>
+    let updatedRota = rota.rota.map((item) =>
       item.order === selectedDelivery.order
         ? {
             ...item,
@@ -98,6 +112,19 @@ export default function DriverRouteView() {
     );
 
     const novoStatus = todasConcluidas ? "concluido" : "em_andamento";
+
+    // Recalcula ETAs para paradas restantes via Mapbox
+    if (!todasConcluidas) {
+      setIsRecalculating(true);
+      const serviceTime = Number(configs.find(c => c.chave === "tempo_parada_entrega")?.valor) || 20;
+      const trafficBuffer = Number(configs.find(c => c.chave === "margem_transito")?.valor) || 10;
+      try {
+        updatedRota = await recalculateRemainingETAs(updatedRota, selectedDelivery.order, serviceTime, trafficBuffer);
+      } catch (err) {
+        console.warn("Erro no recálculo de ETAs, mantendo previsões anteriores:", err);
+      }
+      setIsRecalculating(false);
+    }
 
     await updateRotaMutation.mutateAsync({
       rota: updatedRota,

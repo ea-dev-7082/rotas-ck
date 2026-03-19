@@ -6,6 +6,16 @@ function getNotasText(item) {
   return notas.map(n => n.numero || "").filter(Boolean).join(" / ") || "-";
 }
 
+function formatDeliveredTime(deliveredAt) {
+  if (!deliveredAt) return "-";
+  try {
+    const d = new Date(deliveredAt);
+    return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  } catch {
+    return "-";
+  }
+}
+
 function RouteCard({ rota }) {
   const veiculo = rota.veiculo_descricao || "Veículo";
   const placa = rota.veiculo_placa || "";
@@ -13,9 +23,10 @@ function RouteCard({ rota }) {
   const entregas = (rota.rota || []).slice(1, -1);
 
   const headerLabel = placa ? `${veiculo} ${placa}`.toUpperCase() : veiculo.toUpperCase();
+  const hasDeliveredData = entregas.some(e => e.deliveredAt);
 
   return (
-    <div className="border-2 border-black min-w-[260px] flex-1 break-inside-avoid" style={{maxWidth: "33%"}}>
+    <div className="border-2 border-black min-w-[280px] flex-1 break-inside-avoid" style={{maxWidth: "48%"}}>
       {/* Cabeçalho com veículo */}
       <div className="text-center border-b-2 border-black px-2 py-1 font-bold text-sm uppercase bg-white">
         {headerLabel}
@@ -28,9 +39,11 @@ function RouteCard({ rota }) {
       </div>
 
       {/* Header tabela */}
-      <div className="flex border-b border-black text-[11px] font-bold underline">
-        <span className="w-[55%] px-2 py-0.5 text-center">CLIENTE</span>
-        <span className="w-[45%] px-2 py-0.5 text-center">NF</span>
+      <div className="flex border-b border-black text-[10px] font-bold underline">
+        <span className="w-[30%] px-1 py-0.5 text-center">CLIENTE</span>
+        <span className="w-[25%] px-1 py-0.5 text-center">NF</span>
+        <span className="w-[22%] px-1 py-0.5 text-center">PREVISTO</span>
+        <span className="w-[23%] px-1 py-0.5 text-center">ENTREGUE</span>
       </div>
 
       {/* Linhas de clientes */}
@@ -38,9 +51,13 @@ function RouteCard({ rota }) {
         <div className="text-center text-xs text-gray-400 py-4">Sem entregas</div>
       ) : (
         entregas.map((item, idx) => (
-          <div key={idx} className="flex text-[11px] border-b border-gray-200 last:border-b-0">
-            <span className="w-[55%] px-2 py-0.5 text-center truncate">{item.client_name}</span>
-            <span className="w-[45%] px-2 py-0.5 text-center truncate">{getNotasText(item)}</span>
+          <div key={idx} className="flex text-[10px] border-b border-gray-200 last:border-b-0">
+            <span className="w-[30%] px-1 py-0.5 text-center truncate">{item.client_name}</span>
+            <span className="w-[25%] px-1 py-0.5 text-center truncate">{getNotasText(item)}</span>
+            <span className="w-[22%] px-1 py-0.5 text-center">{item.estimated_arrival || "-"}</span>
+            <span className={`w-[23%] px-1 py-0.5 text-center ${item.status === "delivered" ? "text-green-700 font-semibold" : item.status === "problem" ? "text-red-600" : ""}`}>
+              {item.status === "delivered" ? formatDeliveredTime(item.deliveredAt) : item.status === "problem" ? "⚠️" : "-"}
+            </span>
           </div>
         ))
       )}
