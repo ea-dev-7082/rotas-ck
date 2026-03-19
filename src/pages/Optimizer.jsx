@@ -288,6 +288,11 @@ export default function Optimizer() {
       setGeocodedClients(clientesFinal);
       
       // Filtra apenas pontos com coordenadas válidas para otimizar
+      const clientesSemCoord = clientesFinal.filter(p => !p.latitude || !p.longitude);
+      if (clientesSemCoord.length > 0) {
+        console.warn(`⚠️ ${clientesSemCoord.length} cliente(s) sem coordenadas (serão ignorados):`, clientesSemCoord.map(c => c.nome).join(", "));
+      }
+      
       const pontosParaOtimizar = [matrizGeocodificada, ...clientesFinal].filter(p => p.latitude && p.longitude);
 
       if (pontosParaOtimizar.length < 2) {
