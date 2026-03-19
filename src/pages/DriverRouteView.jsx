@@ -35,12 +35,17 @@ export default function DriverRouteView() {
   });
 
   // Busca configurações do dono da rota para recálculo
+  // Tenta buscar pelo owner da rota, e se a RLS bloquear, usa fallback local
   const { data: configs } = useQuery({
     queryKey: ["configs-recalc", rota?.owner || rota?.created_by],
     queryFn: async () => {
       const ownerEmail = rota?.owner || rota?.created_by;
       if (!ownerEmail) return [];
-      return base44.entities.Configuracao.filter({ owner: ownerEmail });
+      try {
+        return await base44.entities.Configuracao.filter({ owner: ownerEmail });
+      } catch {
+        return [];
+      }
     },
     enabled: !!(rota?.owner || rota?.created_by),
     initialData: [],
@@ -116,9 +121,10 @@ export default function DriverRouteView() {
     // Recalcula ETAs para paradas restantes via Mapbox
     if (!todasConcluidas) {
       setIsRecalculating(true);
-      const serviceTime = Number(configs.find(c => c.chave === "tempo_parada_entrega")?.valor) || 20;
-      const trafficBuffer = Number(configs.find(c => c.chave === "margem_transito")?.valor) || 10;
-      const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || null;
+      // Tenta ler das configs do gestor, senão usa defaults da rota ou padrões
+      const serviceTime = Number(configs.find(c => c.chave === "tempo_parada_entrega")?.valor) || Number(rota.tempo_parada_entrega) || 20;
+      const trafficBuffer = Number(configs.find(c => c.chave === "margem_transito")?.valor) || Number(rota.margem_transito) || 10;
+      const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || rota.mapbox_token || null;
       try {
         updatedRota = await recalculateRemainingETAs(updatedRota, selectedDelivery.order, serviceTime, trafficBuffer, mapboxToken);
       } catch (err) {
