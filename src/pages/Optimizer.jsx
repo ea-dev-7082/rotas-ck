@@ -750,6 +750,12 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
             responsavelExpedicao={currentUser?.full_name}
             veiculoData={selectedVeiculoData}
             motoristaData={selectedMotoristaData}
+            routeConfig={{
+              mapbox_token: mapboxToken,
+              tempo_parada_entrega: String(tempoParadaEntrega),
+              margem_transito: String(margemTransito),
+              data_prevista: new Date().toISOString().split('T')[0]
+            }}
             onSaveRelatorio={async (data) => {
               await base44.entities.Relatorio.create({ ...data, owner: currentUser?.email });
             }}
