@@ -69,7 +69,7 @@ export default function DriverRouteView() {
 
   // Atualiza status da rota para "em_andamento" ao abrir
   useEffect(() => {
-    if (rota && rota.status === "agendado") {
+    if (rota && (rota.status === "agendado" || rota.status === "liberado")) {
       updateRotaMutation.mutate({ status: "em_andamento" });
     }
   }, [rota?.id]);

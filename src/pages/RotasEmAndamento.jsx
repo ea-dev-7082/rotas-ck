@@ -34,12 +34,13 @@ export default function RotasEmAndamento() {
         { owner: currentUser.email },
         "-created_date"
       );
-      // Filtra apenas rotas em andamento ou agendadas para hoje
+      // Filtra rotas em andamento, liberadas, agendadas para hoje, e concluídas hoje (retorno)
       const today = format(new Date(), "yyyy-MM-dd");
       return rotas.filter(r => 
         r.status === "em_andamento" || 
         r.status === "liberado" ||
-        (r.status === "agendado" && r.data_prevista === today)
+        (r.status === "agendado" && r.data_prevista === today) ||
+        (r.status === "concluido" && r.updated_date && format(new Date(r.updated_date), "yyyy-MM-dd") === today)
       );
     },
     enabled: !!currentUser,
