@@ -1,13 +1,29 @@
 import React, { useMemo } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { TrendingUp, Fuel, Wrench, Car } from "lucide-react";
+import { TrendingUp, Fuel, Wrench, Car, Gauge } from "lucide-react";
 
-export default function CustoKmReport({ registros, veiculos }) {
+export default function CustoKmReport({ registros, veiculos, currentUser }) {
+  // Busca registros diários de veículos para km reais
+  const { data: registrosDiarios = [] } = useQuery({
+    queryKey: ["registros-diarios-report", currentUser?.email],
+    queryFn: async () => {
+      const all = await base44.entities.RegistroDiarioVeiculo.list("-data", 500);
+      return all.filter(r =>
+        r.owner === currentUser?.email || r.created_by === currentUser?.email
+      );
+    },
+    enabled: !!currentUser,
+    initialData: [],
+  });
+
   const relatorio = useMemo(() => {
-    // Agrupa por veículo
     const porVeiculo = {};
+
+    // Acumula custos dos registros de manutenção
     registros.forEach(reg => {
       if (!porVeiculo[reg.veiculo_id]) {
         porVeiculo[reg.veiculo_id] = {
@@ -18,9 +34,11 @@ export default function CustoKmReport({ registros, veiculos }) {
           total_manutencao: 0,
           total_geral: 0,
           total_litros: 0,
-          km_min: Infinity,
-          km_max: 0,
-          registros: 0
+          registros: 0,
+          km_rodados_diarios: 0,
+          dias_registrados: 0,
+          total_combustivel_diario: 0,
+          litros_diarios: 0,
         };
       }
       const v = porVeiculo[reg.veiculo_id];
@@ -33,44 +51,83 @@ export default function CustoKmReport({ registros, veiculos }) {
       } else {
         v.total_manutencao += Number(reg.valor) || 0;
       }
+    });
 
-      if (reg.km_atual) {
-        const km = Number(reg.km_atual);
-        if (km < v.km_min) v.km_min = km;
-        if (km > v.km_max) v.km_max = km;
+    // Acumula km dos registros diários
+    registrosDiarios.forEach(rd => {
+      const vid = rd.veiculo_id;
+      if (!porVeiculo[vid]) {
+        const veiculo = veiculos.find(v => v.id === vid);
+        porVeiculo[vid] = {
+          veiculo_id: vid,
+          descricao: rd.veiculo_descricao || veiculo?.descricao || "Veículo",
+          placa: rd.veiculo_placa || veiculo?.placa || "",
+          total_combustivel: 0,
+          total_manutencao: 0,
+          total_geral: 0,
+          total_litros: 0,
+          registros: 0,
+          km_rodados_diarios: 0,
+          dias_registrados: 0,
+          total_combustivel_diario: 0,
+          litros_diarios: 0,
+        };
+      }
+      const v = porVeiculo[vid];
+      const kmI = Number(rd.km_inicial) || 0;
+      const kmF = Number(rd.km_final) || 0;
+      if (kmI > 0 && kmF > 0 && kmF > kmI) {
+        v.km_rodados_diarios += (kmF - kmI);
+        v.dias_registrados++;
+      }
+      // Combustível dos registros diários (abastecimentos inline)
+      if (rd.abastecimentos && rd.abastecimentos.length > 0) {
+        rd.abastecimentos.forEach(ab => {
+          v.total_combustivel_diario += Number(ab.valor) || 0;
+          v.litros_diarios += Number(ab.litros) || 0;
+        });
       }
     });
 
     return Object.values(porVeiculo).map(v => {
-      const kmRodados = v.km_max > 0 && v.km_min < Infinity ? v.km_max - v.km_min : 0;
+      const kmTotal = v.km_rodados_diarios;
+      // Custo combustível combinado (manutenção + diário)
+      const custoCombustivelTotal = v.total_combustivel + v.total_combustivel_diario;
+      const litrosTotal = v.total_litros + v.litros_diarios;
       return {
         ...v,
-        km_rodados: kmRodados,
-        custo_por_km: kmRodados > 0 ? v.total_geral / kmRodados : 0,
-        km_por_litro: v.total_litros > 0 && kmRodados > 0 ? kmRodados / v.total_litros : 0
+        km_rodados: kmTotal,
+        custo_combustivel_km: kmTotal > 0 ? custoCombustivelTotal / kmTotal : 0,
+        custo_total_km: kmTotal > 0 ? (custoCombustivelTotal + v.total_manutencao) / kmTotal : 0,
+        km_por_litro: litrosTotal > 0 && kmTotal > 0 ? kmTotal / litrosTotal : 0,
+        custo_combustivel_total: custoCombustivelTotal,
+        litros_total: litrosTotal,
       };
     });
-  }, [registros]);
+  }, [registros, registrosDiarios, veiculos]);
 
   const totais = useMemo(() => {
     return relatorio.reduce((acc, v) => ({
-      combustivel: acc.combustivel + v.total_combustivel,
+      combustivel: acc.combustivel + v.custo_combustivel_total,
       manutencao: acc.manutencao + v.total_manutencao,
-      geral: acc.geral + v.total_geral,
-      registros: acc.registros + v.registros
-    }), { combustivel: 0, manutencao: 0, geral: 0, registros: 0 });
+      geral: acc.geral + v.custo_combustivel_total + v.total_manutencao,
+      kmTotal: acc.kmTotal + v.km_rodados,
+      registros: acc.registros + v.registros,
+    }), { combustivel: 0, manutencao: 0, geral: 0, kmTotal: 0, registros: 0 });
   }, [relatorio]);
 
-  const chartData = relatorio.map(v => ({
+  const custoMedioGeralKm = totais.kmTotal > 0 ? totais.geral / totais.kmTotal : 0;
+
+  const chartData = relatorio.filter(v => v.km_rodados > 0).map(v => ({
     name: `${v.placa || v.descricao}`,
-    Combustível: Number(v.total_combustivel.toFixed(2)),
-    Manutenção: Number(v.total_manutencao.toFixed(2))
+    "R$/Km Combustível": Number(v.custo_combustivel_km.toFixed(2)),
+    "R$/Km Total": Number(v.custo_total_km.toFixed(2)),
   }));
 
   return (
     <div className="space-y-6">
       {/* Cards resumo */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
             <Fuel className="w-5 h-5 mx-auto mb-1 text-blue-500" />
@@ -94,9 +151,18 @@ export default function CustoKmReport({ registros, veiculos }) {
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
+            <Gauge className="w-5 h-5 mx-auto mb-1 text-indigo-500" />
+            <p className="text-xs text-gray-500 uppercase font-medium">Km Rodados</p>
+            <p className="text-xl font-bold text-indigo-600">{totais.kmTotal.toLocaleString("pt-BR")}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-2 border-purple-200 bg-purple-50">
+          <CardContent className="p-4 text-center">
             <Car className="w-5 h-5 mx-auto mb-1 text-purple-500" />
-            <p className="text-xs text-gray-500 uppercase font-medium">Registros</p>
-            <p className="text-xl font-bold text-purple-600">{totais.registros}</p>
+            <p className="text-xs text-purple-700 uppercase font-medium">Média R$/Km</p>
+            <p className="text-2xl font-bold text-purple-700">
+              {custoMedioGeralKm > 0 ? `R$ ${custoMedioGeralKm.toFixed(2)}` : "-"}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -105,7 +171,7 @@ export default function CustoKmReport({ registros, veiculos }) {
       {chartData.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Custos por Veículo</CardTitle>
+            <CardTitle className="text-base">Custo por Km por Veículo</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[280px]">
@@ -116,8 +182,8 @@ export default function CustoKmReport({ registros, veiculos }) {
                   <YAxis fontSize={12} />
                   <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
                   <Legend />
-                  <Bar dataKey="Combustível" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Manutenção" fill="#f97316" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="R$/Km Combustível" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="R$/Km Total" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -128,7 +194,7 @@ export default function CustoKmReport({ registros, veiculos }) {
       {/* Tabela custo/km por veículo */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Custo por Km Rodado</CardTitle>
+          <CardTitle className="text-base">Custo por Km Rodado (baseado nos registros diários)</CardTitle>
         </CardHeader>
         <CardContent>
           {relatorio.length === 0 ? (
@@ -140,6 +206,7 @@ export default function CustoKmReport({ registros, veiculos }) {
                   <tr className="border-b text-left">
                     <th className="py-2 px-3 font-semibold text-gray-600">Veículo</th>
                     <th className="py-2 px-3 font-semibold text-gray-600 text-right">Km Rodados</th>
+                    <th className="py-2 px-3 font-semibold text-gray-600 text-right">Dias</th>
                     <th className="py-2 px-3 font-semibold text-gray-600 text-right">Combustível</th>
                     <th className="py-2 px-3 font-semibold text-gray-600 text-right">Manutenção</th>
                     <th className="py-2 px-3 font-semibold text-gray-600 text-right">Total</th>
@@ -151,19 +218,20 @@ export default function CustoKmReport({ registros, veiculos }) {
                   {relatorio.map(v => (
                     <tr key={v.veiculo_id} className="border-b hover:bg-gray-50">
                       <td className="py-2 px-3 font-medium">{v.descricao} <span className="text-gray-400">{v.placa}</span></td>
-                      <td className="py-2 px-3 text-right">{v.km_rodados > 0 ? v.km_rodados.toLocaleString("pt-BR") : "-"}</td>
-                      <td className="py-2 px-3 text-right text-blue-600">R$ {v.total_combustivel.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right">{v.km_rodados > 0 ? v.km_rodados.toLocaleString("pt-BR") : <span className="text-gray-400">-</span>}</td>
+                      <td className="py-2 px-3 text-right">{v.dias_registrados || <span className="text-gray-400">-</span>}</td>
+                      <td className="py-2 px-3 text-right text-blue-600">R$ {v.custo_combustivel_total.toFixed(2)}</td>
                       <td className="py-2 px-3 text-right text-orange-600">R$ {v.total_manutencao.toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-bold">R$ {v.total_geral.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right font-bold">R$ {(v.custo_combustivel_total + v.total_manutencao).toFixed(2)}</td>
                       <td className="py-2 px-3 text-right">
-                        {v.custo_por_km > 0 ? (
-                          <Badge className={v.custo_por_km > 2 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}>
-                            R$ {v.custo_por_km.toFixed(2)}
+                        {v.custo_total_km > 0 ? (
+                          <Badge className={v.custo_total_km > 2 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}>
+                            R$ {v.custo_total_km.toFixed(2)}
                           </Badge>
-                        ) : "-"}
+                        ) : <span className="text-gray-400">-</span>}
                       </td>
                       <td className="py-2 px-3 text-right">
-                        {v.km_por_litro > 0 ? `${v.km_por_litro.toFixed(1)} km/L` : "-"}
+                        {v.km_por_litro > 0 ? `${v.km_por_litro.toFixed(1)} km/L` : <span className="text-gray-400">-</span>}
                       </td>
                     </tr>
                   ))}
@@ -171,6 +239,7 @@ export default function CustoKmReport({ registros, veiculos }) {
               </table>
             </div>
           )}
+          <p className="text-xs text-gray-400 mt-3">* Km rodados são calculados a partir dos registros diários (km inicial → km final). Custos incluem abastecimentos e manutenções do período filtrado.</p>
         </CardContent>
       </Card>
     </div>
