@@ -73,7 +73,7 @@ export default function Optimizer() {
 
   // Configurações
   const enderecoMatriz = configs.find(c => c.chave === "endereco_matriz")?.valor || "";
-  const mapboxToken = MAPBOX_TOKEN;
+  const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || MAPBOX_TOKEN;
   const logoUrl = configs.find(c => c.chave === "logo_url")?.valor || "";
   const nomeEmpresa = configs.find(c => c.chave === "nome_empresa")?.valor || "";
   const tempoParadaEntrega = parseInt(configs.find(c => c.chave === "tempo_parada_entrega")?.valor) || 20;
