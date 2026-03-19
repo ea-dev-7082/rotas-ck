@@ -102,7 +102,7 @@ export default function ReturnPanel({ rotas }) {
 
   return (
     <div className="space-y-3">
-      {motoristasRetorno.map((rota) => {
+      {visibleRotas.map((rota) => {
         const entregas = rota.rota?.slice(1, -1) || [];
         const entregues = entregas.filter((e) => e.status === "delivered").length;
         const problemas = entregas.filter((e) => e.status === "problem").length;
