@@ -312,9 +312,16 @@ export default function EmRota() {
                       )}
                     </div>
 
-                    <div className="text-right text-sm text-gray-500">
-                      <Clock className="w-4 h-4 inline mr-1" />
-                      {entrega.estimated_arrival}
+                    <div className="text-right text-sm space-y-1">
+                      <div className="text-gray-500 flex items-center justify-end gap-1">
+                        <Clock className="w-3 h-3" />
+                        <span>Prev: {entrega.estimated_arrival || "--:--"}</span>
+                      </div>
+                      {entrega.status === "delivered" && entrega.deliveredAt && (
+                        <div className="text-green-600 font-medium text-xs">
+                          ✓ {format(new Date(entrega.deliveredAt), "HH:mm")}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
