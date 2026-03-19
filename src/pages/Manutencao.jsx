@@ -210,7 +210,7 @@ export default function Manutencao() {
           </TabsContent>
 
           <TabsContent value="relatorio">
-            <CustoKmReport registros={filteredRegistros} veiculos={veiculos} />
+            <CustoKmReport registros={filteredRegistros} veiculos={veiculos} currentUser={currentUser} />
           </TabsContent>
         </Tabs>
       </div>
