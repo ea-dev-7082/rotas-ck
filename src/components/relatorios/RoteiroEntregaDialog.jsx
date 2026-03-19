@@ -20,6 +20,16 @@ function getNotasText(item) {
   return notas.map(n => n.numero || "").filter(Boolean).join(" / ");
 }
 
+function formatDeliveredTimeExcel(deliveredAt) {
+  if (!deliveredAt) return "-";
+  try {
+    const d = new Date(deliveredAt);
+    return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  } catch {
+    return "-";
+  }
+}
+
 function exportToExcel(rotas, dateLabel) {
   const rows = [];
   rotas.forEach(rota => {
@@ -36,7 +46,9 @@ function exportToExcel(rotas, dateLabel) {
         Cliente: item.client_name || "",
         NF: getNotasText(item),
         Endereco: item.address || "",
-        Volumes: (item.notas_fiscais || []).reduce((acc, n) => acc + (Number(n.volume) || 0), 0)
+        Volumes: (item.notas_fiscais || []).reduce((acc, n) => acc + (Number(n.volume) || 0), 0),
+        Previsto: item.estimated_arrival || "-",
+        Entregue: item.status === "delivered" ? formatDeliveredTimeExcel(item.deliveredAt) : item.status === "problem" ? "Problema" : "-"
       });
     });
   });
@@ -44,7 +56,7 @@ function exportToExcel(rotas, dateLabel) {
   if (rows.length === 0) return;
 
   // Build CSV (Excel compatible with UTF-8 BOM)
-  const headers = ["Veiculo", "Motorista", "Ordem", "Cliente", "NF", "Endereco", "Volumes"];
+  const headers = ["Veiculo", "Motorista", "Ordem", "Cliente", "NF", "Endereco", "Volumes", "Previsto", "Entregue"];
   const csvContent = "\uFEFF" + [
     headers.join(";"),
     ...rows.map(r => headers.map(h => `"${String(r[h] || "").replace(/"/g, '""')}"`).join(";"))
@@ -114,9 +126,9 @@ export default function RoteiroEntregaDialog({ open, onClose, userEmail }) {
           }
           .route-card {
             border: 2px solid #000;
-            min-width: 280px;
-            flex: 1 1 30%;
-            max-width: 33%;
+            min-width: 320px;
+            flex: 1 1 45%;
+            max-width: 48%;
             page-break-inside: avoid;
           }
           .route-header {
@@ -139,24 +151,20 @@ export default function RoteiroEntregaDialog({ open, onClose, userEmail }) {
           .table-header {
             display: flex;
             border-bottom: 1px solid #000;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
             text-decoration: underline;
           }
-          .table-header span { padding: 2px 8px; }
-          .table-header span:first-child { width: 55%; text-align: center; }
-          .table-header span:last-child { width: 45%; text-align: center; }
+          .table-header span { padding: 2px 4px; }
           .table-row {
             display: flex;
-            font-size: 11px;
+            font-size: 10px;
             border-bottom: 1px solid #eee;
           }
-          .table-row span { padding: 2px 8px; }
-          .table-row span:first-child { width: 55%; text-align: center; }
-          .table-row span:last-child { width: 45%; text-align: center; }
+          .table-row span { padding: 2px 4px; text-align: center; }
           @media print {
             body { padding: 8px; }
-            .route-card { max-width: 32%; }
+            .route-card { max-width: 48%; }
           }
         </style>
       </head>
