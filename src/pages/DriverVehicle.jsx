@@ -61,17 +61,23 @@ export default function DriverVehicle() {
     queryKey: ["veiculos-driver"],
     queryFn: async () => {
       if (!currentUser) return [];
+      // Busca veículos via rotas atribuídas ao motorista
       const rotas = await base44.entities.RotaAgendada.list("-created_date", 10);
       const owners = [...new Set(rotas.map(r => r.created_by).filter(Boolean))];
       if (owners.length === 0) return [];
       const allVeiculos = await base44.entities.Veiculo.list();
-      const filtered = allVeiculos.filter(v => owners.includes(v.created_by));
-      if (filtered.length > 0) setEmpresaOwner(filtered[0].created_by);
-      return filtered;
+      return allVeiculos.filter(v => owners.includes(v.created_by));
     },
     enabled: !!currentUser,
     initialData: [],
   });
+
+  // Determina o owner da empresa a partir do veículo selecionado
+  useEffect(() => {
+    if (selectedVeiculo?.created_by) {
+      setEmpresaOwner(selectedVeiculo.created_by);
+    }
+  }, [selectedVeiculo]);
 
   const { data: registros = [] } = useQuery({
     queryKey: ["manutencao-driver", selectedVeiculo?.id],
