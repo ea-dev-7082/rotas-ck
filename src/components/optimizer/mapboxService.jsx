@@ -8,6 +8,7 @@ function sanitizeAddress(address) {
   return address
     .toString()
     .replace(/[\n\r\t]/g, " ") // Remove quebras de linha
+    .replace(/[+]/g, "")       // Remove caractere +
     .replace(/\s+/g, " ")      // Remove espaços duplos
     .trim();                   // Remove espaços nas pontas
 }
