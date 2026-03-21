@@ -34,12 +34,12 @@ export default function RotasEmAndamento() {
         { owner: currentUser.email },
         "-created_date"
       );
-      // Filtra rotas em andamento, liberadas e agendadas para hoje (exclui concluídas)
       const today = format(new Date(), "yyyy-MM-dd");
       return rotas.filter(r => 
         r.status === "em_andamento" || 
         r.status === "liberado" ||
-        (r.status === "agendado" && r.data_prevista === today)
+        (r.status === "agendado" && r.data_prevista === today) ||
+        (r.status === "concluido" && r.updated_date && format(new Date(r.updated_date), "yyyy-MM-dd") === today)
       );
     },
     enabled: !!currentUser,
@@ -71,15 +71,21 @@ export default function RotasEmAndamento() {
     };
   };
 
-  // Rotas com todas entregas finalizadas (para o painel de retorno)
+  // Rotas com todas entregas finalizadas OU status concluído (para o painel de retorno)
   const rotasRetorno = (rotasEmAndamento || []).filter((rota) => {
+    // Rota já concluída vai direto pro retorno
+    if (rota.status === "concluido") return true;
+    
     const entregas = rota.rota?.slice(1, -1) || [];
     if (entregas.length === 0) return false;
     return entregas.every((e) => e.status === "delivered" || e.status === "problem");
   });
 
-  // Rotas ainda em andamento (não finalizadas)
+  // Rotas ainda em andamento (não finalizadas e não concluídas)
   const rotasAtivas = (rotasEmAndamento || []).filter((rota) => {
+    // Rota concluída nunca aparece nos cards ativos
+    if (rota.status === "concluido") return false;
+    
     const entregas = rota.rota?.slice(1, -1) || [];
     if (entregas.length === 0) return true;
     return !entregas.every((e) => e.status === "delivered" || e.status === "problem");
