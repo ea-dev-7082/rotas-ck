@@ -4,15 +4,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Home, CheckCircle2, Loader2 } from "lucide-react";
+import { Home, CheckCircle2, Loader2, X } from "lucide-react";
 import { format } from "date-fns";
 
 export default function ReturnPanel({ rotas, onDismiss }) {
   const [closingId, setClosingId] = useState(null);
+  const [dismissingId, setDismissingId] = useState(null);
   const queryClient = useQueryClient();
 
-  // NÃO re-filtra mais — confia nas rotas que o pai mandou
-  // Busca relatórios vinculados
   const rotaIds = rotas.map((r) => r.id);
 
   const { data: relatoriosVinculados } = useQuery({
@@ -31,12 +30,12 @@ export default function ReturnPanel({ rotas, onDismiss }) {
     return relatoriosVinculados.find((r) => r.rota_agendada_id === rotaId);
   };
 
+  // PASSO 1: Marcar como concluído (Retornou)
   const handleRetornou = async (rota) => {
     setClosingId(rota.id);
     const agora = new Date().toISOString();
 
     try {
-      // 1. Atualiza a RotaAgendada para concluído com hora de retorno
       if (rota.status !== "concluido") {
         await base44.entities.RotaAgendada.update(rota.id, {
           status: "concluido",
@@ -44,7 +43,6 @@ export default function ReturnPanel({ rotas, onDismiss }) {
         });
       }
 
-      // 2. Busca o relatório vinculado e atualiza com dados reais
       const relatorio = getRelatorioParaRota(rota.id);
       if (relatorio) {
         const rotaRealAtualizada = (rota.rota || []).map((item) => ({
@@ -71,12 +69,6 @@ export default function ReturnPanel({ rotas, onDismiss }) {
         });
       }
 
-      // 3. Notifica o pai para remover da tela
-      if (onDismiss) {
-        onDismiss(rota.id);
-      }
-
-      // 4. Invalida queries
       queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] });
       queryClient.invalidateQueries({ queryKey: ["relatorios"] });
       queryClient.invalidateQueries({ queryKey: ["relatorios-vinculados"] });
@@ -84,6 +76,32 @@ export default function ReturnPanel({ rotas, onDismiss }) {
       console.error("Erro ao finalizar rota:", error);
     } finally {
       setClosingId(null);
+    }
+  };
+
+  // PASSO 2: Dispensar definitivamente (salva no banco!)
+  const handleDismiss = async (rota) => {
+    setDismissingId(rota.id);
+    try {
+      // Marca no banco para nunca mais aparecer nesta tela
+      await base44.entities.RotaAgendada.update(rota.id, {
+        fechado_retorno: true,
+      });
+
+      // Notifica o pai para remover imediatamente (sem esperar refetch)
+      if (onDismiss) {
+        onDismiss(rota.id);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] });
+    } catch (error) {
+      console.error("Erro ao dispensar rota:", error);
+      // Mesmo com erro, remove da tela
+      if (onDismiss) {
+        onDismiss(rota.id);
+      }
+    } finally {
+      setDismissingId(null);
     }
   };
 
@@ -105,6 +123,7 @@ export default function ReturnPanel({ rotas, onDismiss }) {
         const entregues = entregas.filter((e) => e.status === "delivered").length;
         const problemas = entregas.filter((e) => e.status === "problem").length;
         const isClosing = closingId === rota.id;
+        const isDismissing = dismissingId === rota.id;
 
         const ultimaEntrega = [...entregas]
           .filter((e) => e.deliveredAt)
@@ -112,14 +131,23 @@ export default function ReturnPanel({ rotas, onDismiss }) {
 
         const matrizRetorno = rota.rota?.[rota.rota.length - 1];
 
-        // Verifica se já foi finalizado (status da rota OU relatório)
         const relatorio = getRelatorioParaRota(rota.id);
         const jaFinalizado = rota.status === "concluido" || relatorio?.status === "concluido";
 
         return (
-          <Card key={rota.id} className="bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200">
+          <Card key={rota.id} className="bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200 relative">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
+              {/* Botão X para dispensar rápido (sempre visível) */}
+              <button
+                onClick={() => handleDismiss(rota)}
+                disabled={isDismissing}
+                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-gray-200 hover:bg-red-100 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors"
+                title="Dispensar rota"
+              >
+                <X className="w-3 h-3" />
+              </button>
+
+              <div className="flex items-center justify-between mb-2 pr-6">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
                     <Home className="w-4 h-4 text-emerald-600" />
@@ -162,7 +190,6 @@ export default function ReturnPanel({ rotas, onDismiss }) {
                 </p>
               )}
 
-              {/* Botão Retornou ou indicador de Finalizado */}
               {!jaFinalizado ? (
                 <Button
                   onClick={() => handleRetornou(rota)}
@@ -183,12 +210,22 @@ export default function ReturnPanel({ rotas, onDismiss }) {
                 </Button>
               ) : (
                 <Button
-                  onClick={() => onDismiss && onDismiss(rota.id)}
+                  onClick={() => handleDismiss(rota)}
+                  disabled={isDismissing}
                   variant="ghost"
                   className="w-full mt-3 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-medium"
                 >
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Rota Finalizada — Dispensar
+                  {isDismissing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Removendo...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Rota Finalizada — Dispensar
+                    </>
+                  )}
                 </Button>
               )}
             </CardContent>
