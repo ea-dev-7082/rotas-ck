@@ -40,7 +40,7 @@ export default function Manutencao() {
     queryKey: ["veiculos-manutencao", currentUser?.email],
     queryFn: async () => {
       const allVeiculos = await base44.entities.Veiculo.list();
-      return allVeiculos.filter(v => 
+      return allVeiculos.filter(v =>
         v.owner === currentUser.email || v.created_by === currentUser.email
       );
     },
@@ -51,10 +51,9 @@ export default function Manutencao() {
   const { data: registros, isLoading } = useQuery({
     queryKey: ["manutencao", currentUser?.email],
     queryFn: async () => {
-      // Busca registros onde owner é o email da empresa OU onde owner é null mas created_by é a empresa
       const allRecords = await base44.entities.ManutencaoVeiculo.list("-data");
-      return allRecords.filter(r => 
-        r.owner === currentUser.email || 
+      return allRecords.filter(r =>
+        r.owner === currentUser.email ||
         r.created_by === currentUser.email
       );
     },
@@ -120,8 +119,11 @@ export default function Manutencao() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-slate-100 p-6">
       <div className="container mx-auto max-w-6xl">
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-          className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4"
+        >
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
               <Wrench className="w-6 h-6 text-white" />
@@ -144,8 +146,11 @@ export default function Manutencao() {
         </motion.div>
 
         {/* Filtros */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          className="flex flex-wrap items-center gap-3 mb-6 bg-white p-4 rounded-xl border shadow-sm">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-wrap items-center gap-3 mb-6 bg-white p-4 rounded-xl border shadow-sm"
+        >
           <Filter className="w-4 h-4 text-gray-400" />
 
           <Select value={filterVeiculo} onValueChange={setFilterVeiculo}>
@@ -171,9 +176,19 @@ export default function Manutencao() {
             </SelectContent>
           </Select>
 
-          <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-[150px] h-9" />
+          <Input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="w-[150px] h-9"
+          />
           <span className="text-gray-400 text-sm">até</span>
-          <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-[150px] h-9" />
+          <Input
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            className="w-[150px] h-9"
+          />
 
           <Badge variant="secondary" className="ml-auto">
             {filteredRegistros.length} registro(s)
@@ -210,7 +225,14 @@ export default function Manutencao() {
           </TabsContent>
 
           <TabsContent value="relatorio">
-            <CustoKmReport registros={filteredRegistros} veiculos={veiculos} currentUser={currentUser} />
+            {/* ✅ CORREÇÃO: Passa startDate e endDate para o relatório */}
+            <CustoKmReport
+              registros={filteredRegistros}
+              veiculos={veiculos}
+              currentUser={currentUser}
+              startDate={startDate}
+              endDate={endDate}
+            />
           </TabsContent>
         </Tabs>
       </div>
