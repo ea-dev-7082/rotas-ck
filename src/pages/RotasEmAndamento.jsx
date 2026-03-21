@@ -2,9 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { 
-  Truck, MapPin, Clock, CheckCircle2, AlertTriangle, 
+  Truck, Clock, CheckCircle2,
   Package, Eye, RefreshCw, User, History, Home, PanelRightOpen, PanelRightClose
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,7 @@ export default function RotasEmAndamento() {
   const [showHistorico, setShowHistorico] = useState(false);
   const [showReturnPanel, setShowReturnPanel] = useState(true);
   const [finishedRouteIds, setFinishedRouteIds] = useState(new Set());
+  const [dismissedRouteIds, setDismissedRouteIds] = useState(new Set());
   const queryClient = useQueryClient();
   const lastInvalidation = useRef(0);
 
@@ -46,12 +46,12 @@ export default function RotasEmAndamento() {
     },
     enabled: !!currentUser,
     initialData: [],
-    staleTime: 5000,        // Dados ficam "frescos" por 5 segundos
-    gcTime: 10 * 60 * 1000, // Garbage collection após 10 min (evita acumular cache)
-    refetchInterval: 30000,  // Refetch automático a cada 30s em vez de subscription agressiva
+    staleTime: 5000,
+    gcTime: 10 * 60 * 1000,
+    refetchInterval: 30000,
   });
 
-  // Rastreia rotas concluídas
+  // Rastreia rotas concluídas para não piscar
   useEffect(() => {
     if (!rotasEmAndamento || rotasEmAndamento.length === 0) return;
     
@@ -70,11 +70,10 @@ export default function RotasEmAndamento() {
     }
   }, [rotasEmAndamento]);
 
-  // Subscription com throttle para evitar spam de invalidações
+  // Subscription com throttle
   useEffect(() => {
     const unsubscribe = base44.entities.RotaAgendada.subscribe(() => {
       const now = Date.now();
-      // Throttle: no máximo 1 invalidação a cada 3 segundos
       if (now - lastInvalidation.current > 3000) {
         lastInvalidation.current = now;
         queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] });
@@ -87,6 +86,15 @@ export default function RotasEmAndamento() {
       }
     };
   }, [queryClient]);
+
+  // Callback: remove a rota da tela definitivamente
+  const handleDismissRoute = (rotaId) => {
+    setDismissedRouteIds((prev) => {
+      const next = new Set(prev);
+      next.add(rotaId);
+      return next;
+    });
+  };
 
   const calcularProgresso = (rota) => {
     const entregas = rota.rota?.slice(1, -1) || [];
@@ -104,8 +112,10 @@ export default function RotasEmAndamento() {
     };
   };
 
-  // Rotas para o painel de retorno
+  // Rotas para o painel de retorno (exclui dispensadas)
   const rotasRetorno = (rotasEmAndamento || []).filter((rota) => {
+    if (dismissedRouteIds.has(rota.id)) return false;
+    
     if (rota.status === "concluido") return true;
     if (finishedRouteIds.has(rota.id)) return true;
     
@@ -118,6 +128,7 @@ export default function RotasEmAndamento() {
   const rotasAtivas = (rotasEmAndamento || []).filter((rota) => {
     if (rota.status === "concluido") return false;
     if (finishedRouteIds.has(rota.id)) return false;
+    if (dismissedRouteIds.has(rota.id)) return false;
     
     const entregas = rota.rota?.slice(1, -1) || [];
     if (entregas.length === 0) return true;
@@ -167,7 +178,7 @@ export default function RotasEmAndamento() {
           </div>
         </div>
 
-        <div className={`flex gap-6 ${showReturnPanel && rotasRetorno.length > 0 ? '' : ''}`}>
+        <div className="flex gap-6">
           {/* Coluna principal */}
           <div className={`flex-1 ${showReturnPanel && rotasRetorno.length > 0 ? 'min-w-0' : ''}`}>
             {isLoading ? (
@@ -201,7 +212,9 @@ export default function RotasEmAndamento() {
                     Todas as entregas foram finalizadas
                   </h3>
                   <p className="text-gray-500 text-sm">
-                    Os motoristas estão retornando para a base. Veja o painel "Retorno" ao lado.
+                    {rotasRetorno.length > 0 
+                      ? 'Os motoristas estão retornando para a base. Veja o painel "Retorno" ao lado.'
+                      : 'Todas as rotas do dia foram concluídas com sucesso!'}
                   </p>
                 </CardContent>
               </Card>
@@ -301,7 +314,7 @@ export default function RotasEmAndamento() {
                   <h2 className="font-bold text-gray-900">Retorno à Base</h2>
                   <Badge className="bg-emerald-100 text-emerald-800 text-xs">{rotasRetorno.length}</Badge>
                 </div>
-                <ReturnPanel rotas={rotasRetorno} />
+                <ReturnPanel rotas={rotasRetorno} onDismiss={handleDismissRoute} />
               </div>
             </div>
           )}
@@ -315,7 +328,7 @@ export default function RotasEmAndamento() {
               <h2 className="font-bold text-gray-900">Retorno à Base</h2>
               <Badge className="bg-emerald-100 text-emerald-800 text-xs">{rotasRetorno.length}</Badge>
             </div>
-            <ReturnPanel rotas={rotasRetorno} />
+            <ReturnPanel rotas={rotasRetorno} onDismiss={handleDismissRoute} />
           </div>
         )}
 
