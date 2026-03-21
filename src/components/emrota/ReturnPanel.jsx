@@ -7,31 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Home, CheckCircle2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
-export default function ReturnPanel({ rotas }) {
+export default function ReturnPanel({ rotas, onDismiss }) {
   const [closingId, setClosingId] = useState(null);
-  const [dismissedIds, setDismissedIds] = useState([]);
   const queryClient = useQueryClient();
 
-  const motoristasRetorno = rotas.filter((rota) => {
-    const entregas = rota.rota?.slice(1, -1) || [];
-    if (entregas.length === 0) return false;
-    return entregas.every(
-      (e) => e.status === "delivered" || e.status === "problem"
-    );
-  });
+  // NÃO re-filtra mais — confia nas rotas que o pai mandou
+  // Busca relatórios vinculados
+  const rotaIds = rotas.map((r) => r.id);
 
-  // Busca relatórios vinculados às rotas em retorno para saber quais já foram fechados
-  const rotaIds = motoristasRetorno.map((r) => r.id);
   const { data: relatoriosVinculados } = useQuery({
     queryKey: ["relatorios-vinculados", rotaIds.join(",")],
     queryFn: async () => {
       if (rotaIds.length === 0) return [];
-      // Busca todos relatórios do usuário e filtra pelos IDs
       const todos = await base44.entities.Relatorio.list("-created_date", 100);
       return todos.filter((r) => rotaIds.includes(r.rota_agendada_id));
     },
     enabled: rotaIds.length > 0,
     initialData: [],
+    staleTime: 10000,
   });
 
   const getRelatorioParaRota = (rotaId) => {
@@ -42,54 +35,59 @@ export default function ReturnPanel({ rotas }) {
     setClosingId(rota.id);
     const agora = new Date().toISOString();
 
-    // 1. Atualiza a RotaAgendada para concluído com hora de retorno (se ainda não)
-    if (rota.status !== "concluido") {
-      await base44.entities.RotaAgendada.update(rota.id, {
-        status: "concluido",
-        hora_retorno: agora,
-      });
+    try {
+      // 1. Atualiza a RotaAgendada para concluído com hora de retorno
+      if (rota.status !== "concluido") {
+        await base44.entities.RotaAgendada.update(rota.id, {
+          status: "concluido",
+          hora_retorno: agora,
+        });
+      }
+
+      // 2. Busca o relatório vinculado e atualiza com dados reais
+      const relatorio = getRelatorioParaRota(rota.id);
+      if (relatorio) {
+        const rotaRealAtualizada = (rota.rota || []).map((item) => ({
+          order: item.order,
+          client_name: item.client_name,
+          address: item.address,
+          estimated_arrival: item.estimated_arrival,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          notas_fiscais: item.notas_fiscais || [],
+          volume_total: item.volume_total || 0,
+          status: item.status || null,
+          deliveredAt: item.deliveredAt || null,
+          receivedBy: item.receivedBy || null,
+          notes: item.notes || null,
+          occurrenceType: item.occurrenceType || null,
+          occurrenceDescription: item.occurrenceDescription || null,
+        }));
+
+        await base44.entities.Relatorio.update(relatorio.id, {
+          rota: rotaRealAtualizada,
+          hora_retorno: agora,
+          status: "concluido",
+        });
+      }
+
+      // 3. Notifica o pai para remover da tela
+      if (onDismiss) {
+        onDismiss(rota.id);
+      }
+
+      // 4. Invalida queries
+      queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] });
+      queryClient.invalidateQueries({ queryKey: ["relatorios"] });
+      queryClient.invalidateQueries({ queryKey: ["relatorios-vinculados"] });
+    } catch (error) {
+      console.error("Erro ao finalizar rota:", error);
+    } finally {
+      setClosingId(null);
     }
-
-    // 2. Busca o relatório vinculado e atualiza com dados reais
-    const relatorio = getRelatorioParaRota(rota.id);
-    if (relatorio) {
-      // Pega a rota da RotaAgendada com dados reais (deliveredAt, status, notes, etc.)
-      const rotaRealAtualizada = (rota.rota || []).map((item) => ({
-        order: item.order,
-        client_name: item.client_name,
-        address: item.address,
-        estimated_arrival: item.estimated_arrival,
-        latitude: item.latitude,
-        longitude: item.longitude,
-        notas_fiscais: item.notas_fiscais || [],
-        volume_total: item.volume_total || 0,
-        // Dados reais das entregas
-        status: item.status || null,
-        deliveredAt: item.deliveredAt || null,
-        receivedBy: item.receivedBy || null,
-        notes: item.notes || null,
-        occurrenceType: item.occurrenceType || null,
-        occurrenceDescription: item.occurrenceDescription || null,
-      }));
-
-      await base44.entities.Relatorio.update(relatorio.id, {
-        rota: rotaRealAtualizada,
-        hora_retorno: agora,
-        status: "concluido",
-      });
-    }
-
-    // 3. Remove o cartão da lista e invalida queries
-    setDismissedIds((prev) => [...prev, rota.id]);
-    queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] });
-    queryClient.invalidateQueries({ queryKey: ["relatorios"] });
-    queryClient.invalidateQueries({ queryKey: ["relatorios-vinculados"] });
-    setClosingId(null);
   };
 
-  const visibleRotas = motoristasRetorno.filter((r) => !dismissedIds.includes(r.id));
-
-  if (visibleRotas.length === 0) {
+  if (rotas.length === 0) {
     return (
       <Card className="bg-white border-dashed">
         <CardContent className="p-6 text-center text-gray-400">
@@ -102,7 +100,7 @@ export default function ReturnPanel({ rotas }) {
 
   return (
     <div className="space-y-3">
-      {visibleRotas.map((rota) => {
+      {rotas.map((rota) => {
         const entregas = rota.rota?.slice(1, -1) || [];
         const entregues = entregas.filter((e) => e.status === "delivered").length;
         const problemas = entregas.filter((e) => e.status === "problem").length;
@@ -114,9 +112,9 @@ export default function ReturnPanel({ rotas }) {
 
         const matrizRetorno = rota.rota?.[rota.rota.length - 1];
 
-        // Verifica se o relatório vinculado já foi fechado
+        // Verifica se já foi finalizado (status da rota OU relatório)
         const relatorio = getRelatorioParaRota(rota.id);
-        const relatorioFechado = relatorio?.status === "concluido";
+        const jaFinalizado = rota.status === "concluido" || relatorio?.status === "concluido";
 
         return (
           <Card key={rota.id} className="bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200">
@@ -136,7 +134,7 @@ export default function ReturnPanel({ rotas }) {
                   </div>
                 </div>
                 <Badge className="bg-emerald-100 text-emerald-800 text-xs">
-                  {relatorioFechado ? "Finalizado" : "Retornando"}
+                  {jaFinalizado ? "Finalizado" : "Retornando"}
                 </Badge>
               </div>
 
@@ -164,8 +162,8 @@ export default function ReturnPanel({ rotas }) {
                 </p>
               )}
 
-              {/* Botão Retornou - aparece se relatório não foi fechado ainda */}
-              {!relatorioFechado ? (
+              {/* Botão Retornou ou indicador de Finalizado */}
+              {!jaFinalizado ? (
                 <Button
                   onClick={() => handleRetornou(rota)}
                   disabled={isClosing}
@@ -184,10 +182,14 @@ export default function ReturnPanel({ rotas }) {
                   )}
                 </Button>
               ) : (
-                <div className="mt-3 flex items-center justify-center gap-2 text-emerald-700 bg-emerald-100 rounded-lg py-2 text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Rota Finalizada
-                </div>
+                <Button
+                  onClick={() => onDismiss && onDismiss(rota.id)}
+                  variant="ghost"
+                  className="w-full mt-3 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-medium"
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Rota Finalizada — Dispensar
+                </Button>
               )}
             </CardContent>
           </Card>
