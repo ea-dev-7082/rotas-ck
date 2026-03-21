@@ -30,12 +30,13 @@ export default function ReturnPanel({ rotas, onDismiss }) {
     return relatoriosVinculados.find((r) => r.rota_agendada_id === rotaId);
   };
 
-  // PASSO 1: Marcar como concluído (Retornou)
+  // PASSO 1: Marcar como concluído no banco
   const handleRetornou = async (rota) => {
     setClosingId(rota.id);
     const agora = new Date().toISOString();
 
     try {
+      // Atualiza RotaAgendada
       if (rota.status !== "concluido") {
         await base44.entities.RotaAgendada.update(rota.id, {
           status: "concluido",
@@ -43,6 +44,7 @@ export default function ReturnPanel({ rotas, onDismiss }) {
         });
       }
 
+      // Atualiza Relatório vinculado
       const relatorio = getRelatorioParaRota(rota.id);
       if (relatorio) {
         const rotaRealAtualizada = (rota.rota || []).map((item) => ({
@@ -79,16 +81,20 @@ export default function ReturnPanel({ rotas, onDismiss }) {
     }
   };
 
-  // PASSO 2: Dispensar definitivamente (salva no banco!)
+  // PASSO 2: Dispensar definitivamente — grava fechado_retorno=true no banco
   const handleDismiss = async (rota) => {
     setDismissingId(rota.id);
     try {
-      // Marca no banco para nunca mais aparecer nesta tela
-      await base44.entities.RotaAgendada.update(rota.id, {
-        fechado_retorno: true,
-      });
+      // Garante que está concluída antes de dispensar
+      const updates = { fechado_retorno: true };
+      if (rota.status !== "concluido") {
+        updates.status = "concluido";
+        updates.hora_retorno = new Date().toISOString();
+      }
 
-      // Notifica o pai para remover imediatamente (sem esperar refetch)
+      await base44.entities.RotaAgendada.update(rota.id, updates);
+
+      // Remove imediatamente da tela (sem esperar refetch)
       if (onDismiss) {
         onDismiss(rota.id);
       }
@@ -96,7 +102,7 @@ export default function ReturnPanel({ rotas, onDismiss }) {
       queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] });
     } catch (error) {
       console.error("Erro ao dispensar rota:", error);
-      // Mesmo com erro, remove da tela
+      // Mesmo com erro no banco, remove da tela para não travar o usuário
       if (onDismiss) {
         onDismiss(rota.id);
       }
@@ -137,14 +143,18 @@ export default function ReturnPanel({ rotas, onDismiss }) {
         return (
           <Card key={rota.id} className="bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200 relative">
             <CardContent className="p-4">
-              {/* Botão X para dispensar rápido (sempre visível) */}
+              {/* Botão X para dispensar rápido */}
               <button
                 onClick={() => handleDismiss(rota)}
                 disabled={isDismissing}
-                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-gray-200 hover:bg-red-100 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors"
-                title="Dispensar rota"
+                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-gray-200/80 hover:bg-red-100 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors z-10"
+                title="Dispensar da tela"
               >
-                <X className="w-3 h-3" />
+                {isDismissing ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <X className="w-3 h-3" />
+                )}
               </button>
 
               <div className="flex items-center justify-between mb-2 pr-6">
