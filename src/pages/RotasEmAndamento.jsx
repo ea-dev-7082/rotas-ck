@@ -19,7 +19,6 @@ export default function RotasEmAndamento() {
   const [currentUser, setCurrentUser] = useState(null);
   const [showHistorico, setShowHistorico] = useState(false);
   const [showReturnPanel, setShowReturnPanel] = useState(true);
-  const [finishedRouteIds, setFinishedRouteIds] = useState(new Set());
   const [dismissedRouteIds, setDismissedRouteIds] = useState(new Set());
   const queryClient = useQueryClient();
   const lastInvalidation = useRef(0);
@@ -37,12 +36,17 @@ export default function RotasEmAndamento() {
         "-created_date"
       );
       const today = format(new Date(), "yyyy-MM-dd");
-      return rotas.filter(r => 
-        r.status === "em_andamento" || 
-        r.status === "liberado" ||
-        (r.status === "agendado" && r.data_prevista === today) ||
-        (r.status === "concluido" && r.updated_date && format(new Date(r.updated_date), "yyyy-MM-dd") === today)
-      );
+      return rotas.filter(r => {
+        // NUNCA mostra rotas que já foram dispensadas no banco
+        if (r.fechado_retorno === true) return false;
+        
+        return (
+          r.status === "em_andamento" || 
+          r.status === "liberado" ||
+          (r.status === "agendado" && r.data_prevista === today) ||
+          (r.status === "concluido" && r.updated_date && format(new Date(r.updated_date), "yyyy-MM-dd") === today)
+        );
+      });
     },
     enabled: !!currentUser,
     initialData: [],
@@ -50,25 +54,6 @@ export default function RotasEmAndamento() {
     gcTime: 10 * 60 * 1000,
     refetchInterval: 30000,
   });
-
-  // Rastreia rotas concluídas para não piscar
-  useEffect(() => {
-    if (!rotasEmAndamento || rotasEmAndamento.length === 0) return;
-    
-    const newFinished = new Set(finishedRouteIds);
-    let changed = false;
-    
-    rotasEmAndamento.forEach((rota) => {
-      if (rota.status === "concluido" && !newFinished.has(rota.id)) {
-        newFinished.add(rota.id);
-        changed = true;
-      }
-    });
-    
-    if (changed) {
-      setFinishedRouteIds(newFinished);
-    }
-  }, [rotasEmAndamento]);
 
   // Subscription com throttle
   useEffect(() => {
@@ -87,7 +72,7 @@ export default function RotasEmAndamento() {
     };
   }, [queryClient]);
 
-  // Callback: remove a rota da tela definitivamente
+  // Callback: remove da tela imediatamente + já salvou no banco via ReturnPanel
   const handleDismissRoute = (rotaId) => {
     setDismissedRouteIds((prev) => {
       const next = new Set(prev);
@@ -112,26 +97,28 @@ export default function RotasEmAndamento() {
     };
   };
 
-  // Rotas para o painel de retorno (exclui dispensadas)
+  // Rotas para o painel de retorno
   const rotasRetorno = (rotasEmAndamento || []).filter((rota) => {
+    // Dispensada localmente? Não mostra
     if (dismissedRouteIds.has(rota.id)) return false;
     
+    // Já concluída no banco
     if (rota.status === "concluido") return true;
-    if (finishedRouteIds.has(rota.id)) return true;
     
+    // Todas entregas finalizadas (delivered ou problem)
     const entregas = rota.rota?.slice(1, -1) || [];
     if (entregas.length === 0) return false;
     return entregas.every((e) => e.status === "delivered" || e.status === "problem");
   });
 
-  // Rotas ativas (cards visíveis)
+  // Rotas ativas (cards na área principal)
   const rotasAtivas = (rotasEmAndamento || []).filter((rota) => {
     if (rota.status === "concluido") return false;
-    if (finishedRouteIds.has(rota.id)) return false;
     if (dismissedRouteIds.has(rota.id)) return false;
     
     const entregas = rota.rota?.slice(1, -1) || [];
     if (entregas.length === 0) return true;
+    // Se TODAS entregas estão finalizadas, vai pro retorno, não fica aqui
     return !entregas.every((e) => e.status === "delivered" || e.status === "problem");
   });
 
@@ -305,7 +292,7 @@ export default function RotasEmAndamento() {
             )}
           </div>
 
-          {/* Painel lateral de Retorno */}
+          {/* Painel lateral de Retorno - Desktop */}
           {showReturnPanel && rotasRetorno.length > 0 && (
             <div className="w-80 shrink-0 hidden lg:block">
               <div className="sticky top-24">
@@ -320,7 +307,7 @@ export default function RotasEmAndamento() {
           )}
         </div>
 
-        {/* Painel de Retorno mobile */}
+        {/* Painel de Retorno - Mobile */}
         {showReturnPanel && rotasRetorno.length > 0 && (
           <div className="lg:hidden mt-6">
             <div className="flex items-center gap-2 mb-3">
@@ -332,7 +319,6 @@ export default function RotasEmAndamento() {
           </div>
         )}
 
-        {/* Histórico do Dia Dialog */}
         <HistoricoDiaDialog 
           open={showHistorico} 
           onClose={() => setShowHistorico(false)} 
