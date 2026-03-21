@@ -20,6 +20,8 @@ export default function RotasEmAndamento() {
   const [currentUser, setCurrentUser] = useState(null);
   const [showHistorico, setShowHistorico] = useState(false);
   const [showReturnPanel, setShowReturnPanel] = useState(true);
+  // Guarda IDs de rotas que já foram finalizadas para não sumir do retorno
+  const [finishedRouteIds, setFinishedRouteIds] = useState(new Set());
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -45,6 +47,23 @@ export default function RotasEmAndamento() {
     enabled: !!currentUser,
     initialData: [],
   });
+
+  // Rastreia rotas que foram concluídas para manter no painel de retorno
+  useEffect(() => {
+    if (!rotasEmAndamento || rotasEmAndamento.length === 0) return;
+    
+    const newFinished = new Set(finishedRouteIds);
+    rotasEmAndamento.forEach((rota) => {
+      if (rota.status === "concluido") {
+        newFinished.add(rota.id);
+      }
+    });
+    
+    // Só atualiza se houve mudança
+    if (newFinished.size !== finishedRouteIds.size) {
+      setFinishedRouteIds(newFinished);
+    }
+  }, [rotasEmAndamento]);
 
   // Atualização em tempo real
   useEffect(() => {
@@ -73,8 +92,11 @@ export default function RotasEmAndamento() {
 
   // Rotas com todas entregas finalizadas OU status concluído (para o painel de retorno)
   const rotasRetorno = (rotasEmAndamento || []).filter((rota) => {
-    // Rota já concluída vai direto pro retorno
+    // Rota já marcada como concluída (status no banco)
     if (rota.status === "concluido") return true;
+    
+    // Rota que já foi finalizada anteriormente (evita piscar)
+    if (finishedRouteIds.has(rota.id)) return true;
     
     const entregas = rota.rota?.slice(1, -1) || [];
     if (entregas.length === 0) return false;
@@ -85,6 +107,9 @@ export default function RotasEmAndamento() {
   const rotasAtivas = (rotasEmAndamento || []).filter((rota) => {
     // Rota concluída nunca aparece nos cards ativos
     if (rota.status === "concluido") return false;
+    
+    // Rota que já foi registrada como finalizada também não aparece
+    if (finishedRouteIds.has(rota.id)) return false;
     
     const entregas = rota.rota?.slice(1, -1) || [];
     if (entregas.length === 0) return true;
