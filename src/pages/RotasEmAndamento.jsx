@@ -36,15 +36,19 @@ export default function RotasEmAndamento() {
         "-created_date"
       );
       const today = format(new Date(), "yyyy-MM-dd");
+      
       return rotas.filter(r => {
-        // NUNCA mostra rotas que já foram dispensadas no banco
+        // ========================================
+        // FILTRO PRINCIPAL: se fechado_retorno = true, NUNCA mostra
+        // ========================================
         if (r.fechado_retorno === true) return false;
         
         return (
           r.status === "em_andamento" || 
           r.status === "liberado" ||
           (r.status === "agendado" && r.data_prevista === today) ||
-          (r.status === "concluido" && r.updated_date && format(new Date(r.updated_date), "yyyy-MM-dd") === today)
+          (r.status === "concluido" && r.updated_date && 
+           format(new Date(r.updated_date), "yyyy-MM-dd") === today)
         );
       });
     },
@@ -64,21 +68,14 @@ export default function RotasEmAndamento() {
         queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] });
       }
     });
-    
     return () => {
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
-      }
+      if (typeof unsubscribe === "function") unsubscribe();
     };
   }, [queryClient]);
 
-  // Callback: remove da tela imediatamente + já salvou no banco via ReturnPanel
+  // Callback do ReturnPanel — remoção imediata local
   const handleDismissRoute = (rotaId) => {
-    setDismissedRouteIds((prev) => {
-      const next = new Set(prev);
-      next.add(rotaId);
-      return next;
-    });
+    setDismissedRouteIds((prev) => new Set([...prev, rotaId]));
   };
 
   const calcularProgresso = (rota) => {
@@ -97,28 +94,31 @@ export default function RotasEmAndamento() {
     };
   };
 
+  // ============================================
   // Rotas para o painel de retorno
+  // ============================================
   const rotasRetorno = (rotasEmAndamento || []).filter((rota) => {
-    // Dispensada localmente? Não mostra
+    // Dispensada localmente (proteção instantânea)
     if (dismissedRouteIds.has(rota.id)) return false;
     
-    // Já concluída no banco
+    // Já concluída → vai pro retorno
     if (rota.status === "concluido") return true;
     
-    // Todas entregas finalizadas (delivered ou problem)
+    // Todas entregas finalizadas → vai pro retorno
     const entregas = rota.rota?.slice(1, -1) || [];
     if (entregas.length === 0) return false;
     return entregas.every((e) => e.status === "delivered" || e.status === "problem");
   });
 
-  // Rotas ativas (cards na área principal)
+  // ============================================
+  // Rotas ativas (cards principais)
+  // ============================================
   const rotasAtivas = (rotasEmAndamento || []).filter((rota) => {
     if (rota.status === "concluido") return false;
     if (dismissedRouteIds.has(rota.id)) return false;
     
     const entregas = rota.rota?.slice(1, -1) || [];
     if (entregas.length === 0) return true;
-    // Se TODAS entregas estão finalizadas, vai pro retorno, não fica aqui
     return !entregas.every((e) => e.status === "delivered" || e.status === "problem");
   });
 
@@ -132,33 +132,21 @@ export default function RotasEmAndamento() {
               <Truck className="w-7 h-7 text-blue-600" />
               Rotas em Andamento
             </h1>
-            <p className="text-gray-500 mt-1">
-              Acompanhe as entregas em tempo real
-            </p>
+            <p className="text-gray-500 mt-1">Acompanhe as entregas em tempo real</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline"
-              onClick={() => setShowHistorico(true)}
-            >
+            <Button variant="outline" onClick={() => setShowHistorico(true)}>
               <History className="w-4 h-4 mr-2" />
               Histórico do Dia
             </Button>
             {rotasRetorno.length > 0 && (
-              <Button 
-                variant="outline"
-                onClick={() => setShowReturnPanel(!showReturnPanel)}
-                className="relative"
-              >
+              <Button variant="outline" onClick={() => setShowReturnPanel(!showReturnPanel)} className="relative">
                 {showReturnPanel ? <PanelRightClose className="w-4 h-4 mr-2" /> : <PanelRightOpen className="w-4 h-4 mr-2" />}
                 Retorno
                 <Badge className="ml-2 bg-emerald-100 text-emerald-800 text-xs">{rotasRetorno.length}</Badge>
               </Button>
             )}
-            <Button 
-              variant="outline"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] })}
-            >
+            <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] })}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Atualizar
             </Button>
@@ -180,12 +168,8 @@ export default function RotasEmAndamento() {
                   <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Truck className="w-10 h-10 text-gray-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Nenhuma rota em andamento
-                  </h3>
-                  <p className="text-gray-500 mb-6">
-                    Não há entregas em andamento no momento. Agende uma nova rota pelo Otimizador.
-                  </p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhuma rota em andamento</h3>
+                  <p className="text-gray-500 mb-6">Não há entregas em andamento no momento.</p>
                   <Button asChild>
                     <Link to={createPageUrl("Optimizer")}>Ir para Otimizador</Link>
                   </Button>
@@ -195,9 +179,7 @@ export default function RotasEmAndamento() {
               <Card className="bg-white">
                 <CardContent className="p-8 text-center">
                   <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-3" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    Todas as entregas foram finalizadas
-                  </h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Todas as entregas foram finalizadas</h3>
                   <p className="text-gray-500 text-sm">
                     {rotasRetorno.length > 0 
                       ? 'Os motoristas estão retornando para a base. Veja o painel "Retorno" ao lado.'
@@ -210,7 +192,6 @@ export default function RotasEmAndamento() {
                 {rotasAtivas.map((rota) => {
                   const progresso = calcularProgresso(rota);
                   const contagem = contarEntregas(rota);
-
                   return (
                     <Card key={rota.id} className="bg-white hover:shadow-lg transition-shadow">
                       <CardHeader className="pb-3">
@@ -225,11 +206,9 @@ export default function RotasEmAndamento() {
                             </p>
                           </div>
                           <Badge className={
-                            rota.status === "em_andamento" 
-                              ? "bg-blue-100 text-blue-800" 
-                              : rota.status === "liberado"
-                              ? "bg-cyan-100 text-cyan-800"
-                              : "bg-yellow-100 text-yellow-800"
+                            rota.status === "em_andamento" ? "bg-blue-100 text-blue-800" 
+                            : rota.status === "liberado" ? "bg-cyan-100 text-cyan-800"
+                            : "bg-yellow-100 text-yellow-800"
                           }>
                             {rota.status === "em_andamento" ? "Em Andamento" : rota.status === "liberado" ? "Enviada" : "Agendada"}
                           </Badge>
@@ -254,7 +233,6 @@ export default function RotasEmAndamento() {
                             <div className="text-xs text-gray-500">Problemas</div>
                           </div>
                         </div>
-
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Progresso</span>
@@ -262,7 +240,6 @@ export default function RotasEmAndamento() {
                           </div>
                           <Progress value={progresso} className="h-2" />
                         </div>
-
                         <div className="flex items-center justify-between text-sm text-gray-500">
                           <div className="flex items-center gap-1">
                             <Clock className="w-4 h-4" />
@@ -277,7 +254,6 @@ export default function RotasEmAndamento() {
                             </div>
                           )}
                         </div>
-
                         <Button asChild className="w-full" variant="outline">
                           <Link to={`${createPageUrl("EmRota")}?rotaId=${rota.id}`}>
                             <Eye className="w-4 h-4 mr-2" />
@@ -292,7 +268,7 @@ export default function RotasEmAndamento() {
             )}
           </div>
 
-          {/* Painel lateral de Retorno - Desktop */}
+          {/* Painel lateral - Desktop */}
           {showReturnPanel && rotasRetorno.length > 0 && (
             <div className="w-80 shrink-0 hidden lg:block">
               <div className="sticky top-24">
@@ -307,7 +283,7 @@ export default function RotasEmAndamento() {
           )}
         </div>
 
-        {/* Painel de Retorno - Mobile */}
+        {/* Painel - Mobile */}
         {showReturnPanel && rotasRetorno.length > 0 && (
           <div className="lg:hidden mt-6">
             <div className="flex items-center gap-2 mb-3">
