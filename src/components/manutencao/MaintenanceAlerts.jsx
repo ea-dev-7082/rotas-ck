@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle, Wrench, X, Bell, BellRing,
   Droplets, CircleDot, Clock, Car, Settings2,
@@ -82,6 +84,17 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
   const [mostrarTodos, setMostrarTodos] = useState(false);
   const [dismissed, setDismissed] = useState([]);
 
+  // Busca configs de alerta personalizadas por veículo
+  const { data: configsAlerta = [] } = useQuery({
+    queryKey: ["configs-alerta-veiculos"],
+    queryFn: () => base44.entities.ConfigAlertaVeiculo.list(),
+    initialData: [],
+  });
+
+  const getConfigVeiculo = (veiculoId) => {
+    return configsAlerta.find(c => c.veiculo_id === veiculoId) || {};
+  };
+
   // ═══════════════════════════════════════════════════
   // Km atual de cada veículo = maior "km_atual" entre
   // todos os registros de ManutencaoVeiculo desse veículo
@@ -131,8 +144,28 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
       const descricao = `${veiculo.descricao || "Veículo"} (${veiculo.placa || ""})`;
 
       // ── Alertas por tipo de manutenção ──
+      // Busca config personalizada para este veículo
+      const configVeiculo = getConfigVeiculo(veiculo.id);
+
       Object.entries(ALERTAS_CONFIG).forEach(([chave, config]) => {
         const IconComponent = config.icon;
+
+        // Usa intervalo personalizado se existir, senão usa default
+        const intervaloKmKey = chave === "troca_oleo" ? "troca_oleo_km"
+          : chave === "revisao_preventiva" ? "revisao_preventiva_km"
+          : chave === "pneu" ? "pneu_km" : null;
+        const intervaloDiasKey = chave === "troca_oleo" ? "troca_oleo_dias"
+          : chave === "revisao_preventiva" ? "revisao_preventiva_dias"
+          : null;
+
+        const intervaloKmReal = intervaloKmKey && configVeiculo[intervaloKmKey]
+          ? Number(configVeiculo[intervaloKmKey])
+          : config.intervalo_km;
+        const intervaloDiasReal = intervaloDiasKey && configVeiculo[intervaloDiasKey]
+          ? Number(configVeiculo[intervaloDiasKey])
+          : config.intervalo_dias;
+        const antecedenciaKmReal = intervaloKmReal ? Math.round(intervaloKmReal * 0.1) : config.antecedencia_km;
+        const antecedenciaDiasReal = intervaloDiasReal ? Math.min(30, Math.round(intervaloDiasReal * 0.08)) : config.antecedencia_dias;
 
         // Encontra o último registro desse tipo (ex: "troca_oleo")
         let ultimoRegistro = null;
@@ -152,12 +185,12 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
         let alertaKm = false;
         let criticoKm = false;
 
-        if (config.intervalo_km && kmAtual > 0) {
+        if (intervaloKmReal && kmAtual > 0) {
           if (kmUltimo > 0) {
             const kmDesde = kmAtual - kmUltimo;
-            kmRestante = config.intervalo_km - kmDesde;
+            kmRestante = intervaloKmReal - kmDesde;
             if (kmRestante <= 0) { criticoKm = true; alertaKm = true; }
-            else if (kmRestante <= config.antecedencia_km) { alertaKm = true; }
+            else if (kmRestante <= antecedenciaKmReal) { alertaKm = true; }
           } else {
             // Nunca fez esse tipo — alerta crítico
             alertaKm = true;
@@ -170,12 +203,12 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
         let alertaTempo = false;
         let criticoTempo = false;
 
-        if (config.intervalo_dias) {
+        if (intervaloDiasReal) {
           if (dataUltimo) {
             const diasDesde = hoje.diff(dataUltimo, "days");
-            diasRestante = config.intervalo_dias - diasDesde;
+            diasRestante = intervaloDiasReal - diasDesde;
             if (diasRestante <= 0) { criticoTempo = true; alertaTempo = true; }
-            else if (diasRestante <= config.antecedencia_dias) { alertaTempo = true; }
+            else if (diasRestante <= antecedenciaDiasReal) { alertaTempo = true; }
           } else {
             // Nunca fez — alerta crítico
             alertaTempo = true;
@@ -188,8 +221,8 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
         if (criticoKm || criticoTempo) {
           severidade = "critico";
         } else if (alertaKm || alertaTempo) {
-          const metadeKm = config.antecedencia_km ? config.antecedencia_km / 2 : 0;
-          const metadeDias = config.antecedencia_dias ? config.antecedencia_dias / 2 : 0;
+          const metadeKm = antecedenciaKmReal ? antecedenciaKmReal / 2 : 0;
+          const metadeDias = antecedenciaDiasReal ? antecedenciaDiasReal / 2 : 0;
           if ((kmRestante !== null && kmRestante <= metadeKm) ||
               (diasRestante !== null && diasRestante <= metadeDias)) {
             severidade = "atencao";
