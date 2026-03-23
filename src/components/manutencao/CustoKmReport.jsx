@@ -526,9 +526,7 @@ export default function CustoKmReport({
             </div>
           )}
           <p className="text-xs text-gray-400 mt-3">
-            * Km rodados são calculados a partir dos registros diários e rotas (km inicial → km
-            final) dentro do período selecionado. Custos de combustível e manutenção também
-            são do mesmo período.
+            * Km rodados são calculados pelo km inicial do período até o km do último registro do período para cada veículo. Se faltar esse histórico, o sistema usa os registros diários e rotas.
           </p>
         </CardContent>
       </Card>
