@@ -311,7 +311,7 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
     const ordem = { critico: 0, atencao: 1, proximo: 2, ok: 3 };
     lista.sort((a, b) => ordem[a.severidade] - ordem[b.severidade]);
     return lista;
-  }, [veiculos, kmAtualPorVeiculo, ultimoRegistroPorTipoVeiculo]);
+  }, [veiculos, kmAtualPorVeiculo, ultimoRegistroPorTipoVeiculo, configsAlerta]);
 
   // ── Contadores ──
   const contadores = useMemo(() => ({
