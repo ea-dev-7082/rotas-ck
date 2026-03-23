@@ -110,7 +110,9 @@ export default function CustoKmReport({
 
     // ────────────────────────────────────────────────
     // PASSO 1: Acumular custos dos registros de manutenção (já vêm filtrados por data)
+    // Também coleta km_atual de cada registro para calcular km rodados
     // ────────────────────────────────────────────────
+    const kmPorVeiculo = {}; // { vid: [km1, km2, ...] }
     registros.forEach(reg => {
       const v = getOrCreate(reg.veiculo_id, reg.veiculo_descricao, reg.veiculo_placa);
       v.registros_count++;
@@ -120,6 +122,13 @@ export default function CustoKmReport({
         v.total_litros += Number(reg.litros) || 0;
       } else {
         v.total_manutencao += Number(reg.valor) || 0;
+      }
+
+      // Coleta km_atual para calcular km rodados via ManutencaoVeiculo
+      const km = Number(reg.km_atual) || 0;
+      if (km > 0) {
+        if (!kmPorVeiculo[reg.veiculo_id]) kmPorVeiculo[reg.veiculo_id] = [];
+        kmPorVeiculo[reg.veiculo_id].push(km);
       }
     });
 
@@ -179,9 +188,22 @@ export default function CustoKmReport({
 
     // ────────────────────────────────────────────────
     // PASSO 3: Calcular métricas
+    // Se não há km de registros diários/rotas, usa a diferença
+    // entre o maior e menor km_atual dos registros de Manutenção
     // ────────────────────────────────────────────────
     return Object.values(porVeiculo).map(v => {
-      const kmTotal = v.km_rodados_diarios;
+      let kmTotal = v.km_rodados_diarios;
+
+      // Fallback: usa diferença entre max e min km_atual dos registros de manutenção
+      if (kmTotal === 0 && kmPorVeiculo[v.veiculo_id]?.length >= 2) {
+        const kms = kmPorVeiculo[v.veiculo_id];
+        const maxKm = Math.max(...kms);
+        const minKm = Math.min(...kms);
+        if (maxKm > minKm) {
+          kmTotal = maxKm - minKm;
+        }
+      }
+
       const custoTotal = v.total_combustivel + v.total_manutencao;
 
       return {
