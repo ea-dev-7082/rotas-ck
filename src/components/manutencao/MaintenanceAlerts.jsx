@@ -91,25 +91,49 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
     initialData: [],
   });
 
+  // Busca RegistroDiarioVeiculo para pegar km_inicial/km_final
+  const { data: registrosDiarios = [] } = useQuery({
+    queryKey: ["registros-diarios-alertas"],
+    queryFn: () => base44.entities.RegistroDiarioVeiculo.list("-data", 200),
+    initialData: [],
+  });
+
+  // Busca RotaAgendada para pegar km_inicial/km_final
+  const { data: rotasAgendadas = [] } = useQuery({
+    queryKey: ["rotas-agendadas-alertas"],
+    queryFn: () => base44.entities.RotaAgendada.list("-created_date", 200),
+    initialData: [],
+  });
+
   const getConfigVeiculo = (veiculoId) => {
     return configsAlerta.find(c => c.veiculo_id === veiculoId) || {};
   };
 
   // ═══════════════════════════════════════════════════
-  // Km atual de cada veículo = maior "km_atual" entre
-  // todos os registros de ManutencaoVeiculo desse veículo
+  // Km atual de cada veículo = maior km entre TODAS as fontes:
+  // ManutencaoVeiculo, RegistroDiarioVeiculo, RotaAgendada
   // ═══════════════════════════════════════════════════
   const kmAtualPorVeiculo = useMemo(() => {
     const mapa = {};
-    registros.forEach(reg => {
-      const vid = reg.veiculo_id;
-      const km = Number(reg.km_atual) || 0;
-      if (km > 0 && (!mapa[vid] || km > mapa[vid])) {
-        mapa[vid] = km;
+    const updateMax = (vid, km) => {
+      if (km > 0 && (!mapa[vid] || km > mapa[vid])) mapa[vid] = km;
+    };
+    // ManutencaoVeiculo
+    registros.forEach(reg => updateMax(reg.veiculo_id, Number(reg.km_atual) || 0));
+    // RegistroDiarioVeiculo
+    registrosDiarios.forEach(reg => {
+      updateMax(reg.veiculo_id, Number(reg.km_inicial) || 0);
+      updateMax(reg.veiculo_id, Number(reg.km_final) || 0);
+    });
+    // RotaAgendada
+    rotasAgendadas.forEach(rota => {
+      if (rota.veiculo_id) {
+        updateMax(rota.veiculo_id, Number(rota.km_inicial) || 0);
+        updateMax(rota.veiculo_id, Number(rota.km_final) || 0);
       }
     });
     return mapa;
-  }, [registros]);
+  }, [registros, registrosDiarios, rotasAgendadas]);
 
   // ═══════════════════════════════════════════════════
   // Último registro de cada "tipo" por veículo
@@ -311,7 +335,7 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
     const ordem = { critico: 0, atencao: 1, proximo: 2, ok: 3 };
     lista.sort((a, b) => ordem[a.severidade] - ordem[b.severidade]);
     return lista;
-  }, [veiculos, kmAtualPorVeiculo, ultimoRegistroPorTipoVeiculo, configsAlerta]);
+  }, [veiculos, kmAtualPorVeiculo, ultimoRegistroPorTipoVeiculo, configsAlerta, getConfigVeiculo]);
 
   // ── Contadores ──
   const contadores = useMemo(() => ({
@@ -500,7 +524,7 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
               <span>🟢 OK = em dia</span>
             </div>
             <p className="text-[10px] text-gray-300">
-              * O km atual é baseado no maior km_atual registrado em Manutenção & Combustível para cada veículo.
+              * O km atual é baseado no maior km registrado em Manutenção, Registro Diário e Rotas para cada veículo.
             </p>
           </CardContent>
         </CollapsibleContent>

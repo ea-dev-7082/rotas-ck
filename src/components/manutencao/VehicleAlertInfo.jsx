@@ -61,6 +61,22 @@ export default function VehicleAlertInfo({ veiculoId, registros, currentUser }) 
     enabled: !!veiculoId,
   });
 
+  // Busca RegistroDiarioVeiculo para este veículo (km_inicial/km_final)
+  const { data: registrosDiarios = [] } = useQuery({
+    queryKey: ["registros-diarios-veiculo", veiculoId],
+    queryFn: () => base44.entities.RegistroDiarioVeiculo.filter({ veiculo_id: veiculoId }, "-data", 50),
+    enabled: !!veiculoId,
+    initialData: [],
+  });
+
+  // Busca RotaAgendada para este veículo (km_inicial/km_final)
+  const { data: rotasVeiculo = [] } = useQuery({
+    queryKey: ["rotas-veiculo-km", veiculoId],
+    queryFn: () => base44.entities.RotaAgendada.filter({ veiculo_id: veiculoId }, "-created_date", 50),
+    enabled: !!veiculoId,
+    initialData: [],
+  });
+
   const config = localConfig || configData || {};
 
   const getVal = (campo) => config[campo] ?? DEFAULTS[campo] ?? 0;
@@ -70,15 +86,24 @@ export default function VehicleAlertInfo({ veiculoId, registros, currentUser }) 
     return (registros || []).filter(r => r.veiculo_id === veiculoId);
   }, [registros, veiculoId]);
 
-  // Km atual = maior km_atual registrado
+  // Km atual = maior km entre TODAS as fontes
   const kmAtual = useMemo(() => {
     let max = 0;
-    veiculoRegistros.forEach(r => {
-      const km = Number(r.km_atual) || 0;
-      if (km > max) max = km;
+    const check = (v) => { if (v > max) max = v; };
+    // ManutencaoVeiculo
+    veiculoRegistros.forEach(r => check(Number(r.km_atual) || 0));
+    // RegistroDiarioVeiculo
+    registrosDiarios.forEach(r => {
+      check(Number(r.km_inicial) || 0);
+      check(Number(r.km_final) || 0);
+    });
+    // RotaAgendada
+    rotasVeiculo.forEach(r => {
+      check(Number(r.km_inicial) || 0);
+      check(Number(r.km_final) || 0);
     });
     return max;
-  }, [veiculoRegistros]);
+  }, [veiculoRegistros, registrosDiarios, rotasVeiculo]);
 
   // Calcular alertas
   const alertas = useMemo(() => {
