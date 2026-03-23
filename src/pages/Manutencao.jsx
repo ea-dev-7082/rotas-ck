@@ -261,7 +261,7 @@ export default function Manutencao() {
 
           <TabsContent value="relatorio">
             <CustoKmReport
-              registros={filteredRegistros}
+              registros={reportRegistros}
               veiculos={veiculos}
               currentUser={currentUser}
               startDate={startDate}
