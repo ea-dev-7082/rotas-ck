@@ -20,6 +20,7 @@ import moment from "moment";
 import ManutencaoForm from "../components/manutencao/ManutencaoForm";
 import ManutencaoList from "../components/manutencao/ManutencaoList";
 import CustoKmReport from "../components/manutencao/CustoKmReport";
+import MaintenanceAlerts from "../components/manutencao/MaintenanceAlerts";
 
 export default function Manutencao() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -48,6 +49,8 @@ export default function Manutencao() {
     initialData: []
   });
 
+  // ✅ TODOS os registros de ManutencaoVeiculo (sem filtro de data)
+  // Usado tanto para a lista filtrada quanto para os alertas
   const { data: registros, isLoading } = useQuery({
     queryKey: ["manutencao", currentUser?.email],
     queryFn: async () => {
@@ -66,6 +69,7 @@ export default function Manutencao() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["manutencao"] })
   });
 
+  // Registros filtrados por data/veículo/tipo (para lista e relatório)
   const filteredRegistros = useMemo(() => {
     return registros.filter(reg => {
       if (filterVeiculo !== "todos" && reg.veiculo_id !== filterVeiculo) return false;
@@ -145,10 +149,30 @@ export default function Manutencao() {
           </div>
         </motion.div>
 
+        {/* ═══════════════════════════════════════════════ */}
+        {/* ALERTAS DE MANUTENÇÃO                          */}
+        {/* Usa TODOS os registros (sem filtro de data)    */}
+        {/* para calcular corretamente a última manutenção */}
+        {/* ═══════════════════════════════════════════════ */}
+        {veiculos.length > 0 && registros.length >= 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mb-6"
+          >
+            <MaintenanceAlerts
+              registros={registros}
+              veiculos={veiculos}
+            />
+          </motion.div>
+        )}
+
         {/* Filtros */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
           className="flex flex-wrap items-center gap-3 mb-6 bg-white p-4 rounded-xl border shadow-sm"
         >
           <Filter className="w-4 h-4 text-gray-400" />
@@ -225,7 +249,6 @@ export default function Manutencao() {
           </TabsContent>
 
           <TabsContent value="relatorio">
-            {/* ✅ CORREÇÃO: Passa startDate e endDate para o relatório */}
             <CustoKmReport
               registros={filteredRegistros}
               veiculos={veiculos}
