@@ -267,6 +267,7 @@ export default function Manutencao() {
         veiculos={veiculos}
         editItem={editItem}
         currentUser={currentUser}
+        registros={registros}
         onSaved={() => queryClient.invalidateQueries({ queryKey: ["manutencao"] })}
       />
     </div>

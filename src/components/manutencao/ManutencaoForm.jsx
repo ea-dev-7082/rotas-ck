@@ -18,6 +18,7 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Save, Upload, Loader2 } from "lucide-react";
+import VehicleAlertInfo from "./VehicleAlertInfo";
 import moment from "moment";
 
 const TIPOS = [
@@ -29,7 +30,7 @@ const TIPOS = [
   { value: "outros", label: "Outros" }
 ];
 
-export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editItem, currentUser }) {
+export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editItem, currentUser, registros }) {
   const [form, setForm] = useState(editItem || {
     veiculo_id: "",
     tipo: "abastecimento",
@@ -144,6 +145,15 @@ export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editI
               </SelectContent>
             </Select>
           </div>
+
+          {/* Alertas e Configuração do veículo */}
+          {form.veiculo_id && (
+            <VehicleAlertInfo
+              veiculoId={form.veiculo_id}
+              registros={registros}
+              currentUser={currentUser}
+            />
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
