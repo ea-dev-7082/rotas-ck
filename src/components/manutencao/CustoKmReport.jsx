@@ -28,14 +28,33 @@ export default function CustoKmReport({
     queryKey: ["registros-diarios-report", currentUser?.email],
     queryFn: async () => {
       if (!currentUser?.email) return [];
-      const all = await base44.entities.RegistroDiarioVeiculo.list("-data", 500);
-      return all.filter(
-        r => r.owner === currentUser.email || r.created_by === currentUser.email
-      );
+      return base44.entities.RegistroDiarioVeiculo.list("-data", 500);
     },
     enabled: !!currentUser?.email,
     initialData: [],
   });
+
+  // Busca rotas agendadas para km (km_inicial/km_final das rotas)
+  const { data: rotasAgendadas = [] } = useQuery({
+    queryKey: ["rotas-km-report", currentUser?.email],
+    queryFn: async () => {
+      if (!currentUser?.email) return [];
+      return base44.entities.RotaAgendada.list("-created_date", 500);
+    },
+    enabled: !!currentUser?.email,
+    initialData: [],
+  });
+
+  // Filtra rotas pelo período
+  const rotasFiltradas = useMemo(() => {
+    if (!startDate || !endDate) return rotasAgendadas;
+    const inicio = moment(startDate).startOf("day");
+    const fim = moment(endDate).endOf("day");
+    return rotasAgendadas.filter(r => {
+      const dataR = moment(r.data_prevista || r.data_agendamento);
+      return dataR.isSameOrAfter(inicio) && dataR.isSameOrBefore(fim);
+    });
+  }, [rotasAgendadas, startDate, endDate]);
 
   // ✅ CORREÇÃO 1: Filtrar registros diários pelo MESMO período dos filtros da página
   const registrosDiariosFiltrados = useMemo(() => {
@@ -119,17 +138,37 @@ export default function CustoKmReport({
         v.dias_registrados++;
       }
 
-      // ✅ CORREÇÃO 3: Só soma abastecimentos inline se NÃO existem já em ManutencaoVeiculo
+      // Só soma abastecimentos inline se NÃO existem já em ManutencaoVeiculo
       if (rd.abastecimentos && rd.abastecimentos.length > 0) {
         rd.abastecimentos.forEach(ab => {
           const chave = `${vid}_${moment(rd.data).format("YYYY-MM-DD")}_${Number(ab.valor).toFixed(2)}`;
-          // Se esse abastecimento já foi contado via ManutencaoVeiculo, pula
           if (idsAbastecimentoManutencao.has(chave)) return;
 
           v.total_combustivel += Number(ab.valor) || 0;
           v.total_litros += Number(ab.litros) || 0;
           v.registros_count++;
         });
+      }
+    });
+
+    // ────────────────────────────────────────────────
+    // PASSO 2B: Acumular km das rotas agendadas (FILTRADAS pelo mesmo período)
+    // ────────────────────────────────────────────────
+    rotasFiltradas.forEach(rota => {
+      if (!rota.veiculo_id) return;
+      const vid = rota.veiculo_id;
+      const veiculo = veiculos.find(v => v.id === vid);
+      const v = getOrCreate(
+        vid,
+        rota.veiculo_descricao || veiculo?.descricao,
+        rota.veiculo_placa || veiculo?.placa
+      );
+
+      const kmI = Number(rota.km_inicial) || 0;
+      const kmF = Number(rota.km_final) || 0;
+      if (kmI > 0 && kmF > 0 && kmF > kmI) {
+        v.km_rodados_diarios += (kmF - kmI);
+        v.dias_registrados++;
       }
     });
 
@@ -150,7 +189,7 @@ export default function CustoKmReport({
         km_por_litro: v.total_litros > 0 && kmTotal > 0 ? kmTotal / v.total_litros : 0,
       };
     });
-  }, [registros, registrosDiariosFiltrados, veiculos, idsAbastecimentoManutencao]);
+  }, [registros, registrosDiariosFiltrados, rotasFiltradas, veiculos, idsAbastecimentoManutencao]);
 
   // ────────────────────────────────────────────────
   // Totais gerais
@@ -459,7 +498,7 @@ export default function CustoKmReport({
             </div>
           )}
           <p className="text-xs text-gray-400 mt-3">
-            * Km rodados são calculados a partir dos registros diários (km inicial → km
+            * Km rodados são calculados a partir dos registros diários e rotas (km inicial → km
             final) dentro do período selecionado. Custos de combustível e manutenção também
             são do mesmo período.
           </p>

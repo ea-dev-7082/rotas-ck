@@ -113,6 +113,7 @@ export default function RegistroDiarioTab({ veiculos, currentUser }) {
       km_final: registroData.km_final || null,
       observacoes: registroData.observacoes,
       status: registroData.km_final ? "fechado" : "aberto",
+      owner: currentUser?.email,
     };
     if (!registro) {
       data.hora_inicio = new Date().toISOString();
