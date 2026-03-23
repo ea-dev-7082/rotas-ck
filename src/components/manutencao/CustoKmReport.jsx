@@ -23,14 +23,18 @@ export default function CustoKmReport({
   startDate,
   endDate,
 }) {
+  // IDs dos veículos da empresa (filtrados na página pai)
+  const veiculoIds = useMemo(() => new Set(veiculos.map(v => v.id)), [veiculos]);
+
   // Busca registros diários de veículos para km reais
   const { data: registrosDiarios = [], isLoading: loadingDiarios } = useQuery({
     queryKey: ["registros-diarios-report", currentUser?.email],
     queryFn: async () => {
       if (!currentUser?.email) return [];
-      return base44.entities.RegistroDiarioVeiculo.list("-data", 500);
+      const all = await base44.entities.RegistroDiarioVeiculo.list("-data", 500);
+      return all.filter(r => veiculoIds.has(r.veiculo_id));
     },
-    enabled: !!currentUser?.email,
+    enabled: !!currentUser?.email && veiculoIds.size > 0,
     initialData: [],
   });
 
@@ -39,9 +43,10 @@ export default function CustoKmReport({
     queryKey: ["rotas-km-report", currentUser?.email],
     queryFn: async () => {
       if (!currentUser?.email) return [];
-      return base44.entities.RotaAgendada.list("-created_date", 500);
+      const all = await base44.entities.RotaAgendada.list("-created_date", 500);
+      return all.filter(r => veiculoIds.has(r.veiculo_id));
     },
-    enabled: !!currentUser?.email,
+    enabled: !!currentUser?.email && veiculoIds.size > 0,
     initialData: [],
   });
 
