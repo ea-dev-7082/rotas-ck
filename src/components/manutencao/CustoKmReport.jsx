@@ -109,10 +109,16 @@ export default function CustoKmReport({
     };
 
     // ────────────────────────────────────────────────
-    // PASSO 1: Acumular custos dos registros de manutenção (já vêm filtrados por data)
-    // Também coleta km_atual de cada registro para calcular km rodados
+    // PASSO 1: Acumular custos e pontos de odômetro do período
     // ────────────────────────────────────────────────
-    const kmPorVeiculo = {}; // { vid: [km1, km2, ...] }
+    const odometroPorVeiculo = {};
+    const addOdometroPoint = (vid, km, dataHora) => {
+      const kmNumero = Number(km) || 0;
+      if (!vid || kmNumero <= 0 || !dataHora) return;
+      if (!odometroPorVeiculo[vid]) odometroPorVeiculo[vid] = [];
+      odometroPorVeiculo[vid].push({ km: kmNumero, timestamp: moment(dataHora).valueOf() });
+    };
+
     registros.forEach(reg => {
       const v = getOrCreate(reg.veiculo_id, reg.veiculo_descricao, reg.veiculo_placa);
       v.registros_count++;
@@ -124,12 +130,7 @@ export default function CustoKmReport({
         v.total_manutencao += Number(reg.valor) || 0;
       }
 
-      // Coleta km_atual para calcular km rodados via ManutencaoVeiculo
-      const km = Number(reg.km_atual) || 0;
-      if (km > 0) {
-        if (!kmPorVeiculo[reg.veiculo_id]) kmPorVeiculo[reg.veiculo_id] = [];
-        kmPorVeiculo[reg.veiculo_id].push(km);
-      }
+      addOdometroPoint(reg.veiculo_id, reg.km_atual, reg.created_date || reg.data);
     });
 
     // ────────────────────────────────────────────────
@@ -144,9 +145,11 @@ export default function CustoKmReport({
         rd.veiculo_placa || veiculo?.placa
       );
 
-      // Acumula km rodados
+      // Guarda km inicial/final do dia para calcular o período corretamente
       const kmI = Number(rd.km_inicial) || 0;
       const kmF = Number(rd.km_final) || 0;
+      addOdometroPoint(vid, kmI, rd.hora_inicio || rd.data);
+      addOdometroPoint(vid, kmF, rd.hora_fim || moment(rd.data).endOf("day").toISOString());
       if (kmI > 0 && kmF > 0 && kmF > kmI) {
         v.km_rodados_diarios += (kmF - kmI);
         v.dias_registrados++;
@@ -180,6 +183,8 @@ export default function CustoKmReport({
 
       const kmI = Number(rota.km_inicial) || 0;
       const kmF = Number(rota.km_final) || 0;
+      addOdometroPoint(vid, kmI, rota.hora_saida || rota.data_prevista || rota.data_agendamento || rota.created_date);
+      addOdometroPoint(vid, kmF, rota.hora_retorno || rota.data_prevista || rota.data_agendamento || rota.created_date);
       if (kmI > 0 && kmF > 0 && kmF > kmI) {
         v.km_rodados_diarios += (kmF - kmI);
         v.dias_registrados++;
@@ -187,28 +192,24 @@ export default function CustoKmReport({
     });
 
     // ────────────────────────────────────────────────
-    // PASSO 3: Calcular métricas
-    // Se não há km de registros diários/rotas, usa a diferença
-    // entre o maior e menor km_atual dos registros de Manutenção
+    // PASSO 3: Calcular métricas usando km inicial e final do período
     // ────────────────────────────────────────────────
     return Object.values(porVeiculo).map(v => {
-      let kmTotal = v.km_rodados_diarios;
+      const pontosOrdenados = (odometroPorVeiculo[v.veiculo_id] || [])
+        .filter(p => Number.isFinite(p.timestamp))
+        .sort((a, b) => a.timestamp - b.timestamp);
 
-      // Fallback: usa diferença entre max e min km_atual dos registros de manutenção
-      if (kmTotal === 0 && kmPorVeiculo[v.veiculo_id]?.length >= 2) {
-        const kms = kmPorVeiculo[v.veiculo_id];
-        const maxKm = Math.max(...kms);
-        const minKm = Math.min(...kms);
-        if (maxKm > minKm) {
-          kmTotal = maxKm - minKm;
-        }
-      }
-
+      const primeiroKm = pontosOrdenados[0]?.km || 0;
+      const ultimoKm = pontosOrdenados[pontosOrdenados.length - 1]?.km || 0;
+      const kmPeriodo = ultimoKm > primeiroKm ? (ultimoKm - primeiroKm) : 0;
+      const kmTotal = kmPeriodo > 0 ? kmPeriodo : v.km_rodados_diarios;
       const custoTotal = v.total_combustivel + v.total_manutencao;
 
       return {
         ...v,
         km_rodados: kmTotal,
+        km_inicial_periodo: primeiroKm,
+        km_final_periodo: ultimoKm,
         custo_total: custoTotal,
         custo_combustivel_km: kmTotal > 0 ? v.total_combustivel / kmTotal : 0,
         custo_manutencao_km: kmTotal > 0 ? v.total_manutencao / kmTotal : 0,
