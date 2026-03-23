@@ -164,6 +164,7 @@ export default function Manutencao() {
             <MaintenanceAlerts
               registros={registros}
               veiculos={veiculos}
+              currentUser={currentUser}
             />
           </motion.div>
         )}

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangle, Wrench, X, Bell, BellRing,
+  AlertTriangle, Wrench, Bell, BellRing,
   Droplets, CircleDot, Clock, Car, Settings2,
   ChevronDown, ChevronUp, CheckCircle2
 } from "lucide-react";
@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
 import moment from "moment";
+import AlertActionDialog from "@/components/manutencao/AlertActionDialog";
 
 // ═══════════════════════════════════════════════════
 // CONFIGURAÇÃO DOS ALERTAS
@@ -79,10 +80,11 @@ const SEVERIDADE_STYLES = {
   },
 };
 
-export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
-  const [expandido, setExpandido] = useState(true);
+export default function MaintenanceAlerts({ registros = [], veiculos = [], currentUser = null }) {
+  const [expandido, setExpandido] = useState(false);
   const [mostrarTodos, setMostrarTodos] = useState(false);
   const [dismissed, setDismissed] = useState([]);
+  const [selectedAlert, setSelectedAlert] = useState(null);
 
   // Busca configs de alerta personalizadas por veículo
   const { data: configsAlerta = [] } = useQuery({
@@ -281,6 +283,8 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
 
         lista.push({
           id: `${vid}_${chave}`,
+          alert_key: chave,
+          veiculo_id: vid,
           veiculo_descricao: descricao,
           label: config.label,
           icon: IconComponent,
@@ -290,6 +294,8 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
           kmUltimo,
           kmRestante,
           diasRestante,
+          intervalo_km_base: intervaloKmReal,
+          intervalo_dias_base: intervaloDiasReal,
           dataUltimo: dataUltimo ? dataUltimo.format("DD/MM/YYYY") : null,
         });
       });
@@ -440,19 +446,18 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
                     const IconComp = alerta.icon;
 
                     return (
-                      <motion.div
+                      <motion.button
                         key={alerta.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
-                        className={`flex items-start gap-3 p-3 rounded-lg border ${sev.cor} transition-all`}
+                        onClick={() => setSelectedAlert(alerta)}
+                        className={`w-full flex items-start gap-3 p-3 rounded-lg border ${sev.cor} transition-all text-left hover:shadow-sm`}
                       >
-                        {/* Ícone */}
                         <div className={`mt-0.5 shrink-0 ${sev.icon_cor}`}>
                           <IconComp className="w-4 h-4" />
                         </div>
 
-                        {/* Conteúdo */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-semibold text-gray-800">
@@ -469,7 +474,9 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
                           <p className="text-xs text-gray-500 mt-1">
                             {alerta.mensagem}
                           </p>
-                          {/* Info do último registro */}
+                          <p className="text-[10px] text-blue-600 mt-1 font-medium">
+                            Clique para tratar ou reprogramar
+                          </p>
                           {alerta.dataUltimo && (
                             <p className="text-[10px] text-gray-400 mt-1">
                               Último: {alerta.dataUltimo}
@@ -479,7 +486,6 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
                           )}
                         </div>
 
-                        {/* Indicador km restante */}
                         {alerta.kmRestante !== null && alerta.kmRestante !== undefined && (
                           <div className="text-right shrink-0">
                             <p className={`text-sm font-bold ${
@@ -497,24 +503,20 @@ export default function MaintenanceAlerts({ registros = [], veiculos = [] }) {
                             </p>
                           </div>
                         )}
-
-                        {/* Botão dispensar */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDismissed(prev => [...prev, alerta.id]);
-                          }}
-                          className="shrink-0 p-1 rounded hover:bg-black/5 mt-0.5"
-                          title="Dispensar alerta"
-                        >
-                          <X className="w-3.5 h-3.5 text-gray-400" />
-                        </button>
-                      </motion.div>
+                      </motion.button>
                     );
                   })}
                 </div>
               </AnimatePresence>
             )}
+
+            <AlertActionDialog
+              open={!!selectedAlert}
+              onClose={() => setSelectedAlert(null)}
+              alerta={selectedAlert}
+              currentUser={currentUser}
+              onDismiss={(id) => setDismissed(prev => [...prev, id])}
+            />
 
             {/* Legenda + info */}
             <div className="flex flex-wrap gap-3 pt-2 border-t text-[10px] text-gray-400">
