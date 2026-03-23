@@ -120,19 +120,22 @@ export default function DriverVehicle() {
     setIsSaving(true);
 
     const isGNV = form.tipo_combustivel === "gnv";
+    const kmVal = form.km_atual !== "" && form.km_atual !== null && form.km_atual !== undefined
+      ? Number(form.km_atual) : null;
+
     const payload = {
       veiculo_id: selectedVeiculo.id,
       veiculo_descricao: selectedVeiculo.descricao,
       veiculo_placa: selectedVeiculo.placa,
       tipo: form.tipo,
       data: form.data,
-      km_atual: form.km_atual ? Number(form.km_atual) : null,
-      valor: Number(form.valor),
+      km_atual: (kmVal !== null && !isNaN(kmVal)) ? kmVal : null,
+      valor: Number(form.valor) || 0,
       tipo_combustivel: form.tipo === "abastecimento" ? form.tipo_combustivel : null,
-      litros: !isGNV && form.litros ? Number(form.litros) : null,
-      metros_cubicos: isGNV && form.metros_cubicos ? Number(form.metros_cubicos) : null,
-      preco_litro: !isGNV && form.preco_litro ? Number(form.preco_litro) : null,
-      preco_m3: isGNV && form.preco_m3 ? Number(form.preco_m3) : null,
+      litros: !isGNV && form.litros !== "" && form.litros != null ? Number(form.litros) : null,
+      metros_cubicos: isGNV && form.metros_cubicos !== "" && form.metros_cubicos != null ? Number(form.metros_cubicos) : null,
+      preco_litro: !isGNV && form.preco_litro !== "" && form.preco_litro != null ? Number(form.preco_litro) : null,
+      preco_m3: isGNV && form.preco_m3 !== "" && form.preco_m3 != null ? Number(form.preco_m3) : null,
       posto: form.posto,
       descricao: form.descricao,
       foto_comprovante: form.foto_comprovante,

@@ -86,14 +86,17 @@ export default function ManutencaoForm({ open, onClose, veiculos, onSaved, editI
     if (!form.veiculo_id || !form.tipo || !form.data || !form.valor) return;
     setSaving(true);
 
+    const kmVal = form.km_atual !== "" && form.km_atual !== null && form.km_atual !== undefined
+      ? Number(form.km_atual) : null;
+
     const payload = {
       ...form,
-      km_atual: form.km_atual ? Number(form.km_atual) : null,
-      valor: Number(form.valor),
-      litros: form.litros ? Number(form.litros) : null,
-      metros_cubicos: form.metros_cubicos ? Number(form.metros_cubicos) : null,
-      preco_litro: form.preco_litro ? Number(form.preco_litro) : null,
-      preco_m3: form.preco_m3 ? Number(form.preco_m3) : null,
+      km_atual: (kmVal !== null && !isNaN(kmVal)) ? kmVal : null,
+      valor: Number(form.valor) || 0,
+      litros: form.litros !== "" && form.litros != null ? Number(form.litros) : null,
+      metros_cubicos: form.metros_cubicos !== "" && form.metros_cubicos != null ? Number(form.metros_cubicos) : null,
+      preco_litro: form.preco_litro !== "" && form.preco_litro != null ? Number(form.preco_litro) : null,
+      preco_m3: form.preco_m3 !== "" && form.preco_m3 != null ? Number(form.preco_m3) : null,
       veiculo_descricao: selectedVeiculo?.descricao || "",
       veiculo_placa: selectedVeiculo?.placa || "",
       owner: currentUser?.email || ""
