@@ -69,7 +69,7 @@ export default function Manutencao() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["manutencao"] })
   });
 
-  // Registros filtrados por data/veículo/tipo (para lista e relatório)
+  // Registros filtrados por data/veículo/tipo (apenas para a lista)
   const filteredRegistros = useMemo(() => {
     return registros.filter(reg => {
       if (filterVeiculo !== "todos" && reg.veiculo_id !== filterVeiculo) return false;
@@ -79,6 +79,16 @@ export default function Manutencao() {
       return true;
     });
   }, [registros, filterVeiculo, filterTipo, startDate, endDate]);
+
+  // Registros do relatório de custo (não usa filtro por tipo para não esconder custos)
+  const reportRegistros = useMemo(() => {
+    return registros.filter(reg => {
+      if (filterVeiculo !== "todos" && reg.veiculo_id !== filterVeiculo) return false;
+      if (startDate && moment(reg.data).isBefore(moment(startDate))) return false;
+      if (endDate && moment(reg.data).isAfter(moment(endDate).endOf("day"))) return false;
+      return true;
+    });
+  }, [registros, filterVeiculo, startDate, endDate]);
 
   const handleEdit = (item) => {
     setEditItem(item);
