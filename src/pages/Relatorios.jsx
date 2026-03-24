@@ -596,7 +596,7 @@ export default function Relatorios() {
           {selectedRelatorio &&
           <div className="space-y-6">
               {/* Resumo do Relatório */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
                 <div>
                   <p className="text-xs text-gray-500 uppercase font-bold">Data</p>
                   <p className="font-semibold">{moment(selectedRelatorio.data_impressao).format("DD/MM/YYYY")}</p>
@@ -612,6 +612,17 @@ export default function Relatorios() {
                 <div>
                     <p className="text-xs text-gray-500 uppercase font-bold">Expedição</p>
                     <p className="font-semibold truncate">{selectedRelatorio.responsavel_expedicao || "-"}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-500 uppercase font-bold">Retorno</p>
+                    <p className="font-semibold truncate">
+                      {selectedRelatorio.hora_retorno
+                        ? format(new Date(selectedRelatorio.hora_retorno), "HH:mm")
+                        : ((selectedRelatorio.rota || []).slice(-1)[0]?.estimated_arrival || "-")}
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      {selectedRelatorio.hora_retorno ? "Registrado" : "Previsto"}
+                    </p>
                 </div>
               </div>
 
