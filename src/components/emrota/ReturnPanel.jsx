@@ -33,19 +33,15 @@ export default function ReturnPanel({ rotas, onDismiss }) {
   // PASSO 1: Marcar como concluído no banco
   const handleRetornou = async (rota) => {
     setClosingId(rota.id);
-    const agora = new Date().toISOString();
+    const relatorio = getRelatorioParaRota(rota.id);
+    const horaRetorno = rota.hora_retorno || relatorio?.hora_retorno || new Date().toISOString();
 
     try {
-      // Atualiza RotaAgendada
-      if (rota.status !== "concluido") {
-        await base44.entities.RotaAgendada.update(rota.id, {
-          status: "concluido",
-          hora_retorno: agora,
-        });
-      }
+      await base44.entities.RotaAgendada.update(rota.id, {
+        status: "concluido",
+        hora_retorno: horaRetorno,
+      });
 
-      // Atualiza Relatório vinculado
-      const relatorio = getRelatorioParaRota(rota.id);
       if (relatorio) {
         const rotaRealAtualizada = (rota.rota || []).map((item) => ({
           order: item.order,
@@ -66,7 +62,7 @@ export default function ReturnPanel({ rotas, onDismiss }) {
 
         await base44.entities.Relatorio.update(relatorio.id, {
           rota: rotaRealAtualizada,
-          hora_retorno: agora,
+          hora_retorno: horaRetorno,
           status: "concluido",
         });
       }
@@ -86,10 +82,12 @@ export default function ReturnPanel({ rotas, onDismiss }) {
     setDismissingId(rota.id);
     try {
       // Garante que está concluída antes de dispensar
-      const updates = { fechado_retorno: true };
+      const updates = {
+        fechado_retorno: true,
+        hora_retorno: rota.hora_retorno || new Date().toISOString(),
+      };
       if (rota.status !== "concluido") {
         updates.status = "concluido";
-        updates.hora_retorno = new Date().toISOString();
       }
 
       await base44.entities.RotaAgendada.update(rota.id, updates);
@@ -138,7 +136,8 @@ export default function ReturnPanel({ rotas, onDismiss }) {
         const matrizRetorno = rota.rota?.[rota.rota.length - 1];
 
         const relatorio = getRelatorioParaRota(rota.id);
-        const jaFinalizado = rota.status === "concluido" || relatorio?.status === "concluido";
+        const horaRetornoRegistrada = rota.hora_retorno || relatorio?.hora_retorno;
+        const jaFinalizado = !!horaRetornoRegistrada;
 
         return (
           <Card key={rota.id} className="bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200 relative">
@@ -197,6 +196,13 @@ export default function ReturnPanel({ rotas, onDismiss }) {
                 <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                   Última entrega: {format(new Date(ultimaEntrega.deliveredAt), "HH:mm")}
+                </p>
+              )}
+
+              {horaRetornoRegistrada && (
+                <p className="text-xs text-emerald-700 mt-1 flex items-center gap-1 font-medium">
+                  <Home className="w-3 h-3" />
+                  Retorno registrado: {format(new Date(horaRetornoRegistrada), "HH:mm")}
                 </p>
               )}
 
