@@ -45,10 +45,12 @@ export default function Agendados() {
       currentUser
         ? base44.entities.RotaAgendada.filter(
             { owner: currentUser.email },
-            "-created_date"
+            "-created_date",
+            100
           )
         : [],
     enabled: !!currentUser,
+    staleTime: 2 * 60 * 1000,
   });
 
   const motoristas = useMemo(() => {

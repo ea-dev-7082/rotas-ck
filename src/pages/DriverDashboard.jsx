@@ -25,18 +25,15 @@ export default function DriverDashboard() {
     queryKey: ["rotas-motorista-hoje", currentUser?.email, today],
     queryFn: async () => {
       if (!currentUser) return [];
-      // Busca rotas onde motorista_email = email do usuário logado
-      const todasRotas = await base44.entities.RotaAgendada.list("-created_date");
-      
-      // Filtra rotas deste motorista (hoje ou em andamento ou sem data_prevista)
-      return todasRotas.filter(r => 
-        r.motorista_email === currentUser.email && 
-        r.status !== "agendado" &&
-        (r.data_prevista === today || r.status === "em_andamento" || !r.data_prevista)
+      return base44.entities.RotaAgendada.filter(
+        { motorista_email: currentUser.email },
+        "-created_date",
+        20
       );
     },
     enabled: !!currentUser,
     initialData: [],
+    staleTime: 30 * 1000,
   });
 
   // Atualização em tempo real quando motorista atualiza entregas

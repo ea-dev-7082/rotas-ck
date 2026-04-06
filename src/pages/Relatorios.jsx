@@ -69,11 +69,13 @@ export default function Relatorios() {
     currentUser ?
     base44.entities.Relatorio.filter(
       { owner: currentUser.email },
-      "-created_date"
+      "-created_date",
+      100
     ) :
     [],
     enabled: !!currentUser,
-    initialData: []
+    initialData: [],
+    staleTime: 2 * 60 * 1000
   });
 
   // --- FILTRAGEM ---

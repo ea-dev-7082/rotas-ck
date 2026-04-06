@@ -75,10 +75,11 @@ export default function Clientes() {
     queryKey: ["clientes", currentUser?.email],
     queryFn: () =>
       currentUser
-        ? base44.entities.Cliente.filter({ owner: currentUser.email }, "nome")
+        ? base44.entities.Cliente.filter({ owner: currentUser.email }, "nome", 200)
         : [],
     enabled: !!currentUser,
     initialData: [],
+    staleTime: 5 * 60 * 1000,
   });
 
   // Filtragem de clientes (nome, telefone ou endereço)
