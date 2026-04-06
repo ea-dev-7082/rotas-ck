@@ -3,11 +3,12 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Route, MapPin, TrendingUp, Loader2, Users, Home, Edit } from "lucide-react";
+import { Route, MapPin, TrendingUp, Loader2, Users, Home, Edit, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // --- COMPONENTES FILHOS ---
 import ClientSelector from "../components/optimizer/ClientSelector";
+import ManualAddressDialog from "../components/optimizer/ManualAddressDialog";
 import RouteMap from "../components/optimizer/RouteMap";
 import DraggableRouteList from "../components/optimizer/DraggableRouteList";
 import NearbyClients from "../components/optimizer/NearbyClients";
@@ -37,6 +38,8 @@ export default function Optimizer() {
   const [showNotaFiscalDialog, setShowNotaFiscalDialog] = useState(false);
   const [currentClientForNota, setCurrentClientForNota] = useState("");
   const [editingRotaAgendadaId, setEditingRotaAgendadaId] = useState(null);
+  const [manualClients, setManualClients] = useState([]);
+  const [showManualAddressDialog, setShowManualAddressDialog] = useState(false);
 
   // --- CARREGAMENTO DE DADOS (QUERIES) ---
   useEffect(() => {
@@ -115,19 +118,32 @@ export default function Optimizer() {
       
       // Encontra IDs dos clientes pelo nome
       const clientIds = [];
+      const manualClientsLoaded = [];
       const notasCarregadas = {};
       
       entregas.forEach(entrega => {
         const cliente = clientes.find(c => c.nome === entrega.client_name);
         if (cliente) {
           clientIds.push(cliente.id);
+        } else {
+          manualClientsLoaded.push({
+            id: `manual-loaded-${entrega.order || Date.now()}`,
+            nome: entrega.client_name || "Consumidor",
+            endereco: entrega.address || "",
+            telefone: entrega.phone || "",
+            observacoes: entrega.notes || "",
+            isManual: true,
+            latitude: entrega.latitude,
+            longitude: entrega.longitude,
+          });
+          clientIds.push(`manual-loaded-${entrega.order || Date.now()}`);
         }
-        // Carrega notas fiscais
         if (entrega.notas_fiscais && entrega.notas_fiscais.length > 0) {
           notasCarregadas[entrega.client_name] = entrega.notas_fiscais;
         }
       });
 
+      setManualClients(manualClientsLoaded);
       setSelectedClients(clientIds);
       setNotasFiscais(notasCarregadas);
 
@@ -218,6 +234,7 @@ export default function Optimizer() {
 
   const handleReset = () => {
     setSelectedClients([]);
+    setManualClients([]);
     setOptimizedRoute(null);
     setStats(null);
     setNearbyClients(null);
@@ -238,6 +255,11 @@ export default function Optimizer() {
     }));
   };
 
+  const handleAddManualClient = (manualClient) => {
+    setManualClients(prev => [...prev, manualClient]);
+    setSelectedClients(prev => [...prev, manualClient.id]);
+  };
+
   // 1. OTIMIZAÇÃO INICIAL (BLINDADA)
   const handleOptimize = async () => {
     if (selectedClients.length === 0 || !enderecoMatriz || !mapboxToken) return;
@@ -245,8 +267,21 @@ export default function Optimizer() {
     setIsOptimizing(true);
     try {
       // Prepara dados brutos
+      const allSelectableClients = [...clientes, ...manualClients];
       const selectedClientesData = selectedClients.map(id => {
-        const cliente = clientes.find(c => c.id === id);
+        const cliente = allSelectableClients.find(c => c.id === id);
+        if (cliente?.isManual) {
+          return {
+            nome: "Consumidor",
+            endereco: cliente.endereco,
+            bairro: cliente.bairro,
+            municipio: cliente.municipio,
+            telefone: cliente.telefone,
+            observacoes: cliente.observacoes,
+            latitude: cliente.latitude,
+            longitude: cliente.longitude,
+          };
+        }
         let enderecoFinal;
         if (cliente.usar_endereco_entrega && cliente.endereco_entrega) {
           enderecoFinal = cliente.endereco_entrega;
@@ -260,6 +295,8 @@ export default function Optimizer() {
           endereco: enderecoFinal,
           bairro: cliente.bairro,
           municipio: cliente.municipio,
+          telefone: cliente.telefone,
+          observacoes: cliente.observacoes,
           latitude: cliente.latitude,
           longitude: cliente.longitude
         };
@@ -673,11 +710,20 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
                   onMotoristaChange={setSelectedMotorista}
                 />
                 <ClientSelector
-                  clientes={clientes}
+                  clientes={[...clientes, ...manualClients]}
                   selectedClients={selectedClients}
                   onSelectionChange={setSelectedClients}
                   isLoading={isLoading}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowManualAddressDialog(true)}
+                  className="w-full mt-4 border-dashed border-blue-300 text-blue-700 hover:bg-blue-50"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar Endereço Manual
+                </Button>
                 <div className="flex gap-3 mt-6">
                   <Button
                     onClick={handleOptimize}
@@ -780,6 +826,12 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         clientName={currentClientForNota}
         notasFiscais={notasFiscais[currentClientForNota] || []}
         onSave={handleSaveNotaFiscal}
+      />
+
+      <ManualAddressDialog
+        open={showManualAddressDialog}
+        onClose={() => setShowManualAddressDialog(false)}
+        onSave={handleAddManualClient}
       />
     </div>
   );

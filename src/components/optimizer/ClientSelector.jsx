@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Phone, Search, CheckCircle2, XCircle } from "lucide-react";
+import { MapPin, Phone, Search, CheckCircle2, XCircle, UserRound } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -123,10 +123,16 @@ export default function ClientSelector({
                       className="mt-1"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h4 className="font-semibold text-gray-900">
                           {cliente.nome}
                         </h4>
+                        {cliente.isManual && (
+                          <Badge variant="outline" className="border-amber-300 text-amber-700">
+                            <UserRound className="w-3 h-3 mr-1" />
+                            Manual
+                          </Badge>
+                        )}
                         {isSelected && (
                           <Badge className="bg-blue-500 text-white">
                             Selecionado
