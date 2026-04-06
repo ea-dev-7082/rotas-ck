@@ -44,14 +44,25 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
 import InfiniteScrollSentinel from "@/components/common/InfiniteScrollSentinel";
 
+// Hook de debounce para a busca
+function useDebouncedValue(value, delay = 300) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
 export default function Clientes() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingCliente, setEditingCliente] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [page, setPage] = useState(1);
-  const pageSize = 30;
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
+
+  const pageSize = 100; // Páginas maiores para carregar tudo mais rápido
 
   const fileInputRef = useRef(null);
 
@@ -74,89 +85,119 @@ export default function Clientes() {
     base44.auth.me().then(setCurrentUser);
   }, []);
 
-  // Acumula clientes ao longo das páginas
+  // ========== CARREGAMENTO COMPLETO DE CLIENTES ==========
+  // Carrega TODOS os clientes em background via paginação automática
   const [allClientes, setAllClientes] = useState([]);
+  const [isFullyLoaded, setIsFullyLoaded] = useState(false);
+  const [isLoadingAll, setIsLoadingAll] = useState(false);
 
-  const { data: clientesPage, isLoading } = useQuery({
-    queryKey: ["clientes", currentUser?.email, page],
-    queryFn: async () => {
-      if (!currentUser) return [];
-      return base44.entities.Cliente.filter(
-        { created_by: currentUser.email },
-        "nome",
-        pageSize,
-        (page - 1) * pageSize
-      );
-    },
-    enabled: !!currentUser,
-    initialData: [],
-    staleTime: 2 * 60 * 1000,
-    gcTime: 0,
-  });
+  const loadAllClientes = useCallback(async () => {
+    if (!currentUser || isLoadingAll) return;
 
-  useEffect(() => {
-    if (!clientesPage || clientesPage.length === 0) return;
-    if (page === 1) {
-      setAllClientes(clientesPage);
-    } else {
-      setAllClientes(prev => {
-        const existingIds = new Set(prev.map(c => c.id));
-        const newOnes = clientesPage.filter(c => !existingIds.has(c.id));
-        return [...prev, ...newOnes];
-      });
+    setIsLoadingAll(true);
+    setIsFullyLoaded(false);
+
+    try {
+      let allData = [];
+      let offset = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const batch = await base44.entities.Cliente.filter(
+          { created_by: currentUser.email },
+          "nome",
+          pageSize,
+          offset
+        );
+
+        if (batch && batch.length > 0) {
+          allData = [...allData, ...batch];
+          offset += pageSize;
+          // Atualiza progressivamente para o usuário já ver resultados
+          setAllClientes([...allData]);
+          hasMore = batch.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      setAllClientes(allData);
+      setIsFullyLoaded(true);
+    } catch (error) {
+      console.error("Erro ao carregar clientes:", error);
+    } finally {
+      setIsLoadingAll(false);
     }
-  }, [clientesPage, page]);
+  }, [currentUser, pageSize]);
 
-  const clientes = allClientes;
+  // Carrega todos ao montar ou quando o usuário muda
+  useEffect(() => {
+    if (currentUser) {
+      loadAllClientes();
+    }
+  }, [currentUser?.email]);
 
-  // Filtragem de clientes (nome, telefone ou endereço)
-  const filteredClientes = clientes.filter((cliente) => {
-    const term = searchTerm.toLowerCase();
+  // ========== BUSCA LOCAL SOBRE TODOS OS CLIENTES ==========
+  const filteredClientes = allClientes.filter((cliente) => {
+    if (!debouncedSearch) return true;
 
-    const telefoneStr = cliente.telefone
-      ? String(cliente.telefone).toLowerCase()
-      : "";
-    const enderecoStr = cliente.endereco
-      ? String(cliente.endereco).toLowerCase()
-      : "";
+    const term = debouncedSearch.toLowerCase();
+    const nome = (cliente.nome || "").toLowerCase();
+    const telefone = String(cliente.telefone || "").toLowerCase();
+    const endereco = (cliente.endereco || "").toLowerCase();
+    const bairro = (cliente.bairro || "").toLowerCase();
+    const municipio = (cliente.municipio || "").toLowerCase();
+    const enderecoEntrega = (cliente.endereco_entrega || "").toLowerCase();
 
     return (
-      cliente.nome.toLowerCase().includes(term) ||
-      telefoneStr.includes(term) ||
-      enderecoStr.includes(term)
+      nome.includes(term) ||
+      telefone.includes(term) ||
+      endereco.includes(term) ||
+      bairro.includes(term) ||
+      municipio.includes(term) ||
+      enderecoEntrega.includes(term)
     );
   });
 
-  const visibleClientes = filteredClientes;
-  const hasMoreClientes = !searchTerm && (clientesPage?.length === pageSize);
+  // ========== PAGINAÇÃO VISUAL (apenas para renderização) ==========
+  const [visibleCount, setVisibleCount] = useState(30);
 
-  const handleLoadMoreClientes = useCallback(() => {
-    if (!searchTerm) {
-      setPage((prev) => prev + 1);
-    }
-  }, [searchTerm]);
+  // Reseta contagem visível quando muda a busca
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [debouncedSearch]);
+
+  const visibleClientes = filteredClientes.slice(0, visibleCount);
+  const hasMoreVisible = visibleCount < filteredClientes.length;
+
+  const handleLoadMoreVisible = useCallback(() => {
+    setVisibleCount((prev) => prev + 30);
+  }, []);
 
   // Filtragem de clientes para o dropdown de busca no campo endereço alternativo
-  const clienteSearchResults = clientes.filter((cliente) => {
-    if (!clienteSearch.trim()) return false;
-    // Excluir o cliente sendo editado da busca
-    if (editingCliente && cliente.id === editingCliente.id) return false;
-    return cliente.nome.toLowerCase().includes(clienteSearch.toLowerCase());
-  }).slice(0, 5);
+  const clienteSearchResults = allClientes
+    .filter((cliente) => {
+      if (!clienteSearch.trim()) return false;
+      if (editingCliente && cliente.id === editingCliente.id) return false;
+      return cliente.nome.toLowerCase().includes(clienteSearch.toLowerCase());
+    })
+    .slice(0, 5);
 
   const handleSelectClienteEndereco = (cliente) => {
-    const enderecoSelecionado = cliente.usar_endereco_entrega && cliente.endereco_entrega
-      ? cliente.endereco_entrega
-      : cliente.endereco;
+    const enderecoSelecionado =
+      cliente.usar_endereco_entrega && cliente.endereco_entrega
+        ? cliente.endereco_entrega
+        : cliente.endereco;
     setFormData({ ...formData, endereco_entrega: enderecoSelecionado });
     setClienteSearch("");
     setShowClienteDropdown(false);
   };
 
+  // ========== MUTATIONS ==========
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Cliente.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      loadAllClientes(); // Recarrega lista completa
       handleCloseDialog();
     },
   });
@@ -164,15 +205,16 @@ export default function Clientes() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Cliente.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      loadAllClientes();
       handleCloseDialog();
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Cliente.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+    onSuccess: (_, deletedId) => {
+      // Remove localmente para feedback imediato
+      setAllClientes((prev) => prev.filter((c) => c.id !== deletedId));
     },
   });
 
@@ -181,11 +223,11 @@ export default function Clientes() {
     const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
     if (lines.length === 0) return [];
 
-    // Detecta separador: ponto-e-vírgula, tabulação ou vírgula
     const firstLine = lines[0];
     let separator = ",";
     if (firstLine.includes("\t")) separator = "\t";
-    else if (firstLine.split(";").length > firstLine.split(",").length) separator = ";";
+    else if (firstLine.split(";").length > firstLine.split(",").length)
+      separator = ";";
 
     const headers = firstLine
       .split(separator)
@@ -223,23 +265,21 @@ export default function Clientes() {
     return result;
   };
 
-  // Função para processar arquivo XLSX localmente com a lib xlsx
   const parseXLSX = async (file) => {
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array" });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-    
-    return rawData.map(item => {
-      // Monta endereço completo concatenando rua, número, bairro e município
+
+    return rawData.map((item) => {
       const parts = [
         String(item.endereco || "").trim(),
         item.endereco_num ? String(item.endereco_num).trim() : "",
         item.bairro ? `- ${String(item.bairro).trim()}` : "",
-        item.municipio ? String(item.municipio).trim() : ""
+        item.municipio ? String(item.municipio).trim() : "",
       ].filter(Boolean);
-      
+
       return {
         nome: String(item.nome || "").trim(),
         endereco: parts.join(", ").replace(", - ", " - "),
@@ -249,12 +289,11 @@ export default function Clientes() {
         usar_endereco_entrega:
           item.usar_endereco_entrega === "Sim" ||
           item.usar_endereco_entrega === "sim" ||
-          item.usar_endereco_entrega === true
+          item.usar_endereco_entrega === true,
       };
     });
   };
 
-  // Importação sequencial de clientes (CSV ou XLSX)
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !currentUser) return;
@@ -263,14 +302,12 @@ export default function Clientes() {
 
     try {
       let parsedData = [];
-      const fileExtension = file.name.split('.').pop().toLowerCase();
+      const fileExtension = file.name.split(".").pop().toLowerCase();
 
-      if (fileExtension === 'csv') {
-        // Leitura de CSV
+      if (fileExtension === "csv") {
         const text = await file.text();
         parsedData = parseCSV(text);
-      } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-        // Leitura de XLSX/XLS usando API
+      } else if (fileExtension === "xlsx" || fileExtension === "xls") {
         parsedData = await parseXLSX(file);
       } else {
         throw new Error("Formato de arquivo não suportado");
@@ -279,19 +316,20 @@ export default function Clientes() {
       let importedCount = 0;
 
       for (const item of parsedData) {
-        // Aceita 'nome' ou 'cliente' como campo de nome
         const clienteNome = item.nome || item.cliente;
         if (!clienteNome) continue;
 
-        // Monta endereço: se já veio concatenado usa direto, senão monta das partes
         let enderecoFinal = String(item.endereco || "").trim();
         if (item.endereco_num || item.bairro || item.municipio) {
           enderecoFinal = [
             enderecoFinal,
             item.endereco_num ? String(item.endereco_num).trim() : "",
             item.bairro ? `- ${String(item.bairro).trim()}` : "",
-            item.municipio ? String(item.municipio).trim() : ""
-          ].filter(Boolean).join(", ").replace(", - ", " - ");
+            item.municipio ? String(item.municipio).trim() : "",
+          ]
+            .filter(Boolean)
+            .join(", ")
+            .replace(", - ", " - ");
         }
 
         try {
@@ -315,7 +353,7 @@ export default function Clientes() {
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      loadAllClientes(); // Recarrega tudo
       alert(`${importedCount} clientes importados com sucesso!`);
     } catch (error) {
       console.error("Erro ao importar arquivo:", error);
@@ -328,10 +366,8 @@ export default function Clientes() {
     }
   };
 
-  // Função para excluir todos os clientes do usuário atual
   const handleDeleteAll = async () => {
     if (!currentUser) return;
-    // Confirmação para evitar exclusões acidentais
     const confirmed = window.confirm(
       "Tem certeza de que deseja excluir todos os clientes?"
     );
@@ -339,7 +375,7 @@ export default function Clientes() {
 
     let deletedCount = 0;
 
-    for (const cliente of clientes) {
+    for (const cliente of allClientes) {
       try {
         await base44.entities.Cliente.delete(cliente.id);
         deletedCount++;
@@ -348,14 +384,9 @@ export default function Clientes() {
       }
     }
 
-    queryClient.invalidateQueries({ queryKey: ["clientes"] });
+    setAllClientes([]);
     alert(`${deletedCount} clientes excluídos.`);
   };
-
-  useEffect(() => {
-    setPage(1);
-    setAllClientes([]);
-  }, [searchTerm, currentUser?.email]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -468,13 +499,36 @@ export default function Clientes() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Total de Clientes</p>
-                  <p className="text-3xl font-bold text-purple-600">
-                    {clientes.length}
+                  <p className="text-sm text-gray-500 mb-1">
+                    {debouncedSearch
+                      ? "Resultados da Busca"
+                      : "Total de Clientes"}
                   </p>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-3xl font-bold text-purple-600">
+                      {debouncedSearch
+                        ? filteredClientes.length
+                        : allClientes.length}
+                    </p>
+                    {debouncedSearch && (
+                      <p className="text-sm text-gray-400">
+                        de {allClientes.length}
+                      </p>
+                    )}
+                    {!isFullyLoaded && isLoadingAll && (
+                      <div className="flex items-center gap-1 text-sm text-gray-400">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        carregando...
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center">
-                  <Users className="w-8 h-8 text-purple-600" />
+                  {debouncedSearch ? (
+                    <Search className="w-8 h-8 text-purple-600" />
+                  ) : (
+                    <Users className="w-8 h-8 text-purple-600" />
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -500,9 +554,14 @@ export default function Clientes() {
 
           <CardContent className="p-6">
             <ScrollArea className="h-[600px] pr-4">
-              {filteredClientes.length === 0 ? (
+              {isLoadingAll && allClientes.length === 0 ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-500 mr-2" />
+                  <span className="text-gray-500">Carregando clientes...</span>
+                </div>
+              ) : visibleClientes.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">
-                  {searchTerm
+                  {debouncedSearch
                     ? "Nenhum cliente encontrado para sua busca."
                     : "Nenhum cliente cadastrado ainda."}
                 </div>
@@ -588,12 +647,14 @@ export default function Clientes() {
                       </motion.div>
                     ))}
                   </AnimatePresence>
-                  {hasMoreClientes && (
+
+                  {/* Infinite scroll para renderização visual */}
+                  {hasMoreVisible && (
                     <div className="md:col-span-2">
                       <InfiniteScrollSentinel
-                        onLoadMore={handleLoadMoreClientes}
-                        hasMore={hasMoreClientes}
-                        isLoading={isLoading}
+                        onLoadMore={handleLoadMoreVisible}
+                        hasMore={hasMoreVisible}
+                        isLoading={false}
                       />
                     </div>
                   )}
@@ -649,8 +710,7 @@ export default function Clientes() {
                     Endereço de Entrega Alternativo (Galpão/Depósito)
                   </Label>
                 </div>
-                
-                {/* Campo de busca de cliente */}
+
                 <div className="relative mb-2">
                   <div className="flex items-center gap-2">
                     <Search className="w-4 h-4 text-orange-500" />
@@ -674,9 +734,12 @@ export default function Clientes() {
                           onClick={() => handleSelectClienteEndereco(cliente)}
                           className="w-full px-3 py-2 text-left hover:bg-orange-50 border-b border-orange-100 last:border-b-0"
                         >
-                          <p className="font-medium text-gray-900 text-sm">{cliente.nome}</p>
+                          <p className="font-medium text-gray-900 text-sm">
+                            {cliente.nome}
+                          </p>
                           <p className="text-xs text-gray-500 truncate">
-                            {cliente.usar_endereco_entrega && cliente.endereco_entrega
+                            {cliente.usar_endereco_entrega &&
+                            cliente.endereco_entrega
                               ? cliente.endereco_entrega
                               : cliente.endereco}
                           </p>
