@@ -1,54 +1,93 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, AlertCircle, Truck, Calendar } from "lucide-react";
+import { User, AlertCircle, Calendar, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import BottomNav from "../components/driver/BottomNav";
 import RouteCard from "../components/driver/RouteCard";
 
+const API_BATCH_SIZE = 50;
+
 export default function DriverDashboard() {
   const [currentUser, setCurrentUser] = useState(null);
+  const [rotasHoje, setRotasHoje] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
   }, []);
 
-  // Busca rotas do motorista para hoje
-  const today = format(new Date(), "yyyy-MM-dd");
+  // ========== CARREGAMENTO COMPLETO DE ROTAS ==========
+  const loadRotasMotorista = useCallback(async () => {
+    if (!currentUser?.email) return;
 
-  const { data: rotasHoje, isLoading } = useQuery({
-    queryKey: ["rotas-motorista-hoje", currentUser?.email, today],
-    queryFn: async () => {
-      if (!currentUser) return [];
-      return base44.entities.RotaAgendada.filter(
-        { motorista_email: currentUser.email },
-        "-created_date",
-        20
-      );
-    },
-    enabled: !!currentUser,
-    initialData: [],
-    staleTime: 30 * 1000,
-  });
+    setIsLoading(true);
+    try {
+      let allData = [];
+      let offset = 0;
+      let hasMore = true;
 
-  // Atualização em tempo real quando motorista atualiza entregas
+      while (hasMore) {
+        const batch = await base44.entities.RotaAgendada.filter(
+          { motorista_email: currentUser.email },
+          "-created_date",
+          API_BATCH_SIZE,
+          offset
+        );
+
+        if (batch && batch.length > 0) {
+          allData = [...allData, ...batch];
+          offset += batch.length;
+          hasMore = batch.length === API_BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // Filtra apenas rotas de hoje ou em andamento
+      const today = format(new Date(), "yyyy-MM-dd");
+      const rotasFiltradas = allData.filter((r) => {
+        const isToday = r.data_prevista === today;
+        const isEmAndamento = r.status === "em_andamento";
+        const isLiberado = r.status === "liberado";
+        return isToday || isEmAndamento || isLiberado;
+      });
+
+      setRotasHoje(rotasFiltradas);
+    } catch (error) {
+      console.error("Erro ao carregar rotas do motorista:", error);
+      setRotasHoje([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser?.email]);
+
   useEffect(() => {
-    const unsubscribe = base44.entities.RotaAgendada.subscribe((event) => {
-      // Atualiza a lista quando houver mudanças
-      queryClient.invalidateQueries({ queryKey: ["rotas-motorista-hoje"] });
-    });
-    
-    return unsubscribe;
-  }, [queryClient]);
+    if (currentUser?.email) {
+      loadRotasMotorista();
+    }
+  }, [currentUser?.email, loadRotasMotorista]);
 
-  // Encontra rota atual (em andamento) ou próxima agendada
-  const rotaAtual = rotasHoje.find(r => r.status === "em_andamento") || 
-                    rotasHoje.find(r => r.status === "liberado");
+  // ========== ATUALIZAÇÃO EM TEMPO REAL ==========
+  useEffect(() => {
+    const unsubscribe = base44.entities.RotaAgendada.subscribe(() => {
+      loadRotasMotorista();
+    });
+
+    return unsubscribe;
+  }, [loadRotasMotorista]);
+
+  // ========== ROTA ATUAL (em andamento > liberado) ==========
+  const rotaAtual =
+    rotasHoje.find((r) => r.status === "em_andamento") ||
+    rotasHoje.find((r) => r.status === "liberado");
+
+  const outrasRotas = rotasHoje.filter((r) => r.id !== rotaAtual?.id);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -72,10 +111,9 @@ export default function DriverDashboard() {
       {/* Content */}
       <div className="max-w-md mx-auto px-4 py-6">
         {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-48 bg-white rounded-xl animate-pulse" />
-            ))}
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+            <p className="text-sm text-gray-500">Carregando suas rotas...</p>
           </div>
         ) : rotaAtual ? (
           <div className="space-y-4">
@@ -85,23 +123,23 @@ export default function DriverDashboard() {
             {/* Dica */}
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800">
-                💡 <strong>Dica:</strong> Clique em "Ver Rota" para iniciar suas entregas. Use a aba Veículo para registrar km inicial/final.
+                💡 <strong>Dica:</strong> Clique em "Ver Rota" para iniciar
+                suas entregas. Use a aba Veículo para registrar km
+                inicial/final.
               </p>
             </div>
 
             {/* Outras rotas do dia */}
-            {rotasHoje.filter(r => r.id !== rotaAtual.id).length > 0 && (
+            {outrasRotas.length > 0 && (
               <div className="mt-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <Calendar className="w-5 h-5" />
                   Outras Rotas de Hoje
                 </h2>
                 <div className="space-y-3">
-                  {rotasHoje
-                    .filter(r => r.id !== rotaAtual.id)
-                    .map((rota) => (
-                      <RouteCard key={rota.id} route={rota} />
-                    ))}
+                  {outrasRotas.map((rota) => (
+                    <RouteCard key={rota.id} route={rota} />
+                  ))}
                 </div>
               </div>
             )}
@@ -115,12 +153,11 @@ export default function DriverDashboard() {
               Nenhuma rota para hoje
             </h3>
             <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
-              Você não tem rotas agendadas para hoje. Verifique o histórico ou aguarde uma nova atribuição.
+              Você não tem rotas agendadas para hoje. Verifique o histórico
+              ou aguarde uma nova atribuição.
             </p>
             <Button asChild variant="outline" size="lg">
-              <Link to={createPageUrl("DriverHistory")}>
-                Ver Histórico
-              </Link>
+              <Link to={createPageUrl("DriverHistory")}>Ver Histórico</Link>
             </Button>
           </div>
         )}
