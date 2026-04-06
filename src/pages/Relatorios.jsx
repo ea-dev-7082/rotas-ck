@@ -68,12 +68,7 @@ export default function Relatorios() {
   const { data: relatorios, isLoading } = useQuery({
     queryKey: ["relatorios", currentUser?.email],
     queryFn: () =>
-    currentUser ?
-    base44.entities.Relatorio.filter(
-      { owner: currentUser.email },
-      "-created_date"
-    ) :
-    [],
+      currentUser ? base44.entities.Relatorio.list("-created_date") : [],
     enabled: !!currentUser,
     initialData: [],
     staleTime: 2 * 60 * 1000
