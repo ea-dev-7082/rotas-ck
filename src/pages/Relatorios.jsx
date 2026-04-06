@@ -680,7 +680,7 @@ export default function Relatorios() {
                           <p className="text-sm text-gray-500">{item.address}</p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
-                          {item.deliveredAt && (
+                          {item.status === "delivered" && item.deliveredAt && (
                             <Badge className="bg-green-100 text-green-700 text-xs">
                               Entregue: {format(new Date(item.deliveredAt), "HH:mm")}
                             </Badge>
@@ -690,7 +690,7 @@ export default function Relatorios() {
                               Previsto: {item.estimated_arrival}
                             </Badge>
                           )}
-                          {item.status === "problem" && (
+                          {(item.status === "problem" || item.occurrenceType || item.occurrenceDescription) && (
                             <Badge className="bg-red-100 text-red-700 text-xs">Problema</Badge>
                           )}
                         </div>
