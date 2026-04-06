@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import {
   Truck, MapPin, Clock, CheckCircle2, AlertTriangle,
-  Package, ArrowLeft, RefreshCw, Phone, Loader2,
+  Package, ArrowLeft, RefreshCw, Phone, Loader2, Wifi, WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +41,11 @@ const rotaStatusMap = {
   cancelado: { label: "Cancelada", className: "bg-red-100 text-red-800" },
 };
 
+// Intervalo de polling (ms)
+const POLL_INTERVAL = 15000;
+// Throttle mínimo entre fetches (ms) — evita subscribe + poll ao mesmo tempo
+const FETCH_THROTTLE = 5000;
+
 export default function EmRota() {
   const urlParams = new URLSearchParams(window.location.search);
   const rotaId = urlParams.get("rotaId");
@@ -50,50 +54,126 @@ export default function EmRota() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isLive, setIsLive] = useState(true); // Indica se polling está ativo
+
+  // Controle de throttle
+  const lastFetchTime = useRef(0);
+  const pollIntervalRef = useRef(null);
+  const isMounted = useRef(true);
 
   // ========== CARREGAMENTO DA ROTA ==========
   const loadRota = useCallback(
     async (silent = false) => {
       if (!rotaId) return;
 
+      // Throttle: ignora se foi buscado há menos de FETCH_THROTTLE ms
+      const now = Date.now();
+      if (silent && now - lastFetchTime.current < FETCH_THROTTLE) {
+        return;
+      }
+      lastFetchTime.current = now;
+
       if (!silent) setIsLoading(true);
       else setIsRefreshing(true);
 
       try {
         const rotas = await base44.entities.RotaAgendada.filter({ id: rotaId });
-        setRota(rotas?.[0] || null);
-        setLastUpdated(new Date());
+        if (isMounted.current) {
+          setRota(rotas?.[0] || null);
+          setLastUpdated(new Date());
+        }
       } catch (error) {
         console.error("Erro ao carregar rota:", error);
-        if (!silent) setRota(null);
+        if (!silent && isMounted.current) setRota(null);
       } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
+        if (isMounted.current) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
       }
     },
     [rotaId]
   );
 
-  // Carregamento inicial
+  // ========== CLEANUP ==========
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // ========== CARREGAMENTO INICIAL ==========
   useEffect(() => {
     loadRota();
   }, [loadRota]);
 
-  // ========== TEMPO REAL VIA SUBSCRIBE (sem polling redundante) ==========
+  // ========== POLLING COMO MECANISMO PRINCIPAL ==========
   useEffect(() => {
     if (!rotaId) return;
 
-    const unsubscribe = base44.entities.RotaAgendada.subscribe((event) => {
-      // Recarrega silenciosamente quando houver mudança
-      loadRota(true);
-    });
+    // Só faz polling se a rota ainda não está concluída/cancelada
+    const shouldPoll = !rota || !["concluido", "cancelado"].includes(rota.status);
 
-    return unsubscribe;
+    if (shouldPoll) {
+      pollIntervalRef.current = setInterval(() => {
+        loadRota(true);
+      }, POLL_INTERVAL);
+      setIsLive(true);
+    } else {
+      setIsLive(false);
+    }
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [rotaId, loadRota, rota?.status]);
+
+  // ========== SUBSCRIBE COMO ACELERADOR (complementar ao polling) ==========
+  useEffect(() => {
+    if (!rotaId) return;
+
+    let unsubscribe;
+    try {
+      unsubscribe = base44.entities.RotaAgendada.subscribe((event) => {
+        // Subscribe dispara fetch imediato (respeitando throttle)
+        loadRota(true);
+      });
+    } catch (error) {
+      console.warn("Subscribe não disponível:", error);
+    }
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
   }, [rotaId, loadRota]);
+
+  // ========== PAUSA POLLING QUANDO ABA ESTÁ ESCONDIDA ==========
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Voltou para a aba → refresh imediato
+        loadRota(true);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadRota]);
 
   // ========== REFRESH MANUAL ==========
   const handleRefresh = () => {
-    if (!isRefreshing) loadRota(true);
+    if (!isRefreshing) {
+      lastFetchTime.current = 0; // Força bypass do throttle
+      loadRota(true);
+    }
   };
 
   // ========== EARLY RETURNS ==========
@@ -156,11 +236,9 @@ export default function EmRota() {
     (e) => e.status === "in_progress"
   ).length;
   const progress =
-    entregas.length > 0
-      ? (entregasRealizadas / entregas.length) * 100
-      : 0;
+    entregas.length > 0 ? (entregasRealizadas / entregas.length) * 100 : 0;
 
-  // Tempo médio por entrega (com proteção contra NaN/Infinity)
+  // Tempo médio por entrega
   const entregasComTempo = entregas.filter((e) => e.deliveredAt);
   let tempoMedioEntrega = null;
   if (entregasComTempo.length >= 2) {
@@ -172,7 +250,6 @@ export default function EmRota() {
       if (!isNaN(prev.getTime()) && !isNaN(curr.getTime())) {
         const diffMin = (curr - prev) / 1000 / 60;
         if (diffMin > 0 && diffMin < 480) {
-          // Ignora diffs negativos ou absurdos (> 8h)
           totalDiffMinutes += diffMin;
           validPairs++;
         }
@@ -210,11 +287,28 @@ export default function EmRota() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {lastUpdated && (
-              <span className="text-xs text-gray-400 hidden sm:block">
-                Atualizado às {format(lastUpdated, "HH:mm:ss")}
-              </span>
-            )}
+            {/* Indicador de status do polling */}
+            <div className="hidden sm:flex items-center gap-2">
+              {isLive ? (
+                <div className="flex items-center gap-1.5 text-xs text-green-600">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                  </span>
+                  Ao vivo
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <WifiOff className="w-3 h-3" />
+                  Pausado
+                </div>
+              )}
+              {lastUpdated && (
+                <span className="text-xs text-gray-400">
+                  {format(lastUpdated, "HH:mm:ss")}
+                </span>
+              )}
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -277,7 +371,10 @@ export default function EmRota() {
             </div>
 
             {/* Info adicional da rota */}
-            {(rota.hora_saida || rota.km_inicial || tempoMedioEntrega || rota.total_volumes > 0) && (
+            {(rota.hora_saida ||
+              rota.km_inicial ||
+              tempoMedioEntrega ||
+              rota.total_volumes > 0) && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 pt-4 border-t">
                 {rota.hora_saida && (
                   <div className="text-center p-3 bg-indigo-50 rounded-lg">
@@ -356,9 +453,7 @@ export default function EmRota() {
                           {index + 1}. {entrega.client_name}
                         </span>
                         <Badge
-                          className={
-                            statusColors[entrega.status || "pending"]
-                          }
+                          className={statusColors[entrega.status || "pending"]}
                         >
                           {statusIcons[entrega.status || "pending"]}
                           <span className="ml-1">
@@ -422,10 +517,7 @@ export default function EmRota() {
                           {entrega.deliveredAt && (
                             <div className="text-xs text-red-500">
                               Registrado às{" "}
-                              {format(
-                                new Date(entrega.deliveredAt),
-                                "HH:mm"
-                              )}
+                              {format(new Date(entrega.deliveredAt), "HH:mm")}
                             </div>
                           )}
                           {entrega.photoUrl && (
@@ -472,11 +564,13 @@ export default function EmRota() {
                           Prev: {entrega.estimated_arrival || "--:--"}
                         </span>
                       </div>
-                      {entrega.status === "delivered" && entrega.deliveredAt && (
-                        <div className="text-green-600 font-medium text-xs">
-                          ✓ {format(new Date(entrega.deliveredAt), "HH:mm")}
-                        </div>
-                      )}
+                      {entrega.status === "delivered" &&
+                        entrega.deliveredAt && (
+                          <div className="text-green-600 font-medium text-xs">
+                            ✓{" "}
+                            {format(new Date(entrega.deliveredAt), "HH:mm")}
+                          </div>
+                        )}
                     </div>
                   </div>
                 </div>
