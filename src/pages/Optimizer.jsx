@@ -49,9 +49,7 @@ export default function Optimizer() {
     queryKey: ['clientes', currentUser?.email],
     queryFn: async () => {
       const allClientes = await base44.entities.Cliente.list('nome', 80);
-      return allClientes.filter(c =>
-        c.owner === currentUser.email || c.created_by === currentUser.email
-      );
+      return allClientes;
     },
     enabled: !!currentUser,
     initialData: [],
