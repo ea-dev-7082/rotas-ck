@@ -79,7 +79,7 @@ export default function Clientes() {
     queryFn: async () => {
       const loadedPages = await Promise.all(
         Array.from({ length: page }, (_, index) =>
-          base44.entities.Cliente.list("nome", pageSize + 1, index * pageSize)
+          base44.entities.Cliente.list("nome", pageSize, index * pageSize)
         )
       );
       return loadedPages.flat();
@@ -108,7 +108,7 @@ export default function Clientes() {
   });
 
   const visibleClientes = filteredClientes;
-  const hasMoreClientes = !searchTerm && clientes.length >= page * pageSize;
+  const hasMoreClientes = !searchTerm && clientes.length === page * pageSize;
 
   const handleLoadMoreClientes = useCallback(() => {
     if (!searchTerm) {

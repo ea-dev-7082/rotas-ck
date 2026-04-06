@@ -67,8 +67,16 @@ export default function Relatorios() {
   // --- QUERY DE DADOS ---
   const { data: relatorios, isLoading } = useQuery({
     queryKey: ["relatorios", currentUser?.email],
-    queryFn: () =>
-      currentUser ? base44.entities.Relatorio.list("-created_date", 60) : [],
+    queryFn: async () => {
+      if (!currentUser) return [];
+      const pageSize = 200;
+      const loadedPages = await Promise.all(
+        Array.from({ length: 5 }, (_, index) =>
+          base44.entities.Relatorio.list("-created_date", pageSize, index * pageSize)
+        )
+      );
+      return loadedPages.flat();
+    },
     enabled: !!currentUser,
     initialData: [],
     staleTime: 2 * 60 * 1000

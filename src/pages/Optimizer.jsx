@@ -48,8 +48,13 @@ export default function Optimizer() {
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes', currentUser?.email],
     queryFn: async () => {
-      const allClientes = await base44.entities.Cliente.list('nome', 80);
-      return allClientes;
+      const pageSize = 500;
+      const loadedPages = await Promise.all(
+        Array.from({ length: 6 }, (_, index) =>
+          base44.entities.Cliente.list('nome', pageSize, index * pageSize)
+        )
+      );
+      return loadedPages.flat();
     },
     enabled: !!currentUser,
     initialData: [],
