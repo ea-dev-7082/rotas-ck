@@ -3,7 +3,16 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Route, MapPin, TrendingUp, Loader2, Users, Home, Edit, Plus } from "lucide-react";
+import {
+  Route,
+  MapPin,
+  TrendingUp,
+  Loader2,
+  Users,
+  Home,
+  Edit,
+  Plus,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // --- COMPONENTES FILHOS ---
@@ -17,9 +26,17 @@ import VehicleDriverSelector from "../components/optimizer/VehicleDriverSelector
 import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
 
 // --- SERVIÇOS (MAPBOX) ---
-import { geocodeMultiple, optimizeRoute, getDirections, processOptimizationResult, TIME_CONFIG, MAPBOX_TOKEN } from "../components/optimizer/mapboxService";
+import {
+  geocodeMultiple,
+  optimizeRoute,
+  getDirections,
+  processOptimizationResult,
+  TIME_CONFIG,
+  MAPBOX_TOKEN,
+} from "../components/optimizer/mapboxService";
 
 const DEFAULT_MATRIZ = "Configure o endereço da matriz em Configurações";
+const API_BATCH_SIZE = 50; // Limite real da API Base44
 
 export default function Optimizer() {
   // --- ESTADOS ---
@@ -40,7 +57,7 @@ export default function Optimizer() {
   const [manualClients, setManualClients] = useState([]);
   const [showManualAddressDialog, setShowManualAddressDialog] = useState(false);
 
-  // --- CARREGAMENTO DE DADOS ---
+  // --- CARREGAMENTO DO USUÁRIO ---
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
   }, []);
@@ -57,7 +74,6 @@ export default function Optimizer() {
     setClientesFullyLoaded(false);
 
     try {
-      const BATCH = 500;
       let allData = [];
       let offset = 0;
       let hasMore = true;
@@ -66,15 +82,15 @@ export default function Optimizer() {
         const batch = await base44.entities.Cliente.filter(
           { created_by: currentUser.email },
           "nome",
-          BATCH,
+          API_BATCH_SIZE,
           offset
         );
 
         if (batch && batch.length > 0) {
           allData = [...allData, ...batch];
-          offset += BATCH;
+          offset += batch.length;
           setAllClientes([...allData]);
-          hasMore = batch.length === BATCH;
+          hasMore = batch.length === API_BATCH_SIZE;
         } else {
           hasMore = false;
         }
@@ -107,7 +123,6 @@ export default function Optimizer() {
 
     setIsLoadingVeiculos(true);
     try {
-      const PAGE = 100;
       let allData = [];
       let offset = 0;
       let hasMore = true;
@@ -116,20 +131,19 @@ export default function Optimizer() {
         const batch = await base44.entities.Veiculo.filter(
           { created_by: currentUser.email },
           "descricao",
-          PAGE,
+          API_BATCH_SIZE,
           offset
         );
 
         if (batch && batch.length > 0) {
           allData = [...allData, ...batch];
-          offset += PAGE;
-          hasMore = batch.length === PAGE;
+          offset += batch.length;
+          hasMore = batch.length === API_BATCH_SIZE;
         } else {
           hasMore = false;
         }
       }
 
-      // Filtra apenas ativos do usuário
       const filtered = allData.filter(
         (v) =>
           (v.owner === currentUser.email ||
@@ -161,7 +175,6 @@ export default function Optimizer() {
 
     setIsLoadingMotoristas(true);
     try {
-      const PAGE = 100;
       let allData = [];
       let offset = 0;
       let hasMore = true;
@@ -170,20 +183,19 @@ export default function Optimizer() {
         const batch = await base44.entities.Motorista.filter(
           { created_by: currentUser.email },
           "nome",
-          PAGE,
+          API_BATCH_SIZE,
           offset
         );
 
         if (batch && batch.length > 0) {
           allData = [...allData, ...batch];
-          offset += PAGE;
-          hasMore = batch.length === PAGE;
+          offset += batch.length;
+          hasMore = batch.length === API_BATCH_SIZE;
         } else {
           hasMore = false;
         }
       }
 
-      // Filtra apenas ativos do usuário
       const filtered = allData.filter(
         (m) =>
           (m.owner === currentUser.email ||
@@ -206,7 +218,7 @@ export default function Optimizer() {
 
   const motoristas = allMotoristas;
 
-  // ========== CONFIGURAÇÕES (query simples, poucas entradas) ==========
+  // ========== CONFIGURAÇÕES (query simples, poucos registros) ==========
   const { data: configs } = useQuery({
     queryKey: ["configuracoes", currentUser?.email],
     queryFn: () =>
@@ -217,7 +229,7 @@ export default function Optimizer() {
     initialData: [],
   });
 
-  // Configurações
+  // Configurações derivadas
   const enderecoMatriz =
     configs.find((c) => c.chave === "endereco_matriz")?.valor || "";
   const mapboxToken =
@@ -246,7 +258,7 @@ export default function Optimizer() {
     [motoristas, selectedMotorista]
   );
 
-  // Carrega rota agendada se vier da URL
+  // ========== CARREGA ROTA AGENDADA DA URL ==========
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const rotaAgendadaId = urlParams.get("rotaAgendadaId");
@@ -267,16 +279,13 @@ export default function Optimizer() {
 
       setEditingRotaAgendadaId(rotaId);
 
-      // Seleciona motorista e veículo
       if (rotaAgendada.motorista_id)
         setSelectedMotorista(rotaAgendada.motorista_id);
       if (rotaAgendada.veiculo_id)
         setSelectedVeiculo(rotaAgendada.veiculo_id);
 
-      // Extrai clientes da rota (exceto matriz)
       const entregas = rotaAgendada.rota?.slice(1, -1) || [];
 
-      // Encontra IDs dos clientes pelo nome
       const clientIds = [];
       const manualClientsLoaded = [];
       const notasCarregadas = {};
@@ -286,8 +295,9 @@ export default function Optimizer() {
         if (cliente) {
           clientIds.push(cliente.id);
         } else {
+          const manualId = `manual-loaded-${entrega.order || Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
           manualClientsLoaded.push({
-            id: `manual-loaded-${entrega.order || Date.now()}`,
+            id: manualId,
             nome: entrega.client_name || "Consumidor",
             endereco: entrega.address || "",
             telefone: entrega.phone || "",
@@ -296,9 +306,7 @@ export default function Optimizer() {
             latitude: entrega.latitude,
             longitude: entrega.longitude,
           });
-          clientIds.push(
-            `manual-loaded-${entrega.order || Date.now()}`
-          );
+          clientIds.push(manualId);
         }
         if (entrega.notas_fiscais && entrega.notas_fiscais.length > 0) {
           notasCarregadas[entrega.client_name] = entrega.notas_fiscais;
@@ -309,21 +317,19 @@ export default function Optimizer() {
       setSelectedClients(clientIds);
       setNotasFiscais(notasCarregadas);
 
-      // Carrega a rota otimizada
       setOptimizedRoute(rotaAgendada.rota);
       setStats({
         distance: rotaAgendada.distancia_km,
         time: rotaAgendada.tempo_minutos,
       });
 
-      // Limpa URL
       window.history.replaceState({}, "", window.location.pathname);
     } catch (error) {
       console.error("Erro ao carregar rota agendada:", error);
     }
   };
 
-  // Upload de Logo
+  // ========== UPLOAD DE LOGO ==========
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -333,7 +339,6 @@ export default function Optimizer() {
         file,
       });
 
-      // Salvar URL da logo nas configurações
       const existing = configs.find((c) => c.chave === "logo_url");
       if (existing) {
         await base44.entities.Configuracao.update(existing.id, {
@@ -347,14 +352,13 @@ export default function Optimizer() {
         });
       }
 
-      // Recarregar página para atualizar logo
       window.location.reload();
     } catch (error) {
       console.error("Erro ao fazer upload da logo:", error);
     }
   };
 
-  // --- HELPERS (CÁLCULOS) ---
+  // ========== HELPERS (CÁLCULOS) ==========
   const calcularDistancia = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -400,7 +404,24 @@ export default function Optimizer() {
     return ordenados;
   };
 
-  // --- HANDLERS (AÇÕES) ---
+  // Helpers de tempo reutilizáveis
+  const parseTime = (timeStr) => {
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const formatTime = (totalMinutes) => {
+    const hours = Math.floor(totalMinutes / 60) % 24;
+    const minutes = Math.round(totalMinutes % 60);
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  };
+
+  const getCurrentStartTime = () => {
+    const now = new Date();
+    return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+  };
+
+  // ========== HANDLERS (AÇÕES) ==========
 
   const handleReset = () => {
     setSelectedClients([]);
@@ -430,14 +451,13 @@ export default function Optimizer() {
     setSelectedClients((prev) => [...prev, manualClient.id]);
   };
 
-  // 1. OTIMIZAÇÃO INICIAL (BLINDADA)
+  // ========== 1. OTIMIZAÇÃO INICIAL ==========
   const handleOptimize = async () => {
     if (selectedClients.length === 0 || !enderecoMatriz || !mapboxToken)
       return;
 
     setIsOptimizing(true);
     try {
-      // Prepara dados brutos
       const allSelectableClients = [...clientes, ...manualClients];
       const selectedClientesData = selectedClients.map((id) => {
         const cliente = allSelectableClients.find((c) => c.id === id);
@@ -473,8 +493,7 @@ export default function Optimizer() {
         };
       });
 
-      const now = new Date();
-      const startTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+      const startTime = getCurrentStartTime();
 
       // Geocodificação
       const matrizData = [
@@ -502,7 +521,7 @@ export default function Optimizer() {
 
       setGeocodedClients(clientesFinal);
 
-      // Filtra apenas pontos com coordenadas válidas para otimizar
+      // Filtra apenas pontos com coordenadas válidas
       const clientesSemCoord = clientesFinal.filter(
         (p) => !p.latitude || !p.longitude
       );
@@ -554,7 +573,14 @@ export default function Optimizer() {
       const nearbyResult = await base44.integrations.Core.InvokeLLM({
         prompt: `Você é um especialista em análise geográfica no Rio de Janeiro.
 PONTO DE PARTIDA: ${PONTO_PARTIDA.endereco}
-CLIENTES ROTA ATUAL: ${JSON.stringify(selectedClientesData.map((c) => ({ nome: c.nome, endereco: c.endereco })), null, 2)}
+CLIENTES ROTA ATUAL: ${JSON.stringify(
+          selectedClientesData.map((c) => ({
+            nome: c.nome,
+            endereco: c.endereco,
+          })),
+          null,
+          2
+        )}
 TODOS CLIENTES: ${JSON.stringify(allClientesData, null, 2)}
 CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         add_context_from_internet: true,
@@ -584,14 +610,13 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     setIsOptimizing(false);
   };
 
-  // 2. REORDENAÇÃO — reordena itens restantes por proximidade a partir da posição movida
+  // ========== 2. REORDENAÇÃO ==========
   const handleReorderRoute = async (newEntregas, priorityIndex) => {
     if (newEntregas.length === 0) return;
 
     setIsOptimizing(true);
     try {
-      const now = new Date();
-      const startTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+      const startTime = getCurrentStartTime();
 
       const matrizData = [
         { nome: PONTO_PARTIDA.nome, endereco: PONTO_PARTIDA.endereco },
@@ -605,11 +630,17 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       const coordsMap = {};
       clientes.forEach((c) => {
         if (c.nome && c.latitude)
-          coordsMap[c.nome.trim()] = { lat: c.latitude, lng: c.longitude };
+          coordsMap[c.nome.trim()] = {
+            lat: c.latitude,
+            lng: c.longitude,
+          };
       });
       geocodedClients.forEach((g) => {
         if (g.nome && g.latitude)
-          coordsMap[g.nome.trim()] = { lat: g.latitude, lng: g.longitude };
+          coordsMap[g.nome.trim()] = {
+            lat: g.latitude,
+            lng: g.longitude,
+          };
       });
       newEntregas.forEach((item) => {
         if (item.client_name && item.latitude)
@@ -630,7 +661,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         };
       });
 
-      // --- REORDENAÇÃO POR PROXIMIDADE ---
+      // Itens fixos (até a posição do drag) + reordenação do restante
       const fixedPart = enriched.slice(0, priorityIndex + 1);
       const remainingPart = enriched.slice(priorityIndex + 1);
 
@@ -649,10 +680,11 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       );
       const allDeliveries = [...fixedPart, ...reordered, ...semCoords];
 
+      // Pontos para a Directions API (na ordem final)
       const pontosOrdenados = [
         matrizGeocodificada,
         ...allDeliveries,
-        matrizGeocodificada,
+        matrizGeocodificada, // retorno
       ].filter((p) => p.latitude && p.longitude);
 
       const directionsData = await getDirections(
@@ -661,17 +693,6 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
       );
       const route = directionsData.routes?.[0];
       const legs = route?.legs || [];
-
-      // Helpers
-      const parseTime = (timeStr) => {
-        const [hours, minutes] = timeStr.split(":").map(Number);
-        return hours * 60 + minutes;
-      };
-      const formatTime = (totalMinutes) => {
-        const hours = Math.floor(totalMinutes / 60) % 24;
-        const minutes = Math.round(totalMinutes % 60);
-        return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-      };
 
       const TRAFFIC_BUFFER = 1 + margemTransito / 100;
       const SERVICE_TIME = tempoParadaEntrega;
@@ -706,6 +727,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         };
       });
 
+      // Último leg = retorno à matriz
       const returnLegIdx = allDeliveries.length;
       if (legs[returnLegIdx]) {
         const returnMinutes = (legs[returnLegIdx].duration || 0) / 60;
@@ -746,26 +768,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     setIsOptimizing(false);
   };
 
-  // 4. ATUALIZAR HORÁRIOS (RECALCULA COM HORA ATUAL)
-  const handleRefreshTimes = async () => {
-    if (!optimizedRoute || optimizedRoute.length === 0) return;
-
-    const entregas = optimizedRoute.slice(1, -1);
-    await handleReorderRoute(entregas, entregas.length - 1);
-  };
-
-  // 3. ROTA MANUAL (FALLBACK)
+  // ========== 3. ROTA MANUAL (FALLBACK) ==========
   const buildManualRoute = (matrizGeocodificada, entregas, startTime) => {
-    const parseTime = (timeStr) => {
-      const [hours, minutes] = timeStr.split(":").map(Number);
-      return hours * 60 + minutes;
-    };
-    const formatTime = (totalMinutes) => {
-      const hours = Math.floor(totalMinutes / 60) % 24;
-      const minutes = Math.round(totalMinutes % 60);
-      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-    };
-
     let currentOrder = 1;
     let currentTime = parseTime(startTime);
     const route = [];
@@ -812,7 +816,15 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     return route;
   };
 
-  // --- RENDER ---
+  // ========== 4. ATUALIZAR HORÁRIOS ==========
+  const handleRefreshTimes = async () => {
+    if (!optimizedRoute || optimizedRoute.length === 0) return;
+
+    const entregas = optimizedRoute.slice(1, -1);
+    await handleReorderRoute(entregas, entregas.length - 1);
+  };
+
+  // ========== RENDER ==========
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       <div className="container mx-auto px-4 py-8">
@@ -838,14 +850,22 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
             </div>
           </div>
           <div
-            className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${enderecoMatriz ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}
+            className={`mt-4 inline-flex items-center gap-2 px-4 py-2 border-2 rounded-lg ${
+              enderecoMatriz
+                ? "bg-green-50 border-green-200"
+                : "bg-yellow-50 border-yellow-200"
+            }`}
           >
             <Home
-              className={`w-5 h-5 ${enderecoMatriz ? "text-green-600" : "text-yellow-600"}`}
+              className={`w-5 h-5 ${
+                enderecoMatriz ? "text-green-600" : "text-yellow-600"
+              }`}
             />
             <div className="text-left">
               <p
-                className={`text-xs font-semibold ${enderecoMatriz ? "text-green-600" : "text-yellow-600"}`}
+                className={`text-xs font-semibold ${
+                  enderecoMatriz ? "text-green-600" : "text-yellow-600"
+                }`}
               >
                 Ponto de Partida
               </p>
@@ -856,8 +876,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
             </div>
           </div>
 
-          {/* Indicador de carregamento em background */}
-          {(!clientesFullyLoaded && isLoadingClientes) && (
+          {/* Indicador de carregamento progressivo */}
+          {!clientesFullyLoaded && isLoadingClientes && (
             <div className="mt-2 flex items-center gap-2 text-sm text-gray-400">
               <Loader2 className="w-3 h-3 animate-spin" />
               Carregando clientes... ({allClientes.length} carregados)
@@ -922,6 +942,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
 
         {/* LAYOUT PRINCIPAL */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* COLUNA ESQUERDA - Seleção */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -991,6 +1012,8 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
                 </div>
               </CardContent>
             </Card>
+
+            {/* Notas de otimização */}
             {stats?.notes && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -1012,6 +1035,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
             )}
           </motion.div>
 
+          {/* COLUNA DIREITA - Mapa e Rota */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -1055,6 +1079,7 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
         </div>
       </div>
 
+      {/* MODAIS */}
       <PrintModal
         open={showPrintModal}
         onClose={() => setShowPrintModal(false)}
