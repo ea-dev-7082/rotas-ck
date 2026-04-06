@@ -52,7 +52,7 @@ export default function Relatorios() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [showTimeDialog, setShowTimeDialog] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(30);
+  const [visibleCount, setVisibleCount] = useState(20);
 
   // Ocorrências (Estado local para edição no modal)
   const [occurrences, setOccurrences] = useState({});
@@ -68,7 +68,7 @@ export default function Relatorios() {
   const { data: relatorios, isLoading } = useQuery({
     queryKey: ["relatorios", currentUser?.email],
     queryFn: () =>
-      currentUser ? base44.entities.Relatorio.list("-created_date") : [],
+      currentUser ? base44.entities.Relatorio.list("-created_date", 60) : [],
     enabled: !!currentUser,
     initialData: [],
     staleTime: 2 * 60 * 1000
@@ -130,7 +130,7 @@ export default function Relatorios() {
   const hasMoreRelatorios = visibleRelatorios.length < filteredRelatorios.length;
 
   const handleLoadMoreRelatorios = useCallback(() => {
-    setVisibleCount((prev) => prev + 30);
+    setVisibleCount((prev) => prev + 20);
   }, []);
 
   // --- ESTATÍSTICAS (RESUMO DETALHADO) ---
