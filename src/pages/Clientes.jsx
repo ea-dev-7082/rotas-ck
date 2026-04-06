@@ -77,8 +77,12 @@ export default function Clientes() {
   const { data: clientes, isLoading } = useQuery({
     queryKey: ["clientes", currentUser?.email, page],
     queryFn: async () => {
-      const pageClientes = await base44.entities.Cliente.list("nome", pageSize + 1, (page - 1) * pageSize);
-      return pageClientes;
+      const loadedPages = await Promise.all(
+        Array.from({ length: page }, (_, index) =>
+          base44.entities.Cliente.list("nome", pageSize + 1, index * pageSize)
+        )
+      );
+      return loadedPages.flat();
     },
     enabled: !!currentUser,
     initialData: [],
@@ -103,8 +107,8 @@ export default function Clientes() {
     );
   });
 
-  const visibleClientes = filteredClientes.slice(0, pageSize);
-  const hasMoreClientes = !searchTerm && clientes.length > pageSize;
+  const visibleClientes = filteredClientes;
+  const hasMoreClientes = !searchTerm && clientes.length >= page * pageSize;
 
   const handleLoadMoreClientes = useCallback(() => {
     if (!searchTerm) {
