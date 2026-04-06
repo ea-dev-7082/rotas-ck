@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
@@ -13,143 +13,246 @@ import MarkDeliveredDialog from "../components/driver/MarkDeliveredDialog";
 import OccurrenceDialog from "../components/driver/OccurrenceDialog";
 import { recalculateRemainingETAs } from "@/lib/recalculateETA";
 
+const API_BATCH_SIZE = 50;
+
 export default function DriverRouteView() {
   const urlParams = new URLSearchParams(window.location.search);
   const rotaId = urlParams.get("rotaId");
 
+  const [rota, setRota] = useState(null);
+  const [configs, setConfigs] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [markDeliveredOpen, setMarkDeliveredOpen] = useState(false);
   const [occurrenceOpen, setOccurrenceOpen] = useState(false);
-  const [isRecalculating, setIsRecalculating] = useState(false);
 
+  // Evita atualizar status mais de uma vez
+  const statusUpdatedRef = useRef(false);
   const queryClient = useQueryClient();
 
-  // Busca rota
-  const { data: rota, isLoading } = useQuery({
-    queryKey: ["rota-driver", rotaId],
-    queryFn: async () => {
+  // ========== CARREGAMENTO DA ROTA ==========
+  const loadRota = useCallback(async () => {
+    if (!rotaId) return;
+
+    setIsLoading(true);
+    try {
       const rotas = await base44.entities.RotaAgendada.filter({ id: rotaId });
-      return rotas[0];
-    },
-    enabled: !!rotaId,
-  });
+      const rotaData = rotas?.[0] || null;
+      setRota(rotaData);
 
-  // Busca configurações do dono da rota para recálculo
-  // Tenta buscar pelo owner da rota, e se a RLS bloquear, usa fallback local
-  const { data: configs } = useQuery({
-    queryKey: ["configs-recalc", rota?.owner || rota?.created_by],
-    queryFn: async () => {
-      const ownerEmail = rota?.owner || rota?.created_by;
-      if (!ownerEmail) return [];
-      try {
-        return await base44.entities.Configuracao.filter({ owner: ownerEmail });
-      } catch {
-        return [];
+      // Carrega configs do gestor (owner) para recálculo de ETAs
+      if (rotaData) {
+        const ownerEmail = rotaData.owner || rotaData.created_by;
+        if (ownerEmail) {
+          try {
+            const allConfigs = await base44.entities.Configuracao.filter({
+              owner: ownerEmail,
+            });
+            setConfigs(allConfigs || []);
+          } catch {
+            // RLS pode bloquear — segue sem configs (usa fallback)
+            setConfigs([]);
+          }
+        }
       }
-    },
-    enabled: !!(rota?.owner || rota?.created_by),
-    initialData: [],
-  });
-
-  // Mutation para atualizar rota
-  const updateRotaMutation = useMutation({
-    mutationFn: (updatedRota) => base44.entities.RotaAgendada.update(rotaId, updatedRota),
-    onSuccess: () => {
-      queryClient.invalidateQueries(["rota-driver", rotaId]);
-    },
-  });
-
-  // Extrai entregas (exclui matriz início e fim)
-  const entregas = rota?.rota?.slice(1, -1) || [];
-  const completedCount = entregas.filter((d) => d.status === "delivered").length;
-  const progress = entregas.length > 0 ? (completedCount / entregas.length) * 100 : 0;
-
-  // Encontra próxima entrega pendente
-  const nextDelivery = entregas.find((d) => d.status !== "delivered" && d.status !== "problem");
-
-  // Atualiza status da rota para "em_andamento" ao abrir
-  useEffect(() => {
-    if (rota && (rota.status === "agendado" || rota.status === "liberado")) {
-      updateRotaMutation.mutate({ status: "em_andamento" });
+    } catch (error) {
+      console.error("Erro ao carregar rota:", error);
+      setRota(null);
+    } finally {
+      setIsLoading(false);
     }
-  }, [rota?.id]);
+  }, [rotaId]);
 
-  // Handlers
-  const handleNavigate = (delivery) => {
-    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${delivery.latitude},${delivery.longitude}`;
-    window.open(googleMapsUrl, "_blank");
-  };
+  useEffect(() => {
+    loadRota();
+  }, [loadRota]);
 
-  const handleCall = (phone) => {
+  // ========== ATUALIZA STATUS PARA "EM_ANDAMENTO" (uma única vez) ==========
+  useEffect(() => {
+    if (!rota || statusUpdatedRef.current) return;
+
+    if (rota.status === "agendado" || rota.status === "liberado") {
+      statusUpdatedRef.current = true;
+      base44.entities.RotaAgendada.update(rotaId, {
+        status: "em_andamento",
+      })
+        .then(() => {
+          setRota((prev) => (prev ? { ...prev, status: "em_andamento" } : prev));
+        })
+        .catch((err) => {
+          console.error("Erro ao atualizar status da rota:", err);
+          statusUpdatedRef.current = false;
+        });
+    }
+  }, [rota?.id, rota?.status, rotaId]);
+
+  // ========== DADOS DERIVADOS ==========
+  const entregas = rota?.rota?.slice(1, -1) || [];
+  const completedCount = entregas.filter(
+    (d) => d.status === "delivered"
+  ).length;
+  const progress =
+    entregas.length > 0 ? (completedCount / entregas.length) * 100 : 0;
+  const nextDelivery = entregas.find(
+    (d) => d.status !== "delivered" && d.status !== "problem"
+  );
+
+  // ========== HELPERS ==========
+  const handleNavigate = useCallback((delivery) => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${delivery.latitude},${delivery.longitude}`;
+    window.open(url, "_blank");
+  }, []);
+
+  const handleCall = useCallback((phone) => {
     window.open(`tel:${phone}`, "_self");
-  };
+  }, []);
 
-  const handleMarkDelivered = (delivery) => {
+  const handleMarkDelivered = useCallback((delivery) => {
     setSelectedDelivery(delivery);
     setMarkDeliveredOpen(true);
-  };
+  }, []);
 
-  const handleOccurrence = (delivery) => {
+  const handleOccurrence = useCallback((delivery) => {
     setSelectedDelivery(delivery);
     setOccurrenceOpen(true);
-  };
+  }, []);
 
-  const handleConfirmDelivery = async ({ notes, receivedBy, photoUrl }) => {
-    if (!selectedDelivery || !rota) return;
+  // ========== CONFIRMAR ENTREGA ==========
+  const handleConfirmDelivery = useCallback(
+    async ({ notes, receivedBy, photoUrl }) => {
+      if (!selectedDelivery || !rota || isSaving) return;
 
-    let updatedRota = rota.rota.map((item) =>
-      item.order === selectedDelivery.order
-        ? {
-            ...item,
-            status: "delivered",
-            deliveredAt: new Date().toISOString(),
-            notes: notes || item.notes,
-            receivedBy,
-            photoUrl,
+      setIsSaving(true);
+      try {
+        let updatedRota = rota.rota.map((item) =>
+          item.order === selectedDelivery.order
+            ? {
+                ...item,
+                status: "delivered",
+                deliveredAt: new Date().toISOString(),
+                notes: notes || item.notes,
+                receivedBy,
+                photoUrl,
+              }
+            : item
+        );
+
+        // Verifica se todas entregas foram concluídas
+        const entregasAtualizadas = updatedRota.slice(1, -1);
+        const todasConcluidas = entregasAtualizadas.every(
+          (e) => e.status === "delivered" || e.status === "problem"
+        );
+        const novoStatus = todasConcluidas ? "concluido" : "em_andamento";
+
+        // Recalcula ETAs para paradas restantes
+        if (!todasConcluidas) {
+          setIsRecalculating(true);
+          const serviceTime =
+            Number(
+              configs.find((c) => c.chave === "tempo_parada_entrega")?.valor
+            ) ||
+            Number(rota.tempo_parada_entrega) ||
+            20;
+          const trafficBuffer =
+            Number(
+              configs.find((c) => c.chave === "margem_transito")?.valor
+            ) ||
+            Number(rota.margem_transito) ||
+            10;
+          const mapboxToken =
+            configs.find((c) => c.chave === "mapbox_token")?.valor ||
+            rota.mapbox_token ||
+            null;
+
+          try {
+            updatedRota = await recalculateRemainingETAs(
+              updatedRota,
+              selectedDelivery.order,
+              serviceTime,
+              trafficBuffer,
+              mapboxToken
+            );
+          } catch (err) {
+            console.warn("Erro no recálculo de ETAs:", err);
           }
-        : item
-    );
+          setIsRecalculating(false);
+        }
 
-    // Verifica se todas entregas foram concluídas
-    const entregasAtualizadas = updatedRota.slice(1, -1);
-    const todasConcluidas = entregasAtualizadas.every(
-      (e) => e.status === "delivered" || e.status === "problem"
-    );
+        // Salva rota atualizada
+        await base44.entities.RotaAgendada.update(rotaId, {
+          rota: updatedRota,
+          status: novoStatus,
+        });
 
-    const novoStatus = todasConcluidas ? "concluido" : "em_andamento";
+        // Atualiza estado local imediatamente (sem precisar recarregar)
+        setRota((prev) => ({
+          ...prev,
+          rota: updatedRota,
+          status: novoStatus,
+        }));
 
-    // Recalcula ETAs para paradas restantes via Mapbox
-    if (!todasConcluidas) {
-      setIsRecalculating(true);
-      // Tenta ler das configs do gestor, senão usa defaults da rota ou padrões
-      const serviceTime = Number(configs.find(c => c.chave === "tempo_parada_entrega")?.valor) || Number(rota.tempo_parada_entrega) || 20;
-      const trafficBuffer = Number(configs.find(c => c.chave === "margem_transito")?.valor) || Number(rota.margem_transito) || 10;
-      const mapboxToken = configs.find(c => c.chave === "mapbox_token")?.valor || rota.mapbox_token || null;
-      try {
-        updatedRota = await recalculateRemainingETAs(updatedRota, selectedDelivery.order, serviceTime, trafficBuffer, mapboxToken);
+        // Se concluída, atualiza/cria relatório
+        if (todasConcluidas) {
+          await atualizarRelatorio(
+            updatedRota,
+            entregasAtualizadas
+          );
+        }
+
+        setMarkDeliveredOpen(false);
+        setSelectedDelivery(null);
+        toast.success("Entrega confirmada com sucesso!");
+
+        // Invalida cache do dashboard do motorista
+        queryClient.invalidateQueries({ queryKey: ["rotas-motorista-hoje"] });
       } catch (err) {
-        console.warn("Erro no recálculo de ETAs, mantendo previsões anteriores:", err);
+        console.error("Erro ao confirmar entrega:", err);
+        toast.error("Erro ao salvar. Tente novamente.");
+      } finally {
+        setIsSaving(false);
+        setIsRecalculating(false);
       }
-      setIsRecalculating(false);
-    }
+    },
+    [selectedDelivery, rota, isSaving, configs, rotaId, queryClient]
+  );
 
-    await updateRotaMutation.mutateAsync({
-      rota: updatedRota,
-      status: novoStatus,
-    });
-
-    // Atualiza relatório existente quando a rota é concluída
-    if (todasConcluidas) {
+  // ========== RELATÓRIO (extraído para manter handleConfirmDelivery legível) ==========
+  const atualizarRelatorio = useCallback(
+    async (updatedRota, entregasAtualizadas) => {
       try {
-        const entregasRealizadas = entregasAtualizadas.filter(e => e.status === "delivered").length;
-        const entregasComProblema = entregasAtualizadas.filter(e => e.status === "problem").length;
+        const entregasRealizadas = entregasAtualizadas.filter(
+          (e) => e.status === "delivered"
+        ).length;
+        const entregasComProblema = entregasAtualizadas.filter(
+          (e) => e.status === "problem"
+        ).length;
 
-        // Busca relatório vinculado a esta rota
-        const relatorios = await base44.entities.Relatorio.filter({ rota_agendada_id: rotaId });
-        
-        if (relatorios.length > 0) {
-          // Atualiza o relatório existente com dados de conclusão
-          await base44.entities.Relatorio.update(relatorios[0].id, {
+        // Busca relatório vinculado (com paginação completa)
+        let allRelatorios = [];
+        let offset = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const batch = await base44.entities.Relatorio.filter(
+            { rota_agendada_id: rotaId },
+            "-created_date",
+            API_BATCH_SIZE,
+            offset
+          );
+          if (batch && batch.length > 0) {
+            allRelatorios = [...allRelatorios, ...batch];
+            offset += batch.length;
+            hasMore = batch.length === API_BATCH_SIZE;
+          } else {
+            hasMore = false;
+          }
+        }
+
+        if (allRelatorios.length > 0) {
+          await base44.entities.Relatorio.update(allRelatorios[0].id, {
             rota: updatedRota,
             status: "concluido",
             data_conclusao: new Date().toISOString(),
@@ -157,7 +260,6 @@ export default function DriverRouteView() {
             entregas_com_problema: entregasComProblema,
           });
         } else {
-          // Fallback: cria relatório se não existir (rota antiga sem relatório vinculado)
           await base44.entities.Relatorio.create({
             data_impressao: new Date().toISOString(),
             motorista_nome: rota.motorista_nome || "",
@@ -180,35 +282,53 @@ export default function DriverRouteView() {
         }
       } catch (err) {
         console.error("Erro ao atualizar relatório:", err);
+        // Não bloqueia o fluxo — entrega já foi salva
       }
-    }
+    },
+    [rotaId, rota]
+  );
 
-    setMarkDeliveredOpen(false);
-    setSelectedDelivery(null);
-    toast.success("Entrega confirmada com sucesso!");
-  };
+  // ========== CONFIRMAR OCORRÊNCIA ==========
+  const handleConfirmOccurrence = useCallback(
+    async (occurrenceType, description) => {
+      if (!selectedDelivery || !rota || isSaving) return;
 
-  const handleConfirmOccurrence = async (occurrenceType, description) => {
-    if (!selectedDelivery || !rota) return;
+      setIsSaving(true);
+      try {
+        const updatedRota = rota.rota.map((item) =>
+          item.order === selectedDelivery.order
+            ? {
+                ...item,
+                status: "problem",
+                occurrenceType,
+                occurrenceDescription: `${occurrenceType}: ${description}`,
+              }
+            : item
+        );
 
-    const updatedRota = rota.rota.map((item) =>
-      item.order === selectedDelivery.order
-        ? {
-            ...item,
-            status: "problem",
-            occurrenceType,
-            occurrenceDescription: `${occurrenceType}: ${description}`,
-          }
-        : item
-    );
+        await base44.entities.RotaAgendada.update(rotaId, {
+          rota: updatedRota,
+        });
 
-    await updateRotaMutation.mutateAsync({ rota: updatedRota });
+        // Atualiza estado local
+        setRota((prev) => ({ ...prev, rota: updatedRota }));
 
-    setOccurrenceOpen(false);
-    setSelectedDelivery(null);
-    toast.error("Ocorrência registrada");
-  };
+        setOccurrenceOpen(false);
+        setSelectedDelivery(null);
+        toast.error("Ocorrência registrada");
 
+        queryClient.invalidateQueries({ queryKey: ["rotas-motorista-hoje"] });
+      } catch (err) {
+        console.error("Erro ao registrar ocorrência:", err);
+        toast.error("Erro ao salvar ocorrência. Tente novamente.");
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [selectedDelivery, rota, isSaving, rotaId, queryClient]
+  );
+
+  // ========== EARLY RETURNS ==========
   if (!rotaId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 pb-24">
@@ -225,8 +345,9 @@ export default function DriverRouteView() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 pb-24">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 pb-24 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <p className="text-sm text-gray-500">Carregando rota...</p>
         <BottomNav />
       </div>
     );
@@ -246,6 +367,7 @@ export default function DriverRouteView() {
     );
   }
 
+  // ========== RENDER ==========
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
@@ -265,6 +387,14 @@ export default function DriverRouteView() {
                 {rota.veiculo_descricao} - {rota.veiculo_placa}
               </p>
             </div>
+            {(isSaving || isRecalculating) && (
+              <div className="flex items-center gap-1.5 text-blue-600">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-xs">
+                  {isRecalculating ? "Recalculando..." : "Salvando..."}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -299,7 +429,9 @@ export default function DriverRouteView() {
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Rota Concluída!</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              Rota Concluída!
+            </h3>
             <p className="text-sm text-gray-500 mb-6">
               Todas as entregas foram finalizadas
             </p>
@@ -318,6 +450,7 @@ export default function DriverRouteView() {
         onOpenChange={setMarkDeliveredOpen}
         onConfirm={handleConfirmDelivery}
         delivery={selectedDelivery}
+        isSaving={isSaving}
       />
 
       <OccurrenceDialog
@@ -325,9 +458,9 @@ export default function DriverRouteView() {
         onOpenChange={setOccurrenceOpen}
         onConfirm={handleConfirmOccurrence}
         delivery={selectedDelivery}
+        isSaving={isSaving}
       />
 
-      {/* Bottom Navigation */}
       <BottomNav />
     </div>
   );
