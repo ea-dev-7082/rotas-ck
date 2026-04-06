@@ -1,15 +1,78 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Phone, Search, CheckCircle2, XCircle, UserRound, ChevronDown } from "lucide-react";
+import {
+  MapPin,
+  Phone,
+  Search,
+  CheckCircle2,
+  XCircle,
+  UserRound,
+  ChevronDown,
+  Loader2,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
-const ITEMS_PER_PAGE = 50; // Renderiza 50 por vez para performance
+const ITEMS_PER_PAGE = 50;
+const SCROLL_THRESHOLD = 300;
 
+// ========== ITEM INDIVIDUAL (memo para evitar re-render) ==========
+const ClientItem = React.memo(({ cliente, isSelected, onToggle }) => (
+  <div
+    onClick={() => onToggle(cliente.id)}
+    className={`p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+      isSelected
+        ? "border-blue-500 bg-blue-50"
+        : "border-gray-200 hover:border-blue-300"
+    }`}
+  >
+    <div className="flex items-start gap-3">
+      <Checkbox
+        checked={isSelected}
+        onCheckedChange={() => onToggle(cliente.id)}
+        className="mt-1"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <h4 className="font-semibold text-gray-900 text-sm">
+            {cliente.nome}
+          </h4>
+          {cliente.isManual && (
+            <Badge
+              variant="outline"
+              className="border-amber-300 text-amber-700 text-xs px-1.5 py-0"
+            >
+              <UserRound className="w-3 h-3 mr-1" />
+              Manual
+            </Badge>
+          )}
+          {isSelected && (
+            <Badge className="bg-blue-500 text-white text-xs px-1.5 py-0">
+              ✓
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-start gap-1.5 text-xs text-gray-600">
+          <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <p className="leading-relaxed line-clamp-2">{cliente.endereco}</p>
+        </div>
+        {cliente.telefone && (
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
+            <Phone className="w-3.5 h-3.5" />
+            <span>{cliente.telefone}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+));
+
+ClientItem.displayName = "ClientItem";
+
+// ========== COMPONENTE PRINCIPAL ==========
 export default function ClientSelector({
   clientes,
   selectedClients,
@@ -17,17 +80,33 @@ export default function ClientSelector({
   isLoading,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
-  const scrollRef = useRef(null);
+  const listRef = useRef(null);
+  const debounceTimer = useRef(null);
 
-  // Reseta a contagem visível quando muda a busca
+  // ========== DEBOUNCE DA BUSCA (300ms) ==========
+  const handleSearchChange = useCallback((e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      setVisibleCount(ITEMS_PER_PAGE);
+    }, 300);
+  }, []);
+
+  // Cleanup do timer
   useEffect(() => {
-    setVisibleCount(ITEMS_PER_PAGE);
-  }, [searchTerm]);
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, []);
 
-  // Filtra TODOS os clientes (sem slice)
+  // ========== FILTRAGEM (usa debouncedSearch, não searchTerm) ==========
   const filteredClientes = useMemo(() => {
-    const term = searchTerm.toLowerCase().trim();
+    const term = debouncedSearch.toLowerCase().trim();
     if (!term) return clientes;
 
     return clientes.filter((cliente) => {
@@ -43,9 +122,9 @@ export default function ClientSelector({
         municipio.includes(term)
       );
     });
-  }, [clientes, searchTerm]);
+  }, [clientes, debouncedSearch]);
 
-  // Apenas os itens visíveis na tela (renderização progressiva)
+  // ========== ITENS VISÍVEIS ==========
   const displayedClientes = useMemo(
     () => filteredClientes.slice(0, visibleCount),
     [filteredClientes, visibleCount]
@@ -54,54 +133,63 @@ export default function ClientSelector({
   const hasMore = visibleCount < filteredClientes.length;
   const remainingCount = filteredClientes.length - visibleCount;
 
+  // ========== SET DE SELECIONADOS (lookup O(1) em vez de .includes O(n)) ==========
+  const selectedSet = useMemo(
+    () => new Set(selectedClients),
+    [selectedClients]
+  );
+
+  // ========== HANDLERS ==========
+  const handleToggle = useCallback(
+    (clienteId) => {
+      if (selectedSet.has(clienteId)) {
+        onSelectionChange(selectedClients.filter((id) => id !== clienteId));
+      } else {
+        onSelectionChange([...selectedClients, clienteId]);
+      }
+    },
+    [selectedClients, selectedSet, onSelectionChange]
+  );
+
   const handleLoadMore = useCallback(() => {
-    setVisibleCount((prev) => Math.min(prev + ITEMS_PER_PAGE, filteredClientes.length));
+    setVisibleCount((prev) =>
+      Math.min(prev + ITEMS_PER_PAGE, filteredClientes.length)
+    );
   }, [filteredClientes.length]);
 
-  // Detecta scroll perto do final para carregar mais automaticamente
-  const handleScroll = useCallback((e) => {
-    const target = e.target;
-    if (!target) return;
+  // ========== SCROLL INFINITO (no div nativo, não no ScrollArea) ==========
+  const handleScroll = useCallback(
+    (e) => {
+      if (!hasMore) return;
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+      if (scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD) {
+        handleLoadMore();
+      }
+    },
+    [hasMore, handleLoadMore]
+  );
 
-    const { scrollTop, scrollHeight, clientHeight } = target;
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
-
-    if (isNearBottom && hasMore) {
-      handleLoadMore();
-    }
-  }, [hasMore, handleLoadMore]);
-
-  const handleToggle = (clienteId) => {
-    if (selectedClients.includes(clienteId)) {
-      onSelectionChange(selectedClients.filter((id) => id !== clienteId));
-    } else {
-      onSelectionChange([...selectedClients, clienteId]);
-    }
-  };
-
-  const handleSelectAll = () => {
-    // Selecionar/desmarcar TODOS os filtrados (não apenas os visíveis)
+  const handleSelectAll = useCallback(() => {
     const allFilteredIds = filteredClientes.map((c) => c.id);
-    const allSelected = allFilteredIds.every((id) => selectedClients.includes(id));
+    const allSelected = allFilteredIds.every((id) => selectedSet.has(id));
 
     if (allSelected) {
-      // Remove apenas os filtrados da seleção (mantém outros já selecionados)
-      onSelectionChange(
-        selectedClients.filter((id) => !allFilteredIds.includes(id))
-      );
+      const filterSet = new Set(allFilteredIds);
+      onSelectionChange(selectedClients.filter((id) => !filterSet.has(id)));
     } else {
-      // Adiciona todos os filtrados à seleção atual (sem duplicar)
-      const newSelection = [...new Set([...selectedClients, ...allFilteredIds])];
+      const newSelection = [
+        ...new Set([...selectedClients, ...allFilteredIds]),
+      ];
       onSelectionChange(newSelection);
     }
-  };
+  }, [filteredClientes, selectedClients, selectedSet, onSelectionChange]);
 
-  // Verifica se TODOS os filtrados estão selecionados
   const allFilteredSelected = useMemo(() => {
     if (filteredClientes.length === 0) return false;
-    return filteredClientes.every((c) => selectedClients.includes(c.id));
-  }, [filteredClientes, selectedClients]);
+    return filteredClientes.every((c) => selectedSet.has(c.id));
+  }, [filteredClientes, selectedSet]);
 
+  // ========== LOADING STATE ==========
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -117,27 +205,31 @@ export default function ClientSelector({
     );
   }
 
+  // ========== RENDER ==========
   return (
     <div className="space-y-4">
-      {/* Search */}
+      {/* Search com debounce */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
         <Input
           type="text"
           placeholder="Buscar por nome, endereço, bairro ou município..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearchChange}
           className="pl-10"
         />
+        {searchTerm !== debouncedSearch && (
+          <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-blue-400 animate-spin" />
+        )}
       </div>
 
       {/* Actions */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="text-xs">
             {selectedClients.length} selecionados
           </Badge>
-          <Badge variant="secondary" className="text-sm text-gray-500">
+          <Badge variant="secondary" className="text-xs text-gray-500">
             {filteredClientes.length} encontrados
           </Badge>
         </div>
@@ -145,111 +237,58 @@ export default function ClientSelector({
           variant="ghost"
           size="sm"
           onClick={handleSelectAll}
-          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs"
         >
           {allFilteredSelected ? (
             <>
               <XCircle className="w-4 h-4 mr-1" />
-              Desmarcar Todos
+              Desmarcar
             </>
           ) : (
             <>
               <CheckCircle2 className="w-4 h-4 mr-1" />
-              Selecionar Todos ({filteredClientes.length})
+              Todos ({filteredClientes.length})
             </>
           )}
         </Button>
       </div>
 
-      {/* Client List com scroll infinito */}
-      <ScrollArea
-        className="h-[400px] pr-4"
-        ref={scrollRef}
-        onScrollCapture={handleScroll}
+      {/* Client List — div nativo com overflow para scroll confiável */}
+      <div
+        ref={listRef}
+        onScroll={handleScroll}
+        className="h-[400px] overflow-y-auto pr-2 space-y-2"
+        style={{ overscrollBehavior: "contain" }}
       >
-        <div className="space-y-3">
-          {displayedClientes.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p>Nenhum cliente encontrado</p>
-            </div>
-          ) : (
-            <>
-              {displayedClientes.map((cliente) => {
-                const isSelected = selectedClients.includes(cliente.id);
-                return (
-                  <div
-                    key={cliente.id}
-                    onClick={() => handleToggle(cliente.id)}
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                      isSelected
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 hover:border-blue-300"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => handleToggle(cliente.id)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h4 className="font-semibold text-gray-900">
-                            {cliente.nome}
-                          </h4>
-                          {cliente.isManual && (
-                            <Badge
-                              variant="outline"
-                              className="border-amber-300 text-amber-700"
-                            >
-                              <UserRound className="w-3 h-3 mr-1" />
-                              Manual
-                            </Badge>
-                          )}
-                          {isSelected && (
-                            <Badge className="bg-blue-500 text-white">
-                              Selecionado
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-start gap-2 text-sm text-gray-600 mb-2">
-                          <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                          <p className="leading-relaxed">
-                            {cliente.endereco}
-                          </p>
-                        </div>
-                        {cliente.telefone && (
-                          <div className="flex items-center gap-2 text-sm text-gray-500">
-                            <Phone className="w-4 h-4" />
-                            <span>{cliente.telefone}</span>
-                          </div>
-                        )}
-                        {cliente.observacoes && (
-                          <p className="text-xs text-gray-500 mt-2 italic">
-                            {cliente.observacoes}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+        {displayedClientes.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <p>Nenhum cliente encontrado</p>
+          </div>
+        ) : (
+          <>
+            {displayedClientes.map((cliente) => (
+              <ClientItem
+                key={cliente.id}
+                cliente={cliente}
+                isSelected={selectedSet.has(cliente.id)}
+                onToggle={handleToggle}
+              />
+            ))}
 
-              {/* Botão Carregar Mais */}
-              {hasMore && (
-                <Button
-                  variant="outline"
-                  onClick={handleLoadMore}
-                  className="w-full mt-2 border-dashed border-gray-300 text-gray-500 hover:text-blue-600 hover:border-blue-300"
-                >
-                  <ChevronDown className="w-4 h-4 mr-2" />
-                  Carregar mais ({remainingCount} restantes)
-                </Button>
-              )}
-            </>
-          )}
-        </div>
-      </ScrollArea>
+            {/* Indicador de carregamento / Botão carregar mais */}
+            {hasMore && (
+              <button
+                onClick={handleLoadMore}
+                className="w-full py-3 text-sm text-gray-400 hover:text-blue-600 flex items-center justify-center gap-2 transition-colors"
+              >
+                <ChevronDown className="w-4 h-4" />
+                Mais {Math.min(remainingCount, ITEMS_PER_PAGE)} de{" "}
+                {remainingCount} restantes
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
