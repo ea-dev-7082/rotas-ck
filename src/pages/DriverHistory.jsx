@@ -1,41 +1,80 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar, FileText, Filter } from "lucide-react";
+import { Calendar, FileText, Filter, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import BottomNav from "../components/driver/BottomNav";
 import RouteCard from "../components/driver/RouteCard";
+
+const API_BATCH_SIZE = 50;
 
 export default function DriverHistory() {
   const [currentUser, setCurrentUser] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [rotas, setRotas] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser);
   }, []);
 
-  const { data: rotas, isLoading } = useQuery({
-    queryKey: ["rotas-historico", currentUser?.email],
-    queryFn: async () => {
-      if (!currentUser) return [];
-      // Com RLS atualizado, busca rotas pelo email do motorista
-      const todasRotas = await base44.entities.RotaAgendada.list("-data_prevista", 50);
-      // Exclui rotas apenas agendadas - motorista só vê rotas enviadas/liberadas
-      return todasRotas.filter(r => 
-        r.motorista_email === currentUser.email && 
-        r.status !== "agendado"
-      );
-    },
-    enabled: !!currentUser,
-    initialData: [],
-  });
+  // ========== CARREGAMENTO COMPLETO DE ROTAS ==========
+  const loadHistorico = useCallback(async () => {
+    if (!currentUser?.email) return;
 
-  const filteredRotas = statusFilter === "all" 
-    ? rotas 
-    : rotas.filter(r => r.status === statusFilter);
+    setIsLoading(true);
+    try {
+      let allData = [];
+      let offset = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const batch = await base44.entities.RotaAgendada.filter(
+          { motorista_email: currentUser.email },
+          "-data_prevista",
+          API_BATCH_SIZE,
+          offset
+        );
+
+        if (batch && batch.length > 0) {
+          allData = [...allData, ...batch];
+          offset += batch.length;
+          hasMore = batch.length === API_BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // Exclui rotas apenas agendadas — motorista só vê rotas enviadas/liberadas
+      const rotasVisiveis = allData.filter((r) => r.status !== "agendado");
+      setRotas(rotasVisiveis);
+    } catch (error) {
+      console.error("Erro ao carregar histórico:", error);
+      setRotas([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser?.email]);
+
+  useEffect(() => {
+    if (currentUser?.email) {
+      loadHistorico();
+    }
+  }, [currentUser?.email, loadHistorico]);
+
+  // ========== FILTRO LOCAL POR STATUS ==========
+  const filteredRotas =
+    statusFilter === "all"
+      ? rotas
+      : rotas.filter((r) => r.status === statusFilter);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -49,7 +88,8 @@ export default function DriverHistory() {
                 Histórico
               </h1>
               <p className="text-sm text-gray-500">
-                Suas rotas anteriores
+                {rotas.length} rota{rotas.length !== 1 ? "s" : ""} registrada
+                {rotas.length !== 1 ? "s" : ""}
               </p>
             </div>
           </div>
@@ -62,11 +102,19 @@ export default function DriverHistory() {
                 <SelectValue placeholder="Filtrar por status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="liberado">Liberadas</SelectItem>
-                <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                <SelectItem value="concluido">Concluídas</SelectItem>
-                <SelectItem value="cancelado">Canceladas</SelectItem>
+                <SelectItem value="all">Todas ({rotas.length})</SelectItem>
+                <SelectItem value="liberado">
+                  Liberadas ({rotas.filter((r) => r.status === "liberado").length})
+                </SelectItem>
+                <SelectItem value="em_andamento">
+                  Em Andamento ({rotas.filter((r) => r.status === "em_andamento").length})
+                </SelectItem>
+                <SelectItem value="concluido">
+                  Concluídas ({rotas.filter((r) => r.status === "concluido").length})
+                </SelectItem>
+                <SelectItem value="cancelado">
+                  Canceladas ({rotas.filter((r) => r.status === "cancelado").length})
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -76,10 +124,9 @@ export default function DriverHistory() {
       {/* Content */}
       <div className="max-w-md mx-auto px-4 py-6">
         {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-48 bg-white rounded-xl animate-pulse" />
-            ))}
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+            <p className="text-sm text-gray-500">Carregando histórico...</p>
           </div>
         ) : filteredRotas.length > 0 ? (
           <div className="space-y-4">
@@ -96,7 +143,7 @@ export default function DriverHistory() {
               Nenhuma rota encontrada
             </h3>
             <p className="text-sm text-gray-500">
-              {statusFilter !== "all" 
+              {statusFilter !== "all"
                 ? "Tente alterar o filtro de status"
                 : "Você ainda não possui rotas registradas"}
             </p>
