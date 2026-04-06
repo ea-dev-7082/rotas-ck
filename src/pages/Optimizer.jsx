@@ -48,7 +48,7 @@ export default function Optimizer() {
 
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Cliente.filter({ owner: currentUser.email }, 'nome') : [],
+    queryFn: () => currentUser ? base44.entities.Cliente.list('nome') : [],
     enabled: !!currentUser,
     initialData: [],
     staleTime: 5 * 60 * 1000,
