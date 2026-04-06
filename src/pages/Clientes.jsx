@@ -76,7 +76,7 @@ export default function Clientes() {
   const { data: clientes, isLoading } = useQuery({
     queryKey: ["clientes", currentUser?.email],
     queryFn: async () => {
-      const allClientes = await base44.entities.Cliente.list("nome");
+      const allClientes = await base44.entities.Cliente.list("nome", 200);
       return allClientes.filter((cliente) =>
         cliente.owner === currentUser.email || cliente.created_by === currentUser.email
       );

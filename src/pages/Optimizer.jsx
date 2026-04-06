@@ -15,7 +15,6 @@ import NearbyClients from "../components/optimizer/NearbyClients";
 import PrintModal from "../components/optimizer/PrintModal";
 import VehicleDriverSelector from "../components/optimizer/VehicleDriverSelector";
 import NotaFiscalDialog from "../components/optimizer/NotaFiscalDialog";
-import MaintenanceAlerts from "../components/manutencao/MaintenanceAlerts";
 
 // --- SERVIÇOS (MAPBOX) ---
 import { geocodeMultiple, optimizeRoute, getDirections, processOptimizationResult, TIME_CONFIG, MAPBOX_TOKEN } from "../components/optimizer/mapboxService";
@@ -49,7 +48,7 @@ export default function Optimizer() {
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes', currentUser?.email],
     queryFn: async () => {
-      const allClientes = await base44.entities.Cliente.list('nome');
+      const allClientes = await base44.entities.Cliente.list('nome', 200);
       return allClientes.filter(c =>
         c.owner === currentUser.email || c.created_by === currentUser.email
       );
@@ -69,7 +68,7 @@ export default function Optimizer() {
   const { data: veiculos } = useQuery({
     queryKey: ['veiculos', currentUser?.email],
     queryFn: async () => {
-      const allVeiculos = await base44.entities.Veiculo.list('descricao');
+      const allVeiculos = await base44.entities.Veiculo.list('descricao', 100);
       return allVeiculos.filter(v =>
         (v.owner === currentUser.email || v.created_by === currentUser.email) && v.ativo === true
       );
@@ -81,7 +80,7 @@ export default function Optimizer() {
   const { data: motoristas } = useQuery({
     queryKey: ['motoristas', currentUser?.email],
     queryFn: async () => {
-      const allMotoristas = await base44.entities.Motorista.list('nome');
+      const allMotoristas = await base44.entities.Motorista.list('nome', 100);
       return allMotoristas.filter(m =>
         (m.owner === currentUser.email || m.created_by === currentUser.email) && m.ativo === true
       );
@@ -621,9 +620,6 @@ CRITÉRIOS: Raio de 5-7 km do cliente mais distante OU mesmo bairro.`,
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       <div className="container mx-auto px-4 py-8">
         
-        {/* ALERTAS DE MANUTENÇÃO */}
-        <MaintenanceAlerts currentUser={currentUser} />
-
         {/* HEADER */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
