@@ -514,8 +514,8 @@ export default function Relatorios() {
                 </p>
               </div> :
 
-            <ScrollArea className="max-h-[600px]">
-                <div className="space-y-4">
+            <ScrollArea className="max-h-[600px] pr-4">
+                <div className="space-y-4 min-w-0">
                   <AnimatePresence>
                     {visibleRelatorios.map((relatorio) =>
                   <motion.div
