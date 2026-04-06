@@ -62,6 +62,7 @@ export default function Optimizer() {
     enabled: !!currentUser,
     initialData: [],
     staleTime: 5 * 60 * 1000,
+    gcTime: 0,
   });
 
   const { data: configs } = useQuery({

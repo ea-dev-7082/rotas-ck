@@ -87,6 +87,7 @@ export default function Clientes() {
     enabled: !!currentUser,
     initialData: [],
     staleTime: 5 * 60 * 1000,
+    gcTime: 0,
   });
 
   // Filtragem de clientes (nome, telefone ou endereço)
