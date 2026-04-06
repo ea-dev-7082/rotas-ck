@@ -272,7 +272,7 @@ export default function Optimizer() {
         const cliente = allSelectableClients.find(c => c.id === id);
         if (cliente?.isManual) {
           return {
-            nome: "Consumidor",
+            nome: cliente.nome,
             endereco: cliente.endereco,
             bairro: cliente.bairro,
             municipio: cliente.municipio,

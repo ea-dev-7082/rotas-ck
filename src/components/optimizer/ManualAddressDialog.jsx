@@ -8,7 +8,7 @@ import { MapPin } from "lucide-react";
 
 export default function ManualAddressDialog({ open, onClose, onSave }) {
   const [form, setForm] = useState({
-    nome: "Consumidor",
+    nome: "",
     endereco: "",
     telefone: "",
     observacoes: "",
@@ -16,15 +16,16 @@ export default function ManualAddressDialog({ open, onClose, onSave }) {
 
   useEffect(() => {
     if (open) {
-      setForm({ nome: "Consumidor", endereco: "", telefone: "", observacoes: "" });
+      setForm({ nome: "", endereco: "", telefone: "", observacoes: "" });
     }
   }, [open]);
 
   const handleSave = () => {
     if (!form.endereco.trim()) return;
+    const nomeFinal = form.nome.trim() ? `${form.nome.trim()} (consumidor)` : "Consumidor";
     onSave({
       id: `manual-${Date.now()}`,
-      nome: "Consumidor",
+      nome: nomeFinal,
       endereco: form.endereco.trim(),
       telefone: form.telefone.trim(),
       observacoes: form.observacoes.trim(),
@@ -46,7 +47,12 @@ export default function ManualAddressDialog({ open, onClose, onSave }) {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Nome</Label>
-            <Input value="Consumidor" disabled />
+            <Input
+              value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              placeholder="Ex: João Silva"
+            />
+            <p className="text-xs text-gray-500">Será exibido como: nome + (consumidor)</p>
           </div>
 
           <div className="space-y-2">
