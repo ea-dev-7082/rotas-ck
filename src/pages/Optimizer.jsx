@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,7 @@ export default function Optimizer() {
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes', currentUser?.email],
     queryFn: async () => {
-      const allClientes = await base44.entities.Cliente.list('nome', 200);
+      const allClientes = await base44.entities.Cliente.list('nome', 80);
       return allClientes.filter(c =>
         c.owner === currentUser.email || c.created_by === currentUser.email
       );
@@ -68,7 +68,7 @@ export default function Optimizer() {
   const { data: veiculos } = useQuery({
     queryKey: ['veiculos', currentUser?.email],
     queryFn: async () => {
-      const allVeiculos = await base44.entities.Veiculo.list('descricao', 100);
+      const allVeiculos = await base44.entities.Veiculo.list('descricao', 30);
       return allVeiculos.filter(v =>
         (v.owner === currentUser.email || v.created_by === currentUser.email) && v.ativo === true
       );
@@ -80,7 +80,7 @@ export default function Optimizer() {
   const { data: motoristas } = useQuery({
     queryKey: ['motoristas', currentUser?.email],
     queryFn: async () => {
-      const allMotoristas = await base44.entities.Motorista.list('nome', 100);
+      const allMotoristas = await base44.entities.Motorista.list('nome', 30);
       return allMotoristas.filter(m =>
         (m.owner === currentUser.email || m.created_by === currentUser.email) && m.ativo === true
       );
@@ -102,8 +102,8 @@ export default function Optimizer() {
     endereco: enderecoMatriz || DEFAULT_MATRIZ
   };
 
-  const selectedVeiculoData = veiculos.find(v => v.id === selectedVeiculo);
-  const selectedMotoristaData = motoristas.find(m => m.id === selectedMotorista);
+  const selectedVeiculoData = useMemo(() => veiculos.find(v => v.id === selectedVeiculo), [veiculos, selectedVeiculo]);
+  const selectedMotoristaData = useMemo(() => motoristas.find(m => m.id === selectedMotorista), [motoristas, selectedMotorista]);
 
   // Carrega rota agendada se vier da URL
   useEffect(() => {

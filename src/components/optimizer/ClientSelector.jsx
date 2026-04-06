@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,15 +16,24 @@ export default function ClientSelector({
 }) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredClientes = clientes.filter((cliente) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      cliente.nome.toLowerCase().includes(term) ||
-      cliente.endereco.toLowerCase().includes(term) ||
-      (cliente.bairro && cliente.bairro.toLowerCase().includes(term)) ||
-      (cliente.municipio && cliente.municipio.toLowerCase().includes(term))
-    );
-  });
+  const filteredClientes = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return clientes.slice(0, 50);
+
+    return clientes.filter((cliente) => {
+      const nome = cliente.nome?.toLowerCase() || "";
+      const endereco = cliente.endereco?.toLowerCase() || "";
+      const bairro = cliente.bairro?.toLowerCase() || "";
+      const municipio = cliente.municipio?.toLowerCase() || "";
+
+      return (
+        nome.includes(term) ||
+        endereco.includes(term) ||
+        bairro.includes(term) ||
+        municipio.includes(term)
+      );
+    }).slice(0, 50);
+  }, [clientes, searchTerm]);
 
   const handleToggle = (clienteId) => {
     if (selectedClients.includes(clienteId)) {

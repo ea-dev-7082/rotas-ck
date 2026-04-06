@@ -39,7 +39,7 @@ export default function VehicleDriverSelector({
                 <SelectValue placeholder="Selecione o veículo..." />
               </SelectTrigger>
               <SelectContent>
-                {veiculos.map((v) => (
+                {veiculos.slice(0, 30).map((v) => (
                   <SelectItem key={v.id} value={v.id}>
                     <div className="flex items-center gap-2">
                       {v.tipo === "moto" ? (
@@ -66,7 +66,7 @@ export default function VehicleDriverSelector({
                 <SelectValue placeholder="Selecione o motorista..." />
               </SelectTrigger>
               <SelectContent>
-                {motoristas.map((m) => (
+                {motoristas.slice(0, 30).map((m) => (
                   <SelectItem key={m.id} value={m.id}>
                     {m.nome}
                   </SelectItem>
