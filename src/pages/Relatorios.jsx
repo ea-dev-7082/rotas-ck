@@ -209,6 +209,20 @@ export default function Relatorios() {
     setFilterLabel("Todos");
   };
 
+  useEffect(() => {
+    if (relatorios.length > 0 && !startDate && !endDate && filterLabel === "Todos") {
+      const datas = relatorios
+        .map((relatorio) => relatorio.data_impressao)
+        .filter(Boolean)
+        .sort();
+
+      if (datas.length > 0) {
+        setStartDate(moment(datas[0]).format("YYYY-MM-DD"));
+        setEndDate(moment(datas[datas.length - 1]).format("YYYY-MM-DD"));
+      }
+    }
+  }, [relatorios.length]);
+
   const handleViewDetails = (relatorio) => {
     setSelectedRelatorio(relatorio);
     // Carrega ocorrências existentes para o estado local

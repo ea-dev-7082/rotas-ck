@@ -37,13 +37,15 @@ export default function ReturnPanel({ rotas, onDismiss }) {
     const horaRetorno = rota.hora_retorno || relatorio?.hora_retorno || new Date().toISOString();
 
     try {
-      await base44.entities.RotaAgendada.update(rota.id, {
+      const rotaAtualizada = await base44.entities.RotaAgendada.update(rota.id, {
         status: "concluido",
         hora_retorno: horaRetorno,
       });
 
+      const rotaMaisRecente = rotaAtualizada || rota;
+
       if (relatorio) {
-        const rotaRealAtualizada = (rota.rota || []).map((item) => ({
+        const rotaRealAtualizada = (rotaMaisRecente.rota || []).map((item) => ({
           order: item.order,
           client_name: item.client_name,
           address: item.address,
@@ -70,6 +72,7 @@ export default function ReturnPanel({ rotas, onDismiss }) {
       queryClient.invalidateQueries({ queryKey: ["rotas-em-andamento"] });
       queryClient.invalidateQueries({ queryKey: ["relatorios"] });
       queryClient.invalidateQueries({ queryKey: ["relatorios-vinculados"] });
+      queryClient.invalidateQueries({ queryKey: ["agendados"] });
     } catch (error) {
       console.error("Erro ao finalizar rota:", error);
     } finally {
