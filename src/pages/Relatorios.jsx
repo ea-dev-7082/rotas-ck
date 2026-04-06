@@ -71,8 +71,7 @@ export default function Relatorios() {
     currentUser ?
     base44.entities.Relatorio.filter(
       { owner: currentUser.email },
-      "-created_date",
-      100
+      "-created_date"
     ) :
     [],
     enabled: !!currentUser,
@@ -587,11 +586,13 @@ export default function Relatorios() {
                       </motion.div>
                   )}
                   </AnimatePresence>
-                  <InfiniteScrollSentinel
-                    onLoadMore={handleLoadMoreRelatorios}
-                    hasMore={hasMoreRelatorios}
-                    isLoading={isLoading}
-                  />
+                  {hasMoreRelatorios && (
+                    <InfiniteScrollSentinel
+                      onLoadMore={handleLoadMoreRelatorios}
+                      hasMore={hasMoreRelatorios}
+                      isLoading={isLoading}
+                    />
+                  )}
                 </div>
               </ScrollArea>
             }

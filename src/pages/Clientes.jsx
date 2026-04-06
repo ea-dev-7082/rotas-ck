@@ -560,14 +560,18 @@ export default function Clientes() {
                       </motion.div>
                     ))}
                   </AnimatePresence>
-                  <InfiniteScrollSentinel
-                    onLoadMore={handleLoadMoreClientes}
-                    hasMore={hasMoreClientes}
-                    isLoading={isLoading}
-                  />
-                  </div>
+                  {hasMoreClientes && (
+                    <div className="md:col-span-2">
+                      <InfiniteScrollSentinel
+                        onLoadMore={handleLoadMoreClientes}
+                        hasMore={hasMoreClientes}
+                        isLoading={isLoading}
+                      />
+                    </div>
                   )}
-                  </ScrollArea>
+                </div>
+              )}
+            </ScrollArea>
           </CardContent>
         </Card>
 
