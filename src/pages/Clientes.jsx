@@ -50,7 +50,8 @@ export default function Clientes() {
   const [isImporting, setIsImporting] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [visibleCount, setVisibleCount] = useState(40);
+  const [page, setPage] = useState(1);
+  const pageSize = 30;
 
   const fileInputRef = useRef(null);
 
@@ -74,10 +75,10 @@ export default function Clientes() {
   }, []);
 
   const { data: clientes, isLoading } = useQuery({
-    queryKey: ["clientes", currentUser?.email],
+    queryKey: ["clientes", currentUser?.email, page],
     queryFn: async () => {
-      const allClientes = await base44.entities.Cliente.list("nome", 80);
-      return allClientes;
+      const pageClientes = await base44.entities.Cliente.list("nome", pageSize, (page - 1) * pageSize);
+      return pageClientes;
     },
     enabled: !!currentUser,
     initialData: [],
@@ -102,12 +103,14 @@ export default function Clientes() {
     );
   });
 
-  const visibleClientes = filteredClientes.slice(0, visibleCount);
-  const hasMoreClientes = visibleClientes.length < filteredClientes.length;
+  const visibleClientes = filteredClientes;
+  const hasMoreClientes = !searchTerm && clientes.length === pageSize;
 
   const handleLoadMoreClientes = useCallback(() => {
-    setVisibleCount((prev) => prev + 40);
-  }, []);
+    if (!searchTerm) {
+      setPage((prev) => prev + 1);
+    }
+  }, [searchTerm]);
 
   // Filtragem de clientes para o dropdown de busca no campo endereço alternativo
   const clienteSearchResults = clientes.filter((cliente) => {
@@ -326,8 +329,8 @@ export default function Clientes() {
   };
 
   useEffect(() => {
-    setVisibleCount(40);
-  }, [searchTerm, clientes.length]);
+    setPage(1);
+  }, [searchTerm]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
