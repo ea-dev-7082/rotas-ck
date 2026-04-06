@@ -48,13 +48,16 @@ export default function Optimizer() {
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes', currentUser?.email],
     queryFn: async () => {
-      const pageSize = 500;
-      const loadedPages = await Promise.all(
-        Array.from({ length: 6 }, (_, index) =>
-          base44.entities.Cliente.list('nome', pageSize, index * pageSize)
-        )
-      );
-      return loadedPages.flat();
+      const BATCH = 500;
+      let all = [];
+      let offset = 0;
+      while (true) {
+        const batch = await base44.entities.Cliente.list('nome', BATCH, offset);
+        all = all.concat(batch);
+        if (batch.length < BATCH) break;
+        offset += BATCH;
+      }
+      return all;
     },
     enabled: !!currentUser,
     initialData: [],
