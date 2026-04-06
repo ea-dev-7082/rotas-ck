@@ -48,7 +48,12 @@ export default function Optimizer() {
 
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Cliente.list('nome') : [],
+    queryFn: async () => {
+      const allClientes = await base44.entities.Cliente.list('nome');
+      return allClientes.filter(c =>
+        c.owner === currentUser.email || c.created_by === currentUser.email
+      );
+    },
     enabled: !!currentUser,
     initialData: [],
     staleTime: 5 * 60 * 1000,
@@ -63,14 +68,24 @@ export default function Optimizer() {
 
   const { data: veiculos } = useQuery({
     queryKey: ['veiculos', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Veiculo.filter({ owner: currentUser.email, ativo: true }, 'descricao') : [],
+    queryFn: async () => {
+      const allVeiculos = await base44.entities.Veiculo.list('descricao');
+      return allVeiculos.filter(v =>
+        (v.owner === currentUser.email || v.created_by === currentUser.email) && v.ativo === true
+      );
+    },
     enabled: !!currentUser,
     initialData: [],
   });
 
   const { data: motoristas } = useQuery({
     queryKey: ['motoristas', currentUser?.email],
-    queryFn: () => currentUser ? base44.entities.Motorista.filter({ owner: currentUser.email, ativo: true }, 'nome') : [],
+    queryFn: async () => {
+      const allMotoristas = await base44.entities.Motorista.list('nome');
+      return allMotoristas.filter(m =>
+        (m.owner === currentUser.email || m.created_by === currentUser.email) && m.ativo === true
+      );
+    },
     enabled: !!currentUser,
     initialData: [],
   });
