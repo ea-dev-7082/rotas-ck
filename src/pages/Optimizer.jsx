@@ -48,11 +48,17 @@ export default function Optimizer() {
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes', currentUser?.email],
     queryFn: async () => {
+      if (!currentUser) return [];
       const BATCH = 500;
       let all = [];
       let offset = 0;
       while (true) {
-        const batch = await base44.entities.Cliente.list('nome', BATCH, offset);
+        const batch = await base44.entities.Cliente.filter(
+          { created_by: currentUser.email },
+          'nome',
+          BATCH,
+          offset
+        );
         all = all.concat(batch);
         if (batch.length < BATCH) break;
         offset += BATCH;

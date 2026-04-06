@@ -74,21 +74,40 @@ export default function Clientes() {
     base44.auth.me().then(setCurrentUser);
   }, []);
 
-  const { data: clientes, isLoading } = useQuery({
+  // Acumula clientes ao longo das páginas
+  const [allClientes, setAllClientes] = useState([]);
+
+  const { data: clientesPage, isLoading } = useQuery({
     queryKey: ["clientes", currentUser?.email, page],
     queryFn: async () => {
-      const loadedPages = await Promise.all(
-        Array.from({ length: page }, (_, index) =>
-          base44.entities.Cliente.list("nome", pageSize, index * pageSize)
-        )
+      if (!currentUser) return [];
+      return base44.entities.Cliente.filter(
+        { created_by: currentUser.email },
+        "nome",
+        pageSize,
+        (page - 1) * pageSize
       );
-      return loadedPages.flat();
     },
     enabled: !!currentUser,
     initialData: [],
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
     gcTime: 0,
   });
+
+  useEffect(() => {
+    if (!clientesPage || clientesPage.length === 0) return;
+    if (page === 1) {
+      setAllClientes(clientesPage);
+    } else {
+      setAllClientes(prev => {
+        const existingIds = new Set(prev.map(c => c.id));
+        const newOnes = clientesPage.filter(c => !existingIds.has(c.id));
+        return [...prev, ...newOnes];
+      });
+    }
+  }, [clientesPage, page]);
+
+  const clientes = allClientes;
 
   // Filtragem de clientes (nome, telefone ou endereço)
   const filteredClientes = clientes.filter((cliente) => {
@@ -109,7 +128,7 @@ export default function Clientes() {
   });
 
   const visibleClientes = filteredClientes;
-  const hasMoreClientes = !searchTerm && clientes.length === page * pageSize;
+  const hasMoreClientes = !searchTerm && (clientesPage?.length === pageSize);
 
   const handleLoadMoreClientes = useCallback(() => {
     if (!searchTerm) {
@@ -335,7 +354,8 @@ export default function Clientes() {
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm]);
+    setAllClientes([]);
+  }, [searchTerm, currentUser?.email]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
