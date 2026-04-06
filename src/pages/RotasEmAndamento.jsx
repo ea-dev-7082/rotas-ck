@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { format } from "date-fns";
 import {
   Truck, Clock, CheckCircle2, Package, Eye, RefreshCw,
-  User, History, Home, PanelRightOpen, PanelRightClose, Loader2,
+  User, History, Home, PanelRightOpen, PanelRightClose, Loader2, Wifi, WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,8 @@ import ReturnPanel from "@/components/emrota/ReturnPanel";
 import HistoricoDiaDialog from "@/components/emrota/HistoricoDiaDialog";
 
 const API_BATCH_SIZE = 50;
+const POLL_INTERVAL = 20000;     // Polling a cada 20s (seguro e confiável)
+const FETCH_THROTTLE = 5000;     // Min 5s entre fetches (subscribe + poll não colidem)
 
 /**
  * Busca TODOS os registros de uma entidade com filtro, paginando em batches.
@@ -49,9 +51,12 @@ export default function RotasEmAndamento() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isLive, setIsLive] = useState(true);
 
-  // Throttle para subscribe
-  const lastInvalidation = useRef(0);
+  // Controle de throttle e lifecycle
+  const lastFetchTime = useRef(0);
+  const pollIntervalRef = useRef(null);
+  const isMounted = useRef(true);
 
   // ========== AUTH ==========
   useEffect(() => {
@@ -61,10 +66,25 @@ export default function RotasEmAndamento() {
       .catch((err) => console.error("Erro ao carregar usuário:", err));
   }, []);
 
-  // ========== CARREGAMENTO COM PAGINAÇÃO COMPLETA ==========
+  // ========== CLEANUP ==========
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // ========== CARREGAMENTO COM PAGINAÇÃO + THROTTLE ==========
   const loadRotas = useCallback(
     async (silent = false) => {
       if (!currentUser?.email) return;
+
+      // Throttle: ignora se buscou há menos de FETCH_THROTTLE ms
+      const now = Date.now();
+      if (silent && now - lastFetchTime.current < FETCH_THROTTLE) {
+        return;
+      }
+      lastFetchTime.current = now;
 
       if (!silent) setIsLoading(true);
       else setIsRefreshing(true);
@@ -79,7 +99,6 @@ export default function RotasEmAndamento() {
         const today = format(new Date(), "yyyy-MM-dd");
 
         const filtered = allRotas.filter((r) => {
-          // Se fechado_retorno = true, NUNCA mostra
           if (r.fechado_retorno === true) return false;
 
           return (
@@ -92,51 +111,118 @@ export default function RotasEmAndamento() {
           );
         });
 
-        setRotasEmAndamento(filtered);
-        setLastUpdated(new Date());
+        if (isMounted.current) {
+          setRotasEmAndamento(filtered);
+          setLastUpdated(new Date());
+        }
       } catch (error) {
         console.error("Erro ao carregar rotas:", error);
-        if (!silent) setRotasEmAndamento([]);
+        if (!silent && isMounted.current) setRotasEmAndamento([]);
       } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
+        if (isMounted.current) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
       }
     },
     [currentUser?.email]
   );
 
+  // ========== CARREGAMENTO INICIAL ==========
   useEffect(() => {
     if (currentUser?.email) {
       loadRotas();
     }
   }, [currentUser?.email, loadRotas]);
 
-  // ========== TEMPO REAL VIA SUBSCRIBE (sem polling redundante) ==========
+  // ========== POLLING COMO MECANISMO PRINCIPAL ==========
   useEffect(() => {
     if (!currentUser?.email) return;
 
-    const unsubscribe = base44.entities.RotaAgendada.subscribe(() => {
-      const now = Date.now();
-      // Throttle: máximo 1 refresh a cada 5s
-      if (now - lastInvalidation.current > 5000) {
-        lastInvalidation.current = now;
+    // Verifica se há rotas ativas que precisam de atualização
+    const hasActiveRoutes =
+      rotasEmAndamento.length === 0 || // Ainda carregando, precisa checar
+      rotasEmAndamento.some(
+        (r) => r.status !== "concluido" && r.status !== "cancelado"
+      );
+
+    if (hasActiveRoutes) {
+      pollIntervalRef.current = setInterval(() => {
         loadRotas(true);
+      }, POLL_INTERVAL);
+      setIsLive(true);
+    } else {
+      setIsLive(false);
+    }
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
       }
-    });
+    };
+  }, [currentUser?.email, loadRotas, rotasEmAndamento]);
+
+  // ========== SUBSCRIBE COMO ACELERADOR (complementar ao polling) ==========
+  useEffect(() => {
+    if (!currentUser?.email) return;
+
+    let unsubscribe;
+    try {
+      unsubscribe = base44.entities.RotaAgendada.subscribe(() => {
+        // Subscribe acelera: dispara fetch respeitando throttle
+        loadRotas(true);
+      });
+    } catch (error) {
+      console.warn("Subscribe não disponível, usando apenas polling:", error);
+    }
 
     return () => {
       if (typeof unsubscribe === "function") unsubscribe();
     };
   }, [currentUser?.email, loadRotas]);
 
+  // ========== VISIBILITY API: pausa/retoma ao trocar aba ==========
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        lastFetchTime.current = 0; // Bypass throttle
+        loadRotas(true);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadRotas]);
+
   // ========== REFRESH MANUAL ==========
   const handleRefresh = useCallback(() => {
-    if (!isRefreshing) loadRotas(true);
+    if (!isRefreshing) {
+      lastFetchTime.current = 0; // Bypass throttle
+      loadRotas(true);
+    }
   }, [isRefreshing, loadRotas]);
 
   // ========== DISMISS ROUTE (retorno) ==========
   const handleDismissRoute = useCallback((rotaId) => {
     setDismissedRouteIds((prev) => new Set([...prev, rotaId]));
+    // Também remove do state local para resposta instantânea
+    setRotasEmAndamento((prev) =>
+      prev.map((r) =>
+        r.id === rotaId ? { ...r, fechado_retorno: true } : r
+      )
+    );
+  }, []);
+
+  // ========== ROTA UPDATED (callback do ReturnPanel) ==========
+  const handleRotaUpdated = useCallback((rotaId, newStatus) => {
+    setRotasEmAndamento((prev) =>
+      prev.map((r) =>
+        r.id === rotaId ? { ...r, status: newStatus } : r
+      )
+    );
   }, []);
 
   // ========== CÁLCULOS DERIVADOS ==========
@@ -161,6 +247,7 @@ export default function RotasEmAndamento() {
   // Rotas para o painel de retorno
   const rotasRetorno = useMemo(() => {
     return rotasEmAndamento.filter((rota) => {
+      if (rota.fechado_retorno === true) return false;
       if (dismissedRouteIds.has(rota.id)) return false;
       if (rota.status === "concluido") return true;
 
@@ -175,6 +262,7 @@ export default function RotasEmAndamento() {
   // Rotas ativas (cards principais)
   const rotasAtivas = useMemo(() => {
     return rotasEmAndamento.filter((rota) => {
+      if (rota.fechado_retorno === true) return false;
       if (rota.status === "concluido") return false;
       if (dismissedRouteIds.has(rota.id)) return false;
 
@@ -204,11 +292,26 @@ export default function RotasEmAndamento() {
               <Truck className="w-7 h-7 text-blue-600" />
               Rotas em Andamento
             </h1>
-            <p className="text-gray-500 mt-1">
+            <p className="text-gray-500 mt-1 flex items-center gap-2 flex-wrap">
               Acompanhe as entregas em tempo real
+              {/* Indicador ao vivo */}
+              {isLive ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-green-600">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                  </span>
+                  Ao vivo
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                  <WifiOff className="w-3 h-3" />
+                  Pausado
+                </span>
+              )}
               {lastUpdated && (
-                <span className="text-gray-400 ml-2">
-                  • Atualizado às {format(lastUpdated, "HH:mm:ss")}
+                <span className="text-xs text-gray-400">
+                  • {format(lastUpdated, "HH:mm:ss")}
                 </span>
               )}
             </p>
@@ -316,8 +419,7 @@ export default function RotasEmAndamento() {
                             <CardTitle className="text-lg flex items-center gap-2">
                               <User className="w-4 h-4 text-gray-400 shrink-0" />
                               <span className="truncate">
-                                {rota.motorista_nome ||
-                                  "Motorista não definido"}
+                                {rota.motorista_nome || "Motorista não definido"}
                               </span>
                             </CardTitle>
                             <p className="text-sm text-gray-500 mt-1 truncate">
@@ -341,25 +443,19 @@ export default function RotasEmAndamento() {
                             <div className="text-lg font-bold text-green-600">
                               {contagem.entregues}
                             </div>
-                            <div className="text-xs text-gray-500">
-                              Entregues
-                            </div>
+                            <div className="text-xs text-gray-500">Entregues</div>
                           </div>
                           <div className="p-2 bg-yellow-50 rounded">
                             <div className="text-lg font-bold text-yellow-600">
                               {contagem.pendentes}
                             </div>
-                            <div className="text-xs text-gray-500">
-                              Pendentes
-                            </div>
+                            <div className="text-xs text-gray-500">Pendentes</div>
                           </div>
                           <div className="p-2 bg-red-50 rounded">
                             <div className="text-lg font-bold text-red-600">
                               {contagem.problemas}
                             </div>
-                            <div className="text-xs text-gray-500">
-                              Problemas
-                            </div>
+                            <div className="text-xs text-gray-500">Problemas</div>
                           </div>
                         </div>
 
@@ -377,14 +473,8 @@ export default function RotasEmAndamento() {
                           <div className="flex items-center gap-1">
                             <Clock className="w-4 h-4" />
                             {rota.data_prevista
-                              ? format(
-                                  new Date(rota.data_prevista),
-                                  "dd/MM/yyyy"
-                                )
-                              : format(
-                                  new Date(rota.created_date),
-                                  "dd/MM/yyyy"
-                                )}
+                              ? format(new Date(rota.data_prevista), "dd/MM/yyyy")
+                              : format(new Date(rota.created_date), "dd/MM/yyyy")}
                           </div>
                           {rota.total_volumes > 0 && (
                             <div className="flex items-center gap-1">
@@ -395,9 +485,7 @@ export default function RotasEmAndamento() {
                         </div>
 
                         <Button asChild className="w-full" variant="outline">
-                          <Link
-                            to={`${createPageUrl("EmRota")}?rotaId=${rota.id}`}
-                          >
+                          <Link to={`${createPageUrl("EmRota")}?rotaId=${rota.id}`}>
                             <Eye className="w-4 h-4 mr-2" />
                             Ver Detalhes
                           </Link>
@@ -424,6 +512,7 @@ export default function RotasEmAndamento() {
                 <ReturnPanel
                   rotas={rotasRetorno}
                   onDismiss={handleDismissRoute}
+                  onRotaUpdated={handleRotaUpdated}
                 />
               </div>
             </div>
@@ -443,6 +532,7 @@ export default function RotasEmAndamento() {
             <ReturnPanel
               rotas={rotasRetorno}
               onDismiss={handleDismissRoute}
+              onRotaUpdated={handleRotaUpdated}
             />
           </div>
         )}
