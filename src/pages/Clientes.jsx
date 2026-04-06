@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 import { base44 } from "@/api/base44Client";
 
@@ -42,6 +42,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
+import InfiniteScrollSentinel from "@/components/common/InfiniteScrollSentinel";
 
 export default function Clientes() {
   const [showDialog, setShowDialog] = useState(false);
@@ -49,6 +50,7 @@ export default function Clientes() {
   const [isImporting, setIsImporting] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [visibleCount, setVisibleCount] = useState(40);
 
   const fileInputRef = useRef(null);
 
@@ -99,6 +101,13 @@ export default function Clientes() {
       enderecoStr.includes(term)
     );
   });
+
+  const visibleClientes = filteredClientes.slice(0, visibleCount);
+  const hasMoreClientes = visibleClientes.length < filteredClientes.length;
+
+  const handleLoadMoreClientes = useCallback(() => {
+    setVisibleCount((prev) => prev + 40);
+  }, []);
 
   // Filtragem de clientes para o dropdown de busca no campo endereço alternativo
   const clienteSearchResults = clientes.filter((cliente) => {
@@ -316,6 +325,10 @@ export default function Clientes() {
     alert(`${deletedCount} clientes excluídos.`);
   };
 
+  useEffect(() => {
+    setVisibleCount(40);
+  }, [searchTerm, clientes.length]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (editingCliente) {
@@ -468,7 +481,7 @@ export default function Clientes() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <AnimatePresence>
-                    {filteredClientes.map((cliente) => (
+                    {visibleClientes.map((cliente) => (
                       <motion.div
                         key={cliente.id}
                         initial={{ opacity: 0, scale: 0.95 }}
@@ -547,9 +560,14 @@ export default function Clientes() {
                       </motion.div>
                     ))}
                   </AnimatePresence>
-                </div>
-              )}
-            </ScrollArea>
+                  <InfiniteScrollSentinel
+                    onLoadMore={handleLoadMoreClientes}
+                    hasMore={hasMoreClientes}
+                    isLoading={isLoading}
+                  />
+                  </div>
+                  )}
+                  </ScrollArea>
           </CardContent>
         </Card>
 

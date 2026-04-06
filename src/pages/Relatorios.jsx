@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import moment from "moment";
 import { format } from "date-fns";
 import RoteiroEntregaDialog from "../components/relatorios/RoteiroEntregaDialog";
+import InfiniteScrollSentinel from "@/components/common/InfiniteScrollSentinel";
 
 export default function Relatorios() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -51,6 +52,7 @@ export default function Relatorios() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [showTimeDialog, setShowTimeDialog] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(30);
 
   // Ocorrências (Estado local para edição no modal)
   const [occurrences, setOccurrences] = useState({});
@@ -83,12 +85,10 @@ export default function Relatorios() {
     return relatorios.filter((relatorio) => {
       const dataRelatorio = moment(relatorio.data_impressao);
       
-      // Filtro de data
       if (startDate || endDate) {
         let start = startDate ? moment(startDate) : null;
         let end = endDate ? moment(endDate) : null;
         
-        // Aplica horário se definido
         if (start) {
           if (startTime) {
             const [h, m] = startTime.split(':');
@@ -110,13 +110,11 @@ export default function Relatorios() {
         if (end && dataRelatorio.isAfter(end)) return false;
       }
 
-      // Filtro de motorista
       if (searchMotorista) {
         const motoristaNome = (relatorio.motorista_nome || "").toLowerCase();
         if (!motoristaNome.includes(searchMotorista.toLowerCase())) return false;
       }
 
-      // Filtro de nota fiscal
       if (searchNotaFiscal) {
         const rota = relatorio.rota || [];
         const notasEncontradas = rota.some(item => {
@@ -134,6 +132,13 @@ export default function Relatorios() {
     });
   }, [relatorios, startDate, endDate, startTime, endTime, searchMotorista, searchNotaFiscal]);
 
+  const visibleRelatorios = filteredRelatorios.slice(0, visibleCount);
+  const hasMoreRelatorios = visibleRelatorios.length < filteredRelatorios.length;
+
+  const handleLoadMoreRelatorios = useCallback(() => {
+    setVisibleCount((prev) => prev + 30);
+  }, []);
+
   // --- ESTATÍSTICAS (RESUMO DETALHADO) ---
   const stats = useMemo(() => {
     return filteredRelatorios.reduce(
@@ -146,6 +151,10 @@ export default function Relatorios() {
       { totalRotas: 0, totalEntregas: 0, totalKm: 0, totalTempo: 0 }
     );
   }, [filteredRelatorios]);
+
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [startDate, endDate, startTime, endTime, searchMotorista, searchNotaFiscal, relatorios.length]);
 
   // --- MUTAÇÕES ---
   const deleteMutation = useMutation({
@@ -495,7 +504,7 @@ export default function Relatorios() {
             <ScrollArea className="max-h-[600px]">
                 <div className="space-y-4">
                   <AnimatePresence>
-                    {filteredRelatorios.map((relatorio) =>
+                    {visibleRelatorios.map((relatorio) =>
                   <motion.div
                     key={relatorio.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -578,6 +587,11 @@ export default function Relatorios() {
                       </motion.div>
                   )}
                   </AnimatePresence>
+                  <InfiniteScrollSentinel
+                    onLoadMore={handleLoadMoreRelatorios}
+                    hasMore={hasMoreRelatorios}
+                    isLoading={isLoading}
+                  />
                 </div>
               </ScrollArea>
             }
