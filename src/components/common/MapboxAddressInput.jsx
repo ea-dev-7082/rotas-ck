@@ -28,7 +28,7 @@ export default function MapboxAddressInput({
 
   const fetchSuggestions = useCallback(
     async (query) => {
-      if (!query || query.trim().length < 3) {
+      if (!query || query.trim().length < 2) {
         setSuggestions([]);
         setShowDropdown(false);
         return;
@@ -37,7 +37,7 @@ export default function MapboxAddressInput({
       setIsSearching(true);
       try {
         const encoded = encodeURIComponent(query.trim());
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${token}&country=BR&limit=3&language=pt&types=address,neighborhood,locality,place,region`;
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${token}&country=BR&limit=5&language=pt&types=address,neighborhood,locality,place,region`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Geocoding HTTP ${res.status}`);
         const data = await res.json();
@@ -132,7 +132,7 @@ export default function MapboxAddressInput({
         <ul
           ref={dropdownRef}
           className="absolute z-[9999] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
-          // Impede que o blur do input feche o dropdown antes do clique registrar
+          style={{ position: "absolute", zIndex: 99999 }}
           onMouseDown={(e) => e.preventDefault()}
         >
           {suggestions.map((s, i) => (
