@@ -35,6 +35,7 @@ export default function MapboxAddressInput({
       }
 
       setIsSearching(true);
+      isSearchingRef.current = true;
       try {
         const encoded = encodeURIComponent(query.trim());
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${token}&country=BR&limit=5&language=pt&types=address,neighborhood,locality,place,region`;
@@ -43,6 +44,7 @@ export default function MapboxAddressInput({
         const data = await res.json();
 
         const features = data.features || [];
+        console.log("[Mapbox] features recebidas:", features.length, features.map(f => f.place_name));
         const mapped = features.map((f) => {
           const ctx = f.context || [];
           const bairro =
@@ -71,6 +73,7 @@ export default function MapboxAddressInput({
         setShowDropdown(false);
       } finally {
         setIsSearching(false);
+        isSearchingRef.current = false;
       }
     },
     [token]
@@ -86,14 +89,17 @@ export default function MapboxAddressInput({
     }, 350);
   };
 
-  // Fecha via blur, mas só se não estiver no meio de uma seleção
+  const isSearchingRef = useRef(false);
+
+  // Fecha via blur, mas só se não estiver no meio de uma seleção ou carregando
   const handleBlur = () => {
     setTimeout(() => {
-      if (!isSelectingRef.current) {
+      if (!isSelectingRef.current && !isSearchingRef.current) {
         setShowDropdown(false);
+        setSuggestions([]);
       }
       isSelectingRef.current = false;
-    }, 150);
+    }, 500);
   };
 
   const handleSelect = (suggestion) => {
