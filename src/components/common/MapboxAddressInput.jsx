@@ -1,7 +1,7 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { MapPin, Loader2 } from "lucide-react";
-import { MAPBOX_TOKEN } from "@/components/optimizer/mapboxService";
+import { base44 } from "@/api/base44Client";
 
 /**
  * Campo de endereço com autocompleção via Mapbox Geocoding API.
@@ -16,7 +16,6 @@ export default function MapboxAddressInput({
   disabled = false,
   className = "",
 }) {
-  const token = mapboxToken || MAPBOX_TOKEN;
   const [suggestions, setSuggestions] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -37,14 +36,8 @@ export default function MapboxAddressInput({
       setIsSearching(true);
       isSearchingRef.current = true;
       try {
-        const encoded = encodeURIComponent(query.trim());
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${token}&country=BR&limit=5&language=pt&types=address,neighborhood,locality,place,region`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Geocoding HTTP ${res.status}`);
-        const data = await res.json();
-
-        const features = data.features || [];
-        console.log("[Mapbox] features recebidas:", features.length, features.map(f => f.place_name));
+        const res = await base44.functions.invoke("mapboxGeocode", { query, limit: 5 });
+        const features = (res.data?.features) || [];
         const mapped = features.map((f) => {
           const ctx = f.context || [];
           const bairro =
@@ -76,7 +69,7 @@ export default function MapboxAddressInput({
         isSearchingRef.current = false;
       }
     },
-    [token]
+    []
   );
 
   const handleChange = (e) => {
