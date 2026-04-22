@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MapPin } from "lucide-react";
+import MapboxAddressInput from "@/components/common/MapboxAddressInput";
 
 export default function ManualAddressDialog({ open, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -12,11 +13,13 @@ export default function ManualAddressDialog({ open, onClose, onSave }) {
     endereco: "",
     telefone: "",
     observacoes: "",
+    latitude: null,
+    longitude: null,
   });
 
   useEffect(() => {
     if (open) {
-      setForm({ nome: "", endereco: "", telefone: "", observacoes: "" });
+      setForm({ nome: "", endereco: "", telefone: "", observacoes: "", latitude: null, longitude: null });
     }
   }, [open]);
 
@@ -29,6 +32,8 @@ export default function ManualAddressDialog({ open, onClose, onSave }) {
       endereco: form.endereco.trim(),
       telefone: form.telefone.trim(),
       observacoes: form.observacoes.trim(),
+      latitude: form.latitude || null,
+      longitude: form.longitude || null,
       isManual: true,
     });
     onClose();
@@ -57,10 +62,18 @@ export default function ManualAddressDialog({ open, onClose, onSave }) {
 
           <div className="space-y-2">
             <Label>Endereço completo</Label>
-            <Input
+            <MapboxAddressInput
               value={form.endereco}
-              onChange={(e) => setForm({ ...form, endereco: e.target.value })}
-              placeholder="Rua, número, bairro, cidade"
+              onChange={(val) => setForm({ ...form, endereco: val })}
+              onSelect={(s) =>
+                setForm((prev) => ({
+                  ...prev,
+                  endereco: s.place_name,
+                  latitude: s.latitude,
+                  longitude: s.longitude,
+                }))
+              }
+              placeholder="Rua, número, bairro, cidade..."
             />
           </div>
 

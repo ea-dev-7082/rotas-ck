@@ -43,6 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
 import InfiniteScrollSentinel from "@/components/common/InfiniteScrollSentinel";
+import MapboxAddressInput from "@/components/common/MapboxAddressInput";
 
 // Hook de debounce para a busca
 function useDebouncedValue(value, delay = 300) {
@@ -688,15 +689,18 @@ export default function Clientes() {
 
               <div className="space-y-2">
                 <Label htmlFor="endereco">Endereço da Loja *</Label>
-                <Textarea
-                  id="endereco"
+                <MapboxAddressInput
                   value={formData.endereco}
-                  onChange={(e) =>
-                    setFormData({ ...formData, endereco: e.target.value })
+                  onChange={(val) => setFormData({ ...formData, endereco: val })}
+                  onSelect={(s) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      endereco: s.place_name,
+                      bairro: s.bairro || prev.bairro,
+                      municipio: s.municipio || prev.municipio,
+                    }))
                   }
                   placeholder="Ex: Rua Augusta, 1234 - Consolação, São Paulo - SP"
-                  className="min-h-[80px]"
-                  required
                 />
               </div>
 
@@ -749,17 +753,18 @@ export default function Clientes() {
                   )}
                 </div>
 
-                <Textarea
-                  id="endereco_entrega"
+                <MapboxAddressInput
                   value={formData.endereco_entrega}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      endereco_entrega: e.target.value,
-                    })
+                  onChange={(val) =>
+                    setFormData({ ...formData, endereco_entrega: val })
+                  }
+                  onSelect={(s) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      endereco_entrega: s.place_name,
+                    }))
                   }
                   placeholder="Ex: Av. Industrial, 500 - Galpão 3, Zona Industrial"
-                  className="min-h-[60px] bg-white"
                 />
                 {formData.endereco_entrega && (
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-orange-200">
